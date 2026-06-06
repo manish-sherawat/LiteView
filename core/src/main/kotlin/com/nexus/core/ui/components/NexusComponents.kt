@@ -262,7 +262,11 @@ fun NexusDialog(
                     Box(modifier = Modifier.padding(bottom = 16.dp)) { title() }
                 }
                 if (text != null) {
-                    Box(modifier = Modifier.padding(bottom = 24.dp)) { text() }
+                    Box(modifier = Modifier
+                        .padding(bottom = 24.dp)
+                        .weight(1f, fill = false)
+                        .androidx.compose.foundation.verticalScroll(androidx.compose.foundation.rememberScrollState())
+                    ) { text() }
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
