@@ -822,6 +822,7 @@ private data class ChangelogEntry(val version: String, val date: String, val not
 @Composable
 private fun ChangelogDialog(onDismiss: () -> Unit) {
     val changelog = listOf(
+        ChangelogEntry("v1.2.3", "June 2026", listOf("Fixed text disappearing when long pressing dashboard tabs", "Improved long-press responsiveness on navigation tabs")),
         ChangelogEntry("v1.2.2", "June 2026", listOf("Implemented File Details dialog", "Fixed secure file sharing", "Fixed star icon visual toggle", "Made update release notes scrollable", "Polished Settings UI with new icons")),
         ChangelogEntry("v1.2.0", "June 2026", listOf("Renamed app to LiteView", "Added smooth spring-bounce UI animations", "Redesigned Settings with Changelog timeline", "Performance optimizations for large PDFs")),
         ChangelogEntry("v1.1.5", "May 2026", listOf("Integrated built-in Document Scanner (CameraX & ML Kit)", "Improved offline document caching", "Added quick actions to Dashboard")),

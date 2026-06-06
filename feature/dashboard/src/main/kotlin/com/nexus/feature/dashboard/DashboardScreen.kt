@@ -313,16 +313,34 @@ fun DashboardScreen(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun TabButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
     val bgColor = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.surfaceVariant
     val textColor = if (isSelected) NexusTheme.colors.onPrimary else NexusTheme.colors.textPrimary
     
+    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = androidx.compose.animation.core.spring(
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy
+        ),
+        label = "pressScale"
+    )
+
     Box(
         modifier = Modifier
+            .androidx.compose.ui.draw.scale(scale)
             .clip(NexusTheme.shapes.pill)
             .background(bgColor)
-            .springBounceClick(onClick = { onClick() })
+            .androidx.compose.foundation.combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+                onLongClick = onClick
+            )
             .padding(horizontal = 24.dp, vertical = 12.dp)
     ) {
         NexusText(
