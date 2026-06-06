@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="https://raw.githubusercontent.com/manish-sherawat/LiteView/main/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="80" alt="LiteView Logo"/><br/>
+  <img src="https://github.com/manish-sherawat/LiteView/edit/main/assets/logo.png" width="80" alt="LiteView Logo"/><br/>
   LiteView
 </h1>
 
