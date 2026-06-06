@@ -304,7 +304,7 @@ fun SettingsScreen(
                             value = when (updateState) {
                                 is UpdateState.Checking -> "Checking..."
                                 is UpdateState.Downloading -> "Downloading..."
-                                else -> "Check GitHub"
+                                else -> "Check for Updates"
                             },
                             onClick = { viewModel.checkForUpdates() }
                         )
