@@ -48,6 +48,7 @@ fun DashboardScreen(
     val context = LocalContext.current
     
     var isPermissionGranted by remember { mutableStateOf(viewModel.hasStoragePermission(context)) }
+    var detailsDialogDoc by remember { mutableStateOf<com.nexus.feature.dashboard.data.RecentDocument?>(null) }
 
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -251,7 +252,7 @@ fun DashboardScreen(
                             },
                             onLongClick = { viewModel.toggleSelection(uiModel.doc.uri) },
                             onRemove = { viewModel.removeDocument(uiModel.doc.uri) },
-                            onShowDetails = { },
+                            onShowDetails = { detailsDialogDoc = uiModel.doc },
                             onShare = { viewModel.shareDocument(uiModel.doc.uri) },
                             onRename = { newName -> viewModel.renameDocument(uiModel.doc.uri, newName) },
                             isSelectionMode = uiState.isSelectionMode,
@@ -275,7 +276,7 @@ fun DashboardScreen(
                             },
                             onLongClick = { viewModel.toggleSelection(uiModel.doc.uri) },
                             onRemove = { viewModel.removeDocument(uiModel.doc.uri) },
-                            onShowDetails = { },
+                            onShowDetails = { detailsDialogDoc = uiModel.doc },
                             onShare = { viewModel.shareDocument(uiModel.doc.uri) },
                             onRename = { newName -> viewModel.renameDocument(uiModel.doc.uri, newName) },
                             isSelectionMode = uiState.isSelectionMode,
@@ -284,6 +285,30 @@ fun DashboardScreen(
                     }
                 }
             }
+        }
+
+        detailsDialogDoc?.let { doc ->
+            com.nexus.core.ui.components.NexusDialog(
+                onDismissRequest = { detailsDialogDoc = null },
+                title = { NexusText("File Details", style = NexusTheme.typography.h2) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        NexusText("Name: ${doc.fileName}", style = NexusTheme.typography.body)
+                        NexusText("Type: ${doc.documentType}", style = NexusTheme.typography.body)
+                        NexusText("Size: ${formatFileSize(doc.fileSizeBytes)}", style = NexusTheme.typography.body)
+                        NexusText("Last Opened: ${formatDate(doc.lastOpenedAt)}", style = NexusTheme.typography.body)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        NexusText("Location: ${doc.uri}", color = NexusTheme.colors.textSecondary, style = NexusTheme.typography.caption)
+                    }
+                },
+                confirmButton = {
+                    NexusText(
+                        "Close",
+                        color = NexusTheme.colors.primary,
+                        modifier = Modifier.clickable { detailsDialogDoc = null }.padding(8.dp)
+                    )
+                }
+            )
         }
     }
 }

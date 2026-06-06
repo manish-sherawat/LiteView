@@ -109,7 +109,6 @@ fun FileOptionsDialog(
                     })
                     FileOptionItem(
                         icon = if (isStarred) "🌟" else "⭐", 
-                        iconRes = R.drawable.ic_star,
                         label = if (isStarred) "Unstar file" else "Star file", 
                         onClick = {
                             onDismissRequest()

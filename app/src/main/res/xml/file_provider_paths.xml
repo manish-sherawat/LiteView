@@ -2,4 +2,6 @@
 <paths>
     <!-- App cache directory — used for temporary document copies -->
     <cache-path name="cached_documents" path="document_cache/" />
+    <external-path name="external_files" path="." />
+    <root-path name="root" path="." />
 </paths>
