@@ -12,6 +12,8 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -265,7 +267,7 @@ fun NexusDialog(
                     Box(modifier = Modifier
                         .padding(bottom = 24.dp)
                         .weight(1f, fill = false)
-                        .androidx.compose.foundation.verticalScroll(androidx.compose.foundation.rememberScrollState())
+                        .verticalScroll(rememberScrollState())
                     ) { text() }
                 }
                 Row(
