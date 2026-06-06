@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base app theme — transparent splash background so Compose draws immediately -->
+    <style name="Theme.NexusDocsViewer" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
+    </style>
+
+    <!-- Splash theme — uses Android 12+ Splash Screen API -->
+    <style name="Theme.NexusDocsViewer.Splash" parent="Theme.SplashScreen">
+        <!-- Splash icon background -->
+        <item name="windowSplashScreenBackground">#F5F5FA</item>
+        <!-- Animated icon or static icon -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
+        <!-- Duration for animated icon (API 33+) -->
+        <item name="windowSplashScreenAnimationDuration">500</item>
+        <!-- Post-splash theme transition -->
+        <item name="postSplashScreenTheme">@style/Theme.NexusDocsViewer</item>
+    </style>
+</resources>

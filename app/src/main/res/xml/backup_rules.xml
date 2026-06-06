@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <exclude domain="cache" />
+    <include domain="database" path="nexus_docs.db" />
+    <include domain="sharedpref" path="nexus_preferences.xml" />
+</full-backup-content>

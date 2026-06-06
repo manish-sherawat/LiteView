@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Don't back up cached document copies — they're temporary -->
+        <exclude domain="cache" />
+        <!-- Do back up Room database for recent files history -->
+        <include domain="database" path="nexus_docs.db" />
+        <!-- Back up user preferences -->
+        <include domain="sharedpref" path="nexus_preferences.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="cache" />
+        <include domain="database" path="nexus_docs.db" />
+    </device-transfer>
+</data-extraction-rules>
