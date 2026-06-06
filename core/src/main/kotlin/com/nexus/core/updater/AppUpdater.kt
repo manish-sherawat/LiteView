@@ -135,4 +135,51 @@ class AppUpdater @Inject constructor(
             return false
         }
     }
+    
+    suspend fun fetchAllReleases(): List<GithubRelease> {
+        return withContext(Dispatchers.IO) {
+            val releases = mutableListOf<GithubRelease>()
+            try {
+                val url = URL("https://api.github.com/repos/$githubOwner/$githubRepo/releases")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+                
+                if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                    val reader = BufferedReader(InputStreamReader(connection.inputStream))
+                    val response = reader.readText()
+                    reader.close()
+                    
+                    val jsonArray = org.json.JSONArray(response)
+                    for (i in 0 until jsonArray.length()) {
+                        val json = jsonArray.getJSONObject(i)
+                        val tagName = json.getString("tag_name")
+                        val dateString = json.getString("published_at")
+                        val body = json.optString("body", "No release notes.")
+                        
+                        // Parse date string (e.g. "2026-06-06T12:00:00Z") to "June 2026"
+                        val formattedDate = try {
+                            val formatter = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US)
+                            val date = formatter.parse(dateString)
+                            if (date != null) {
+                                val outFormatter = java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.US)
+                                outFormatter.format(date)
+                            } else {
+                                dateString.substringBefore("T")
+                            }
+                        } catch (e: Exception) {
+                            dateString.substringBefore("T")
+                        }
+                        
+                        releases.add(GithubRelease(tagName, formattedDate, body))
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            releases
+        }
+    }
 }
+
+data class GithubRelease(val version: String, val date: String, val body: String)

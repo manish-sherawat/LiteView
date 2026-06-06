@@ -19,9 +19,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -332,10 +335,10 @@ fun TabButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
 
     Box(
         modifier = Modifier
-            .androidx.compose.ui.draw.scale(scale)
+            .scale(scale)
             .clip(NexusTheme.shapes.pill)
             .background(bgColor)
-            .androidx.compose.foundation.combinedClickable(
+            .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick,

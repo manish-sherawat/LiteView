@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.nexus.core.updater.AppUpdater
@@ -189,4 +190,35 @@ class SettingsViewModel @Inject constructor(
     fun resetUpdateState() {
         appUpdater.resetState()
     }
+
+    // ─── Dynamic Changelog ────────────────────────────────────────────────────
+    
+    private val _changelogState = MutableStateFlow<ChangelogState>(ChangelogState.Idle)
+    val changelogState: StateFlow<ChangelogState> = _changelogState.asStateFlow()
+
+    fun fetchChangelog() {
+        // If already fetched successfully, don't fetch again
+        if (_changelogState.value is ChangelogState.Success) return
+        
+        _changelogState.value = ChangelogState.Loading
+        viewModelScope.launch {
+            try {
+                val releases = appUpdater.fetchAllReleases()
+                if (releases.isNotEmpty()) {
+                    _changelogState.value = ChangelogState.Success(releases)
+                } else {
+                    _changelogState.value = ChangelogState.Error("No releases found.")
+                }
+            } catch (e: Exception) {
+                _changelogState.value = ChangelogState.Error("Failed to load changelog: ${e.message}")
+            }
+        }
+    }
+}
+
+sealed class ChangelogState {
+    object Idle : ChangelogState()
+    object Loading : ChangelogState()
+    data class Success(val releases: List<com.nexus.core.updater.GithubRelease>) : ChangelogState()
+    data class Error(val message: String) : ChangelogState()
 }

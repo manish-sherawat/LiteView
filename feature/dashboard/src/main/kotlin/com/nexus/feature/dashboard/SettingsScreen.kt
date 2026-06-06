@@ -26,6 +26,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -58,6 +59,7 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    val changelogState by viewModel.changelogState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var showThemeDialog by remember { mutableStateOf(false) }
@@ -294,7 +296,10 @@ fun SettingsScreen(
                             iconRes = R.drawable.ic_changelog,
                             title = "Changelog",
                             value = "What's new",
-                            onClick = { showChangelogDialog = true }
+                            onClick = {
+                                viewModel.fetchChangelog()
+                                showChangelogDialog = true
+                            }
                         )
                         SettingsDivider()
                         SettingsNavRow(
@@ -382,7 +387,10 @@ fun SettingsScreen(
     }
 
     if (showChangelogDialog) {
-        ChangelogDialog(onDismiss = { showChangelogDialog = false })
+        ChangelogDialog(
+            state = changelogState,
+            onDismiss = { showChangelogDialog = false }
+        )
     }
 
     when (val state = updateState) {
@@ -820,17 +828,7 @@ private fun ThemeSelectionDialog(
 private data class ChangelogEntry(val version: String, val date: String, val notes: List<String>)
 
 @Composable
-private fun ChangelogDialog(onDismiss: () -> Unit) {
-    val changelog = listOf(
-        ChangelogEntry("v1.2.3", "June 2026", listOf("Fixed text disappearing when long pressing dashboard tabs", "Improved long-press responsiveness on navigation tabs")),
-        ChangelogEntry("v1.2.2", "June 2026", listOf("Implemented File Details dialog", "Fixed secure file sharing", "Fixed star icon visual toggle", "Made update release notes scrollable", "Polished Settings UI with new icons")),
-        ChangelogEntry("v1.2.0", "June 2026", listOf("Renamed app to LiteView", "Added smooth spring-bounce UI animations", "Redesigned Settings with Changelog timeline", "Performance optimizations for large PDFs")),
-        ChangelogEntry("v1.1.5", "May 2026", listOf("Integrated built-in Document Scanner (CameraX & ML Kit)", "Improved offline document caching", "Added quick actions to Dashboard")),
-        ChangelogEntry("v1.1.0", "April 2026", listOf("Added support for Dark Mode", "Implemented 'Remember Reading Position' feature", "Added Haptic Feedback support", "Fixed minor text rendering bugs")),
-        ChangelogEntry("v1.0.5", "March 2026", listOf("Added XLSX spreadsheet viewing support", "Improved DOCX parsing speed", "Added full-text search within documents")),
-        ChangelogEntry("v1.0.0", "January 2026", listOf("Initial Release of LiteView", "Offline PDF and TXT Viewer", "Recent & Starred Files Dashboard", "Local storage integration"))
-    )
-
+private fun ChangelogDialog(state: ChangelogState, onDismiss: () -> Unit) {
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -870,15 +868,32 @@ private fun ChangelogDialog(onDismiss: () -> Unit) {
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
                     
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(vertical = 8.dp)
-                    ) {
-                        items(changelog.size) { index ->
-                            TimelineItem(
-                                entry = changelog[index],
-                                isLast = index == changelog.size - 1
-                            )
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        when (state) {
+                            is ChangelogState.Idle, is ChangelogState.Loading -> {
+                                NexusText("Loading...", color = NexusTheme.colors.primary, style = NexusTheme.typography.body)
+                            }
+                            is ChangelogState.Error -> {
+                                NexusText(
+                                    text = state.message,
+                                    color = NexusTheme.colors.error,
+                                    style = NexusTheme.typography.body,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                            is ChangelogState.Success -> {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(vertical = 8.dp)
+                                ) {
+                                    items(state.releases.size) { index ->
+                                        TimelineItem(
+                                            release = state.releases[index],
+                                            isLast = index == state.releases.size - 1
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                     
@@ -906,7 +921,7 @@ private fun ChangelogDialog(onDismiss: () -> Unit) {
 
 @Composable
 private fun TimelineItem(
-    entry: ChangelogEntry,
+    release: com.nexus.core.updater.GithubRelease,
     isLast: Boolean
 ) {
     Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
@@ -940,7 +955,7 @@ private fun TimelineItem(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 NexusText(
-                    text = entry.version,
+                    text = release.version,
                     style = NexusTheme.typography.title,
                     color = NexusTheme.colors.primary
                 )
@@ -952,7 +967,7 @@ private fun TimelineItem(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     NexusText(
-                        text = entry.date,
+                        text = release.date,
                         style = NexusTheme.typography.caption,
                         color = NexusTheme.colors.primary
                     )
@@ -968,7 +983,15 @@ private fun TimelineItem(
                     .background(NexusTheme.colors.primary.copy(alpha = 0.05f))
                     .padding(12.dp)
             ) {
-                entry.notes.forEach { note ->
+                // Parse markdown list items very simply
+                val notes = release.body
+                    .split('\n')
+                    .map { it.trim() }
+                    .filter { it.startsWith("*") || it.startsWith("-") }
+                    .map { it.removePrefix("*").removePrefix("-").trim() }
+                    .ifEmpty { listOf(release.body.take(150) + "...") }
+
+                notes.forEach { note ->
                     Row(modifier = Modifier.padding(bottom = 6.dp)) {
                         NexusText(
                             text = "•",
@@ -977,7 +1000,7 @@ private fun TimelineItem(
                             modifier = Modifier.padding(end = 8.dp)
                         )
                         NexusText(
-                            text = note,
+                            text = note.take(200), // Cap length
                             style = NexusTheme.typography.body,
                             color = NexusTheme.colors.textSecondary
                         )
