@@ -1,0 +1,16 @@
+<svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Rounded file -->
+  <rect x="4" y="2" width="16" height="20" rx="3"
+        stroke="currentColor" stroke-width="1.5" fill="none"/>
+
+  <!-- Fold corner -->
+  <path d="M14 2V7C14 7.55 14.45 8 15 8H20"
+        stroke="currentColor" stroke-width="1.5" fill="none"/>
+
+  <!-- TXT text -->
+  <text x="12" y="17" text-anchor="middle"
+        font-size="5" font-family="Inter, SF Pro, Roboto, Arial, sans-serif"
+        fill="currentColor" font-weight="600">
+    TXT
+  </text>
+</svg>

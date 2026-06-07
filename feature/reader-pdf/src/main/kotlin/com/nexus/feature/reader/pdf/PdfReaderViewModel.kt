@@ -386,7 +386,7 @@ class PdfReaderViewModel @Inject constructor(
                     val rect = page.bounds
                     val aspectRatio = (rect.y1 - rect.y0) / (rect.x1 - rect.x0)
                     
-                    val scaledWidth = (targetWidth * 0.75f).toInt()
+                    val scaledWidth = (targetWidth * 1.5f).toInt()
                     val scaledHeight = (scaledWidth * aspectRatio).toInt()
 
                     val bmp = AndroidDrawDevice.drawPageFit(page, scaledWidth, scaledHeight)

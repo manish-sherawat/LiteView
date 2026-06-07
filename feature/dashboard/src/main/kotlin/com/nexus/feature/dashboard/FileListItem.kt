@@ -61,10 +61,10 @@ fun FileListItem(
     onShowDetails: () -> Unit,
     onShare: () -> Unit,
     onRename: (String) -> Unit,
+    modifier: Modifier = Modifier,
     isSelectionMode: Boolean = false,
     isSelected: Boolean = false,
-    isOpening: Boolean = false,
-    modifier: Modifier = Modifier
+    isOpening: Boolean = false
 ) {
     val context = LocalContext.current
     var menuExpanded by remember { mutableStateOf(false) }

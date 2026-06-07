@@ -134,9 +134,9 @@ fun NexusCollapsingTopBar(
 @Composable
 fun NexusTopBar(
     title: String,
+    modifier: Modifier = Modifier,
     navigationIcon: (@Composable () -> Unit)? = null,
-    actions: (@Composable () -> Unit)? = null,
-    modifier: Modifier = Modifier
+    actions: (@Composable () -> Unit)? = null
 ) {
     Box(
         modifier = modifier

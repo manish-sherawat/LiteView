@@ -169,7 +169,18 @@ fun NexusSwitch(
     onCheckedChange: ((Boolean) -> Unit)?,
     modifier: Modifier = Modifier
 ) {
-    val trackColor = if (checked) NexusTheme.colors.primary else NexusTheme.colors.surfaceVariant
+    val trackColor by animateColorAsState(
+        targetValue = if (checked) NexusTheme.colors.primary else NexusTheme.colors.surfaceVariant.copy(alpha = 0.8f),
+        label = "switchTrack"
+    )
+    val thumbColor by animateColorAsState(
+        targetValue = if (checked) NexusTheme.colors.onPrimary else NexusTheme.colors.textSecondary,
+        label = "switchThumb"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (checked) Color.Transparent else NexusTheme.colors.textSecondary.copy(alpha = 0.7f),
+        label = "switchBorder"
+    )
     val offset by animateDpAsState(targetValue = if (checked) 22.dp else 0.dp, label = "switchOffset")
 
     Box(
@@ -177,21 +188,18 @@ fun NexusSwitch(
             .size(52.dp, 30.dp)
             .clip(NexusTheme.shapes.pill)
             .background(trackColor)
-            .then(
-                if (!checked) Modifier.border(1.5.dp, NexusTheme.colors.textSecondary.copy(alpha = 0.5f), NexusTheme.shapes.pill)
-                else Modifier
-            )
+            .border(1.5.dp, borderColor, NexusTheme.shapes.pill)
             .clickable { onCheckedChange?.invoke(!checked) }
             .padding(4.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         Box(
             modifier = Modifier
-                .offset(x = offset)
+                .offset { androidx.compose.ui.unit.IntOffset(offset.roundToPx(), 0) }
                 .size(22.dp)
                 .shadow(2.dp, CircleShape)
                 .clip(CircleShape)
-                .background(Color.White)
+                .background(thumbColor)
         )
     }
 }

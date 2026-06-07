@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,7 +45,7 @@ fun FileOptionsDialog(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp, vertical = 24.dp)
                 .clickable(
-                    interactionSource = androidx.compose.foundation.interaction.MutableInteractionSource(),
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null,
                     onClick = onDismissRequest
                 ),
@@ -68,7 +69,7 @@ fun FileOptionsDialog(
                         )
                     }
                     .clickable(
-                        interactionSource = androidx.compose.foundation.interaction.MutableInteractionSource(),
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                         indication = null,
                         onClick = {} // Prevent clicks on the dialog from dismissing it
                     ),
@@ -108,7 +109,8 @@ fun FileOptionsDialog(
                         onRename()
                     })
                     FileOptionItem(
-                        icon = if (isStarred) "🌟" else "⭐", 
+                        icon = "",
+                        iconRes = R.drawable.ic_star,
                         label = if (isStarred) "Unstar file" else "Star file", 
                         onClick = {
                             onDismissRequest()

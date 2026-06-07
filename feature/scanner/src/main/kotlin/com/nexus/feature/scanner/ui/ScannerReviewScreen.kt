@@ -34,7 +34,7 @@ fun ScannerReviewScreen(
 ) {
     if (scannedPages.isEmpty()) return
     
-    var selectedPageIndex by remember { mutableStateOf(scannedPages.size - 1) }
+    var selectedPageIndex by remember { mutableIntStateOf(scannedPages.size - 1) }
     // Ensure index bounds are safe after deletions
     if (selectedPageIndex >= scannedPages.size) {
         selectedPageIndex = scannedPages.size - 1

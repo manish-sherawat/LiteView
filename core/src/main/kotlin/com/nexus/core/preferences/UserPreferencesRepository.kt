@@ -71,7 +71,7 @@ class UserPreferencesRepository @Inject constructor(
         when (prefs[Keys.THEME_MODE]) {
             ThemeMode.LIGHT.name -> ThemeMode.LIGHT
             ThemeMode.DARK.name -> ThemeMode.DARK
-            else -> ThemeMode.SYSTEM
+            else -> ThemeMode.LIGHT
         }
     }
 
