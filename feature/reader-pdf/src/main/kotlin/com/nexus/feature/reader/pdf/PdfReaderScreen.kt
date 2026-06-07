@@ -83,7 +83,7 @@ fun PdfReaderScreen(
                 NexusTopBar(
                     title = displayName,
                     navigationIcon = {
-                        Box(modifier = Modifier.clickable { onBack() }.padding(12.dp)) {
+                        Box(modifier = Modifier.clip(androidx.compose.foundation.shape.CircleShape).clickable { onBack() }.padding(12.dp)) {
                             NexusText("\u2190", style = NexusTheme.typography.h2)
                         }
                     }

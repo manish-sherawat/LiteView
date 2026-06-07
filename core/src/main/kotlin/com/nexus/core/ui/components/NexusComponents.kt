@@ -171,17 +171,27 @@ fun NexusSwitch(
 ) {
     val trackColor by animateColorAsState(
         targetValue = if (checked) NexusTheme.colors.primary else NexusTheme.colors.surfaceVariant.copy(alpha = 0.8f),
+        animationSpec = com.nexus.core.ui.animations.colorSpring(),
         label = "switchTrack"
     )
     val thumbColor by animateColorAsState(
         targetValue = if (checked) NexusTheme.colors.onPrimary else NexusTheme.colors.textSecondary,
+        animationSpec = com.nexus.core.ui.animations.colorSpring(),
         label = "switchThumb"
     )
     val borderColor by animateColorAsState(
         targetValue = if (checked) Color.Transparent else NexusTheme.colors.textSecondary.copy(alpha = 0.7f),
+        animationSpec = com.nexus.core.ui.animations.colorSpring(),
         label = "switchBorder"
     )
-    val offset by animateDpAsState(targetValue = if (checked) 22.dp else 0.dp, label = "switchOffset")
+    val offset by animateDpAsState(
+        targetValue = if (checked) 22.dp else 0.dp,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.65f,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+        ),
+        label = "switchOffset"
+    )
 
     Box(
         modifier = modifier
@@ -258,15 +268,26 @@ fun NexusDialog(
     title: @Composable (() -> Unit)? = null,
     text: @Composable (() -> Unit)? = null
 ) {
+    var isVisible by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { isVisible = true }
+
     Dialog(onDismissRequest = onDismissRequest) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(24.dp, NexusTheme.shapes.large)
-                .clip(NexusTheme.shapes.large)
-                .background(NexusTheme.colors.surface)
-                .padding(24.dp)
+        androidx.compose.animation.AnimatedVisibility(
+            visible = isVisible,
+            enter = androidx.compose.animation.scaleIn(
+                animationSpec = com.nexus.core.ui.animations.dialogSpring(),
+                initialScale = 0.8f
+            ) + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.scaleOut(targetScale = 0.8f) + androidx.compose.animation.fadeOut()
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(24.dp, NexusTheme.shapes.large)
+                    .clip(NexusTheme.shapes.large)
+                    .background(NexusTheme.colors.surface)
+                    .padding(24.dp)
+            ) {
             Column {
                 if (title != null) {
                     Box(modifier = Modifier.padding(bottom = 16.dp)) { title() }
@@ -289,6 +310,7 @@ fun NexusDialog(
                     confirmButton()
                 }
             }
+        }
         }
     }
 }

@@ -40,6 +40,7 @@ import com.nexus.core.theme.NexusTheme
 import com.nexus.core.updater.UpdateState
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.animations.fadeSlideIn
+import com.nexus.core.ui.animations.springBounceClick
 import com.nexus.core.ui.components.NexusCard
 import com.nexus.core.ui.components.NexusDialog
 import com.nexus.core.ui.components.NexusSlider
@@ -158,6 +159,7 @@ fun SettingsScreen(
                         painter = painterResource(id = R.drawable.ic_back),
                         contentDescription = "Back",
                         modifier = Modifier
+                            .clip(androidx.compose.foundation.shape.CircleShape)
                             .clickable { onBack() }
                             .padding(16.dp)
                             .size(24.dp),
@@ -488,7 +490,7 @@ private fun SettingsNavRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .springBounceClick(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -530,7 +532,7 @@ private fun SettingsSwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
+            .springBounceClick { onCheckedChange(!checked) }
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -573,7 +575,7 @@ private fun SettingsDestructiveRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .springBounceClick(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -615,7 +617,7 @@ private fun SettingsPermissionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.springBounceClick(onClick = onClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

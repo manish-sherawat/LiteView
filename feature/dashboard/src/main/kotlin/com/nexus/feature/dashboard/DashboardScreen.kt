@@ -115,7 +115,7 @@ fun DashboardScreen(
                                 painter = painterResource(id = R.drawable.ic_text_scan),
                                 contentDescription = "Scan",
                                 modifier = Modifier
-                                    .clickable { router.navigateToScanner() }
+                                    .springBounceClick { router.navigateToScanner() }
                                     .padding(8.dp)
                                     .size(32.dp),
                                 colorFilter = ColorFilter.tint(NexusTheme.colors.primary)

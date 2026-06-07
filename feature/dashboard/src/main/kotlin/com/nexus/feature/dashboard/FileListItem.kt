@@ -121,12 +121,12 @@ fun FileListItem(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(48.dp)
                         .clip(NexusTheme.shapes.small)
                         .background(accentColor.copy(alpha = 0.14f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    FileTypeIcon(type = docType, size = 18.dp, drawContainer = false)
+                    FileTypeIcon(type = docType, size = 28.dp, drawContainer = false)
                 }
 
                 if (isSelectionMode) {
