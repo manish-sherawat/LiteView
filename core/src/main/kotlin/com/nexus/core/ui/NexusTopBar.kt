@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,15 +23,34 @@ fun NexusTopBar(
     navigationIcon: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
-    Box(
+    Row(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        contentAlignment = Alignment.Center
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        if (navigationIcon != null) {
+            NexusSurface(
+                modifier = Modifier.size(48.dp),
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = NexusTheme.colors.surfaceVariant,
+                elevation = 8.dp
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    navigationIcon()
+                }
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+        }
+
         NexusSurface(
+            modifier = Modifier.weight(1f),
             shape = NexusTheme.shapes.pill,
+            color = NexusTheme.colors.surfaceVariant,
             elevation = 8.dp
         ) {
             Row(
@@ -38,11 +59,6 @@ fun NexusTopBar(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (navigationIcon != null) {
-                    navigationIcon()
-                    Spacer(modifier = Modifier.width(12.dp))
-                }
-                
                 NexusText(
                     text = title,
                     style = NexusTheme.typography.h2,

@@ -102,8 +102,8 @@ fun <T> navPillSpring() = spring<T>(
 
 // ─── springBounceClick ───────────────────────────────────────────────────────
 fun Modifier.springBounceClick(
-    onClick: () -> Unit,
-    scaleDown: Float = 0.96f
+    scaleDown: Float = 0.96f,
+    onClick: () -> Unit
 ): Modifier = composed {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()

@@ -36,8 +36,8 @@ fun FileOptionsDialog(
     onRemove: () -> Unit,
     onShowDetails: () -> Unit
 ) {
-    var isVisible by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    androidx.compose.runtime.LaunchedEffect(Unit) { isVisible = true }
+    val isVisible = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { isVisible.value = true }
 
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -55,7 +55,7 @@ fun FileOptionsDialog(
             contentAlignment = Alignment.BottomCenter
         ) {
             androidx.compose.animation.AnimatedVisibility(
-                visible = isVisible,
+                visible = isVisible.value,
                 enter = androidx.compose.animation.slideInVertically(
                     initialOffsetY = { it },
                     animationSpec = com.nexus.core.ui.animations.dialogSpring()

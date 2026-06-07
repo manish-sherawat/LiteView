@@ -43,7 +43,10 @@ import com.nexus.core.ui.NexusButton
 import com.nexus.core.ui.NexusSurface
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.NexusTopBar
+import kotlinx.coroutines.launch
 import java.net.URLDecoder
+import kotlin.math.roundToInt
+import androidx.compose.animation.core.animateDpAsState
 
 @Composable
 fun PdfReaderScreen(
@@ -60,6 +63,7 @@ fun PdfReaderScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val renderedPages by viewModel.renderedPages.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
     
     val displayName = try { URLDecoder.decode(URLDecoder.decode(fileName, "UTF-8"), "UTF-8") } catch (_: Exception) { fileName }
 
@@ -74,25 +78,10 @@ fun PdfReaderScreen(
             .fillMaxSize()
             .background(NexusTheme.colors.background)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            AnimatedVisibility(
-                visible = !isImmersiveMode,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                NexusTopBar(
-                    title = displayName,
-                    navigationIcon = {
-                        Box(modifier = Modifier.clip(androidx.compose.foundation.shape.CircleShape).clickable { onBack() }.padding(12.dp)) {
-                            NexusText("\u2190", style = NexusTheme.typography.h2)
-                        }
-                    }
-                )
-            }
-
-            AnimatedContent(
-                targetState = uiState,
-                transitionSpec = {
+        AnimatedContent(
+            targetState = uiState,
+            modifier = Modifier.fillMaxSize(),
+            transitionSpec = {
                     fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
                 },
                 label = "pdfReaderState"
@@ -105,10 +94,13 @@ fun PdfReaderScreen(
                     }
                     is PdfReaderUiState.Success -> {
                         Box(modifier = Modifier.fillMaxSize()) {
+                            val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 16.dp else 140.dp)
+                            val bottomPadding by animateDpAsState(targetValue = if (isImmersiveMode) 16.dp else 140.dp)
+                            
                             LazyColumn(
                                 state = listState,
                                 modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(16.dp),
+                                contentPadding = PaddingValues(top = topPadding, start = 16.dp, end = 16.dp, bottom = bottomPadding),
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 items(state.pageCount) { pageIndex ->
@@ -143,26 +135,81 @@ fun PdfReaderScreen(
                                 }
                             }
                             
-                            val currentPage by remember { derivedStateOf { listState.firstVisibleItemIndex + 1 } }
+                            val currentPage by remember(listState) {
+                                derivedStateOf {
+                                    val layoutInfo = listState.layoutInfo
+                                    val visibleItemsInfo = layoutInfo.visibleItemsInfo
+                                    if (visibleItemsInfo.isEmpty()) {
+                                        1
+                                    } else {
+                                        val viewportCenter = layoutInfo.viewportEndOffset / 2
+                                        val closestItem = visibleItemsInfo.minByOrNull { item ->
+                                            val itemCenter = item.offset + item.size / 2
+                                            kotlin.math.abs(itemCenter - viewportCenter)
+                                        }
+                                        (closestItem?.index ?: 0) + 1
+                                    }
+                                }
+                            }
+                            
+                            var isDraggingSlider by remember { mutableStateOf(false) }
+                            var sliderValue by remember { mutableFloatStateOf(1f) }
+                            
+                            LaunchedEffect(currentPage, isDraggingSlider) {
+                                if (!isDraggingSlider) {
+                                    sliderValue = currentPage.toFloat()
+                                }
+                            }
+                            
                             androidx.compose.animation.AnimatedVisibility(
                                 visible = !isImmersiveMode,
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
-                                    .padding(bottom = 48.dp),
+                                    .padding(bottom = 32.dp, start = 16.dp, end = 16.dp),
                                 enter = expandVertically() + fadeIn(),
                                 exit = shrinkVertically() + fadeOut()
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(androidx.compose.foundation.shape.CircleShape)
-                                        .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.9f))
-                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    NexusText(
-                                        text = "Page $currentPage / ${state.pageCount}",
-                                        style = NexusTheme.typography.label,
-                                        color = NexusTheme.colors.textPrimary
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(androidx.compose.foundation.shape.CircleShape)
+                                            .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.9f))
+                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    ) {
+                                        NexusText(
+                                            text = "Page ${sliderValue.roundToInt()} / ${state.pageCount}",
+                                            style = NexusTheme.typography.label,
+                                            color = NexusTheme.colors.textPrimary
+                                        )
+                                    }
+                                    
+                                    if (state.pageCount > 1) {
+                                        androidx.compose.material3.Slider(
+                                            value = sliderValue,
+                                            onValueChange = { newValue -> 
+                                                sliderValue = newValue
+                                                isDraggingSlider = true
+                                                coroutineScope.launch {
+                                                    listState.scrollToItem((newValue.roundToInt() - 1).coerceIn(0, state.pageCount - 1))
+                                                }
+                                            },
+                                            onValueChangeFinished = {
+                                                isDraggingSlider = false
+                                            },
+                                            valueRange = 1f..state.pageCount.toFloat(),
+                                            colors = androidx.compose.material3.SliderDefaults.colors(
+                                                thumbColor = NexusTheme.colors.primary,
+                                                activeTrackColor = NexusTheme.colors.primary,
+                                                inactiveTrackColor = NexusTheme.colors.surfaceVariant
+                                            ),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -178,9 +225,35 @@ fun PdfReaderScreen(
                 }
                 }
             }
+
+            AnimatedVisibility(
+                visible = !isImmersiveMode,
+                modifier = Modifier.align(Alignment.TopCenter),
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                NexusTopBar(
+                    title = displayName,
+                    navigationIcon = {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .clickable { onBack() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_back),
+                                contentDescription = "Back",
+                                modifier = Modifier.size(24.dp),
+                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(com.nexus.core.theme.NexusTheme.colors.textPrimary)
+                            )
+                        }
+                    }
+                )
+            }
         }
     }
-}
 
 @Composable
 private fun ZoomablePdfPage(bitmap: Bitmap, onTap: () -> Unit = {}) {

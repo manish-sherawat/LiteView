@@ -30,6 +30,7 @@ import com.nexus.core.ui.NexusSurface
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.NexusTopBar
 import java.net.URLDecoder
+import androidx.compose.animation.core.animateDpAsState
 
 @Composable
 fun TextReaderScreen(
@@ -49,35 +50,21 @@ fun TextReaderScreen(
     val displayName = try { URLDecoder.decode(URLDecoder.decode(fileName, "UTF-8"), "UTF-8") } catch (_: Exception) { fileName }
 
     var isImmersiveMode by remember { mutableStateOf(false) }
+    val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 16.dp else 140.dp)
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(NexusTheme.colors.background)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            AnimatedVisibility(
-                visible = !isImmersiveMode,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                NexusTopBar(
-                    title = displayName,
-                    navigationIcon = {
-                        Box(modifier = Modifier.clip(androidx.compose.foundation.shape.CircleShape).clickable { onBack() }.padding(12.dp)) {
-                            NexusText("\u2190", style = NexusTheme.typography.h2)
-                        }
-                    }
-                )
-            }
-
-            AnimatedContent(
-                targetState = uiState,
-                transitionSpec = {
-                    fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
-                },
-                label = "textReaderState"
-            ) { state ->
+        AnimatedContent(
+            targetState = uiState,
+            modifier = Modifier.fillMaxSize(),
+            transitionSpec = {
+                fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+            },
+            label = "textReaderState"
+        ) { state ->
                 when (state) {
                     is TextReaderUiState.Loading -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -95,7 +82,7 @@ fun TextReaderScreen(
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = 120.dp, start = 16.dp, end = 16.dp, top = 16.dp)
+                            contentPadding = PaddingValues(bottom = 120.dp, start = 16.dp, end = 16.dp, top = topPadding)
                         ) {
                         itemsIndexed(state.lines) { index, line ->
                             Row(modifier = Modifier.fillMaxWidth()) {
@@ -121,10 +108,36 @@ fun TextReaderScreen(
                             Spacer(modifier = Modifier.height(16.dp))
                             NexusButton(text = "Go Back", onClick = onBack)
                         }
-                        }
                     }
                 }
             }
         }
+
+        AnimatedVisibility(
+                visible = !isImmersiveMode,
+                modifier = Modifier.align(Alignment.TopCenter),
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                NexusTopBar(
+                    title = displayName,
+                    navigationIcon = {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .clickable { onBack() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_back),
+                                contentDescription = "Back",
+                                modifier = Modifier.size(24.dp),
+                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(com.nexus.core.theme.NexusTheme.colors.textPrimary)
+                            )
+                        }
+                    }
+                )
+            }
     }
 }

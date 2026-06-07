@@ -175,8 +175,7 @@ fun SettingsScreen(
             ) {
                 item {
                     SettingsSectionGroup(
-                        label = "Appearance",
-                        modifier = Modifier.fadeSlideIn(delay = 0)
+                        label = "Appearance"
                     ) {
                         SettingsNavRow(
                             emoji = "🎨",
@@ -194,8 +193,7 @@ fun SettingsScreen(
 
                 item {
                     SettingsSectionGroup(
-                        label = "Reader",
-                        modifier = Modifier.fadeSlideIn(delay = 60)
+                        label = "Reader"
                     ) {
                         SettingsSwitchRow(
                             emoji = "📖",
@@ -219,8 +217,7 @@ fun SettingsScreen(
 
                 item {
                     SettingsSectionGroup(
-                        label = "General",
-                        modifier = Modifier.fadeSlideIn(delay = 100)
+                        label = "General"
                     ) {
                         SettingsSwitchRow(
                             emoji = "📳",
@@ -268,8 +265,7 @@ fun SettingsScreen(
 
                 item {
                     SettingsSectionGroup(
-                        label = "Permissions",
-                        modifier = Modifier.fadeSlideIn(delay = 140)
+                        label = "Permissions"
                     ) {
                         SettingsPermissionRow(
                             emoji = "📂",
@@ -283,8 +279,7 @@ fun SettingsScreen(
 
                 item {
                     SettingsSectionGroup(
-                        label = "About",
-                        modifier = Modifier.fadeSlideIn(delay = 180)
+                        label = "About"
                     ) {
                         SettingsInfoRow(
                             emoji = "ℹ️",

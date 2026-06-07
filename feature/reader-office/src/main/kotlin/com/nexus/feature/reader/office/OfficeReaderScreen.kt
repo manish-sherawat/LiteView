@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.animation.AnimatedContent
@@ -30,6 +31,7 @@ import com.nexus.core.ui.NexusSurface
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.NexusTopBar
 import java.net.URLDecoder
+import androidx.compose.animation.core.animateDpAsState
 
 @Composable
 fun OfficeReaderScreen(
@@ -48,31 +50,17 @@ fun OfficeReaderScreen(
     val displayName = try { URLDecoder.decode(URLDecoder.decode(fileName, "UTF-8"), "UTF-8") } catch (_: Exception) { fileName }
 
     var isImmersiveMode by remember { mutableStateOf(false) }
+    val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 0.dp else 140.dp)
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(NexusTheme.colors.background)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            AnimatedVisibility(
-                visible = !isImmersiveMode,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                NexusTopBar(
-                    title = displayName,
-                    navigationIcon = {
-                        Box(modifier = Modifier.clip(androidx.compose.foundation.shape.CircleShape).clickable { onBack() }.padding(12.dp)) {
-                            NexusText("\u2190", style = NexusTheme.typography.h2)
-                        }
-                    }
-                )
-            }
-
-            AnimatedContent(
-                targetState = uiState,
-                transitionSpec = {
+        AnimatedContent(
+            targetState = uiState,
+            modifier = Modifier.fillMaxSize(),
+            transitionSpec = {
                     fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
                 },
                 label = "officeReaderState"
@@ -107,7 +95,7 @@ fun OfficeReaderScreen(
                                 view.tag = htmlWithScript
                             }
                         },
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize().padding(top = topPadding)
                     )
                 }
                 is OfficeReaderUiState.XlsxReady -> {
@@ -147,7 +135,7 @@ fun OfficeReaderScreen(
                         }
                     }
 
-                    Column(modifier = Modifier.fillMaxSize()) {
+                    Column(modifier = Modifier.fillMaxSize().padding(top = topPadding)) {
                         // Sheet Tabs
                         AnimatedVisibility(
                             visible = !isImmersiveMode,
@@ -218,10 +206,36 @@ fun OfficeReaderScreen(
                         }
                     }
                 }
+            } // End when(state)
+        } // End AnimatedContent
+
+        AnimatedVisibility(
+                visible = !isImmersiveMode,
+                modifier = Modifier.align(Alignment.TopCenter),
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                NexusTopBar(
+                    title = displayName,
+                    navigationIcon = {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .clickable { onBack() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_back),
+                                contentDescription = "Back",
+                                modifier = Modifier.size(24.dp),
+                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(com.nexus.core.theme.NexusTheme.colors.textPrimary)
+                            )
+                        }
+                    }
+                )
             }
-        }
     }
-}
 }
 
 private class ImmersiveToggleInterface(private val onToggle: () -> Unit) {
