@@ -102,13 +102,14 @@ fun <T> navPillSpring() = spring<T>(
 
 // ─── springBounceClick ───────────────────────────────────────────────────────
 fun Modifier.springBounceClick(
+    enabled: Boolean = true,
     scaleDown: Float = 0.96f,
     onClick: () -> Unit
 ): Modifier = composed {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue  = if (isPressed) scaleDown else 1f,
+        targetValue  = if (isPressed && enabled) scaleDown else 1f,
         animationSpec = pressSpring(),
         label        = "pressScale"
     )
@@ -117,7 +118,7 @@ fun Modifier.springBounceClick(
     val haptic = LocalHapticFeedback.current
 
     androidx.compose.runtime.LaunchedEffect(isPressed) {
-        if (isPressed && hapticFeedbackEnabled) {
+        if (isPressed && enabled && hapticFeedbackEnabled) {
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         }
     }
@@ -127,6 +128,7 @@ fun Modifier.springBounceClick(
         .clickable(
             interactionSource = interactionSource,
             indication        = null,
+            enabled           = enabled,
             onClick           = onClick
         )
 }

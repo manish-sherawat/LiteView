@@ -1,7 +1,7 @@
 package com.nexus.core.theme
 
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 @Immutable
@@ -17,7 +17,7 @@ data class NexusColors(
     val error: Color
 )
 
-val LocalNexusColors = staticCompositionLocalOf {
+val LocalNexusColors = compositionLocalOf {
     NexusColors(
         background = Color.Unspecified,
         surface = Color.Unspecified,

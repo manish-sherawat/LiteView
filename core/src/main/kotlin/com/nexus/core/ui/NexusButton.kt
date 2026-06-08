@@ -1,6 +1,6 @@
 package com.nexus.core.ui
 
-import androidx.compose.foundation.clickable
+import com.nexus.core.ui.animations.springBounceClick
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -29,9 +29,7 @@ fun NexusButton(
     val interactionSource = remember { MutableInteractionSource() }
 
     NexusSurface(
-        modifier = modifier.clip(shape).clickable(
-            interactionSource = interactionSource,
-            indication = null, // Custom indication could go here
+        modifier = modifier.clip(shape).springBounceClick(
             enabled = enabled,
             onClick = onClick
         ),
@@ -64,9 +62,7 @@ fun NexusIconButton(
     val interactionSource = remember { MutableInteractionSource() }
 
     NexusSurface(
-        modifier = modifier.clip(CircleShape).clickable(
-            interactionSource = interactionSource,
-            indication = null,
+        modifier = modifier.clip(CircleShape).springBounceClick(
             enabled = enabled,
             onClick = onClick
         ),

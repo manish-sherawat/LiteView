@@ -48,10 +48,19 @@ import com.nexus.core.ui.components.NexusSwitch
 import com.nexus.core.ui.components.NexusTopBar
 import com.nexus.core.R
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.nexus.core.ui.NexusSurface
+import androidx.compose.ui.unit.Dp
+import kotlinx.coroutines.launch
+import androidx.compose.ui.draw.shadow
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
@@ -63,19 +72,9 @@ fun SettingsScreen(
     val changelogState by viewModel.changelogState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    var showThemeDialog by remember { mutableStateOf(false) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
-    var showResetDialog by remember { mutableStateOf(false) }
     var showChangelogDialog by remember { mutableStateOf(false) }
-
-    val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
-    ) { uri ->
-        if (uri != null) {
-            viewModel.exportReadingHistory(uri)
-            Toast.makeText(context, "History exported", Toast.LENGTH_SHORT).show()
-        }
-    }
+    var showThemeDialog by remember { mutableStateOf(false) }
 
     var isPermissionGranted by remember {
         mutableStateOf(
@@ -177,15 +176,16 @@ fun SettingsScreen(
                     SettingsSectionGroup(
                         label = "Appearance"
                     ) {
+                        val themeText = when (uiState.themeMode) {
+                            ThemeMode.LIGHT -> "Light"
+                            ThemeMode.DARK -> "Dark"
+                            ThemeMode.SYSTEM -> "System Default"
+                        }
                         SettingsNavRow(
                             emoji = "🎨",
                             iconRes = R.drawable.ic_theme,
                             title = "Theme",
-                            value = when (uiState.themeMode) {
-                                ThemeMode.SYSTEM -> "System"
-                                ThemeMode.LIGHT -> "Light"
-                                ThemeMode.DARK -> "Dark"
-                            },
+                            value = themeText,
                             onClick = { showThemeDialog = true }
                         )
                     }
@@ -237,28 +237,12 @@ fun SettingsScreen(
                             onCheckedChange = { viewModel.setStartupToPicker(it) }
                         )
                         SettingsDivider()
-                        SettingsNavRow(
-                            emoji = "💾",
-                            iconRes = R.drawable.ic_save,
-                            title = "Export Reading History",
-                            value = "Backup as JSON",
-                            onClick = { exportLauncher.launch("nexus_history_backup.json") }
-                        )
-                        SettingsDivider()
                         SettingsDestructiveRow(
                             emoji = "🗑️",
                             iconRes = R.drawable.ic_delete,
                             title = "Clear Cache",
                             subtitle = "Currently ${uiState.cacheSizeText}",
                             onClick = { showClearCacheDialog = true }
-                        )
-                        SettingsDivider()
-                        SettingsDestructiveRow(
-                            emoji = "🔄",
-                            iconRes = R.drawable.ic_reset,
-                            title = "Reset All Settings",
-                            subtitle = "Restore default preferences",
-                            onClick = { showResetDialog = true }
                         )
                     }
                 }
@@ -268,7 +252,7 @@ fun SettingsScreen(
                         label = "Permissions"
                     ) {
                         SettingsPermissionRow(
-                            emoji = "📂",
+                            emoji = "ðŸ“‚",
                             iconRes = R.drawable.ic_folder,
                             title = "Storage Access",
                             isGranted = isPermissionGranted,
@@ -282,7 +266,7 @@ fun SettingsScreen(
                         label = "About"
                     ) {
                         SettingsInfoRow(
-                            emoji = "ℹ️",
+                            emoji = "â„¹ï¸",
                             iconRes = R.drawable.ic_info,
                             title = "App Version",
                             value = uiState.appVersion
@@ -316,17 +300,6 @@ fun SettingsScreen(
         }
     }
 
-    if (showThemeDialog) {
-        ThemeSelectionDialog(
-            currentTheme = uiState.themeMode,
-            onThemeSelected = {
-                viewModel.setThemeMode(it)
-                showThemeDialog = false
-            },
-            onDismiss = { showThemeDialog = false }
-        )
-    }
-
     if (showClearCacheDialog) {
         NexusDialog(
             onDismissRequest = { showClearCacheDialog = false },
@@ -349,34 +322,6 @@ fun SettingsScreen(
                     text = "Cancel",
                     modifier = Modifier
                         .clickable { showClearCacheDialog = false }
-                        .padding(8.dp)
-                )
-            }
-        )
-    }
-
-    if (showResetDialog) {
-        NexusDialog(
-            onDismissRequest = { showResetDialog = false },
-            title = { NexusText("Reset Settings?", style = NexusTheme.typography.h2) },
-            text = { NexusText("Are you sure you want to restore all settings to their defaults? Your reading history and starred files will not be affected.") },
-            confirmButton = {
-                NexusText(
-                    text = "Reset",
-                    color = NexusTheme.colors.error,
-                    modifier = Modifier
-                        .clickable {
-                            viewModel.resetToDefaults()
-                            showResetDialog = false
-                        }
-                        .padding(8.dp)
-                )
-            },
-            dismissButton = {
-                NexusText(
-                    text = "Cancel",
-                    modifier = Modifier
-                        .clickable { showResetDialog = false }
                         .padding(8.dp)
                 )
             }
@@ -448,6 +393,17 @@ fun SettingsScreen(
             )
         }
         else -> {}
+    }
+
+    if (showThemeDialog) {
+        ThemeSelectionDialog(
+            currentTheme = uiState.themeMode,
+            onThemeSelected = { 
+                viewModel.setThemeMode(it)
+                showThemeDialog = false
+            },
+            onDismiss = { showThemeDialog = false }
+        )
     }
 }
 
@@ -811,7 +767,7 @@ private fun ThemeSelectionDialog(
                                 modifier = Modifier.weight(1f)
                             )
                             if (isSelected) {
-                                NexusText("✓", color = NexusTheme.colors.primary, style = NexusTheme.typography.title)
+                                NexusText("âœ“", color = NexusTheme.colors.primary, style = NexusTheme.typography.title)
                             }
                         }
                     }
@@ -991,7 +947,7 @@ private fun TimelineItem(
                 notes.forEach { note ->
                     Row(modifier = Modifier.padding(bottom = 6.dp)) {
                         NexusText(
-                            text = "•",
+                            text = "â€¢",
                             style = NexusTheme.typography.body,
                             color = NexusTheme.colors.primary,
                             modifier = Modifier.padding(end = 8.dp)
@@ -1007,3 +963,4 @@ private fun TimelineItem(
         }
     }
 }
+

@@ -6,7 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import com.nexus.core.ui.animations.springBounceClick
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -168,9 +168,8 @@ private fun NexusBottomNavIcon(
         modifier = Modifier
             .size(52.dp)
             .scale(pressScale)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
+            .springBounceClick(
+                enabled = true,
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center

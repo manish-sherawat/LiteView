@@ -32,6 +32,7 @@ import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.NexusTopBar
 import java.net.URLDecoder
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 
 @Composable
 fun OfficeReaderScreen(
@@ -50,7 +51,7 @@ fun OfficeReaderScreen(
     val displayName = try { URLDecoder.decode(URLDecoder.decode(fileName, "UTF-8"), "UTF-8") } catch (_: Exception) { fileName }
 
     var isImmersiveMode by remember { mutableStateOf(false) }
-    val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 0.dp else 140.dp)
+    val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 0.dp else 100.dp)
 
     Box(
         modifier = modifier
@@ -72,11 +73,45 @@ fun OfficeReaderScreen(
                         }
                     }
                     is OfficeReaderUiState.DocxReady -> {
-                    val htmlWithScript = state.htmlContent + "<script>document.addEventListener('click', function() { AndroidInterface.toggle(); });</script>"
+                    val isDark = isSystemInDarkTheme()
+                    val textColor = if (isDark) "#e0e0e0" else "#1a1a1a"
+                    val htmlWithScript = """
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+                            <style>
+                                body {
+                                    font-family: sans-serif;
+                                    padding: 24px;
+                                    padding-top: 120px;
+                                    padding-bottom: 100px;
+                                    line-height: 1.6;
+                                    color: $textColor !important;
+                                    background-color: transparent !important;
+                                    word-wrap: break-word;
+                                }
+                                body * {
+                                    color: $textColor !important;
+                                    background-color: transparent !important;
+                                }
+                                p { margin-bottom: 16px; margin-top: 0; }
+                                img { max-width: 100%; height: auto; }
+                                table { border-collapse: collapse; width: 100%; background-color: transparent; }
+                                td, th { border: 1px solid #888; padding: 8px; }
+                            </style>
+                        </head>
+                        <body>
+                            ${state.htmlContent}
+                            <script>document.addEventListener('click', function() { AndroidInterface.toggle(); });</script>
+                        </body>
+                        </html>
+                    """.trimIndent()
                     // Docx Viewer using AndroidView
                     AndroidView(
                         factory = { ctx ->
                             WebView(ctx).apply {
+                                setBackgroundColor(0)
                                 layoutParams = android.view.ViewGroup.LayoutParams(
                                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                                     android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -95,20 +130,24 @@ fun OfficeReaderScreen(
                                 view.tag = htmlWithScript
                             }
                         },
-                        modifier = Modifier.fillMaxSize().padding(top = topPadding)
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
                 is OfficeReaderUiState.XlsxReady -> {
                     val rows = state.sheetsRows.getOrElse(state.currentSheet) { emptyList() }
                     val columnWidths = state.sheetsColumnWidths.getOrElse(state.currentSheet) { emptyList() }
                     
-                    val htmlContent = remember(rows, columnWidths, state.showGridlines) {
+                    val isDark = isSystemInDarkTheme()
+                    val textColor = if (isDark) "#e0e0e0" else "#1a1a1a"
+                    
+                    val htmlContent = remember(rows, columnWidths, state.showGridlines, isDark) {
                         buildString {
                             append("<!DOCTYPE html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes\">")
                             append("<style>")
-                            append("body { font-family: sans-serif; font-size: 14px; margin: 0; padding: 16px; background-color: transparent; } ")
-                            append("table { border-collapse: collapse; background-color: #ffffff; border-radius: 4px; overflow: hidden; margin-bottom: 24px; } ")
-                            append("td, th { border: ${if(state.showGridlines) "1px solid #e0e0e0" else "none"}; padding: 8px 12px; white-space: nowrap; color: #1a1a1a; } ")
+                            append("body { font-family: sans-serif; font-size: 14px; margin: 0; padding: 16px; background-color: transparent; color: $textColor !important; } ")
+                            append("body * { color: $textColor !important; } ")
+                            append("table { border-collapse: collapse; background-color: transparent; border-radius: 4px; overflow: hidden; margin-bottom: 24px; } ")
+                            append("td, th { border: ${if(state.showGridlines) "1px solid #888888" else "none"}; padding: 8px 12px; white-space: nowrap; } ")
                             // Add column widths
                             columnWidths.forEachIndexed { i, w ->
                                 append("td:nth-child(${i+1}) { min-width: ${w}px; } ")
@@ -174,6 +213,7 @@ fun OfficeReaderScreen(
                             AndroidView(
                                 factory = { ctx ->
                                     WebView(ctx).apply {
+                                        setBackgroundColor(0)
                                         layoutParams = android.view.ViewGroup.LayoutParams(
                                             android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                                             android.view.ViewGroup.LayoutParams.MATCH_PARENT
