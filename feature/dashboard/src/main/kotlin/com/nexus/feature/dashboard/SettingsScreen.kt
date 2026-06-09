@@ -179,10 +179,13 @@ fun SettingsScreen(
                         val themeText = when (uiState.themeMode) {
                             ThemeMode.LIGHT -> "Light"
                             ThemeMode.DARK -> "Dark"
+                            ThemeMode.SEPIA -> "Sepia"
+                            ThemeMode.OCEAN -> "Ocean"
+                            ThemeMode.FOREST -> "Forest"
+                            ThemeMode.SUNSET -> "Sunset"
                             ThemeMode.SYSTEM -> "System Default"
                         }
                         SettingsNavRow(
-                            emoji = "🎨",
                             iconRes = R.drawable.ic_theme,
                             title = "Theme",
                             value = themeText,
@@ -196,7 +199,6 @@ fun SettingsScreen(
                         label = "Reader"
                     ) {
                         SettingsSwitchRow(
-                            emoji = "📖",
                             iconRes = R.drawable.ic_book,
                             title = "Remember Position",
                             subtitle = "Resume where you left off",
@@ -205,7 +207,6 @@ fun SettingsScreen(
                         )
                         SettingsDivider()
                         SettingsSwitchRow(
-                            emoji = "📱",
                             iconRes = R.drawable.ic_screen_awake,
                             title = "Keep Screen Awake",
                             subtitle = "Prevent sleep while reading",
@@ -220,7 +221,6 @@ fun SettingsScreen(
                         label = "General"
                     ) {
                         SettingsSwitchRow(
-                            emoji = "📳",
                             iconRes = R.drawable.ic_haptic,
                             title = "Haptic Feedback",
                             subtitle = "Vibrate on button taps and interactions",
@@ -229,7 +229,6 @@ fun SettingsScreen(
                         )
                         SettingsDivider()
                         SettingsSwitchRow(
-                            emoji = "🚀",
                             iconRes = R.drawable.ic_startup,
                             title = "Startup to Picker",
                             subtitle = "Bypass the Home screen and open file picker",
@@ -237,8 +236,15 @@ fun SettingsScreen(
                             onCheckedChange = { viewModel.setStartupToPicker(it) }
                         )
                         SettingsDivider()
+                        SettingsSwitchRow(
+                            iconRes = R.drawable.ic_view_grid,
+                            title = "Default to Grid View",
+                            subtitle = "Show documents in a grid layout by default",
+                            checked = uiState.defaultIsGridView,
+                            onCheckedChange = { viewModel.setDefaultIsGridView(it) }
+                        )
+                        SettingsDivider()
                         SettingsDestructiveRow(
-                            emoji = "🗑️",
                             iconRes = R.drawable.ic_delete,
                             title = "Clear Cache",
                             subtitle = "Currently ${uiState.cacheSizeText}",
@@ -252,7 +258,6 @@ fun SettingsScreen(
                         label = "Permissions"
                     ) {
                         SettingsPermissionRow(
-                            emoji = "ðŸ“‚",
                             iconRes = R.drawable.ic_folder,
                             title = "Storage Access",
                             isGranted = isPermissionGranted,
@@ -266,14 +271,12 @@ fun SettingsScreen(
                         label = "About"
                     ) {
                         SettingsInfoRow(
-                            emoji = "â„¹ï¸",
                             iconRes = R.drawable.ic_info,
                             title = "App Version",
                             value = uiState.appVersion
                         )
                         SettingsDivider()
                         SettingsNavRow(
-                            emoji = "",
                             iconRes = R.drawable.ic_changelog,
                             title = "Changelog",
                             value = "What's new",
@@ -284,7 +287,6 @@ fun SettingsScreen(
                         )
                         SettingsDivider()
                         SettingsNavRow(
-                            emoji = "",
                             iconRes = R.drawable.ic_update_progress,
                             title = "Check for Updates",
                             value = when (updateState) {
@@ -432,11 +434,10 @@ private fun SettingsSectionGroup(
 
 @Composable
 private fun SettingsNavRow(
-    emoji: String,
     title: String,
     value: String,
     onClick: () -> Unit,
-    iconRes: Int? = null
+    iconRes: Int
 ) {
     Row(
         modifier = Modifier
@@ -445,16 +446,12 @@ private fun SettingsNavRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (iconRes != null) {
-            Image(
-                painter = painterResource(id = iconRes),
-                contentDescription = title,
-                modifier = Modifier.size(24.dp),
-                colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
-            )
-        } else {
-            NexusText(text = emoji, style = NexusTheme.typography.h2)
-        }
+        Image(
+            painter = painterResource(id = iconRes),
+            contentDescription = title,
+            modifier = Modifier.size(24.dp),
+            colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
+        )
         Spacer(modifier = Modifier.width(16.dp))
         NexusText(
             text = title,
@@ -473,12 +470,11 @@ private fun SettingsNavRow(
 
 @Composable
 private fun SettingsSwitchRow(
-    emoji: String,
     title: String,
     subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    iconRes: Int? = null
+    iconRes: Int
 ) {
     Row(
         modifier = Modifier
@@ -487,16 +483,12 @@ private fun SettingsSwitchRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (iconRes != null) {
-            Image(
-                painter = painterResource(id = iconRes),
-                contentDescription = title,
-                modifier = Modifier.size(24.dp),
-                colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
-            )
-        } else {
-            NexusText(text = emoji, style = NexusTheme.typography.h2)
-        }
+        Image(
+            painter = painterResource(id = iconRes),
+            contentDescription = title,
+            modifier = Modifier.size(24.dp),
+            colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
+        )
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             NexusText(
@@ -517,11 +509,10 @@ private fun SettingsSwitchRow(
 
 @Composable
 private fun SettingsDestructiveRow(
-    emoji: String,
     title: String,
     subtitle: String,
     onClick: () -> Unit,
-    iconRes: Int? = null
+    iconRes: Int
 ) {
     Row(
         modifier = Modifier
@@ -530,16 +521,12 @@ private fun SettingsDestructiveRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (iconRes != null) {
-            Image(
-                painter = painterResource(id = iconRes),
-                contentDescription = title,
-                modifier = Modifier.size(24.dp),
-                colorFilter = ColorFilter.tint(NexusTheme.colors.error)
-            )
-        } else {
-            NexusText(text = emoji, style = NexusTheme.typography.h2)
-        }
+        Image(
+            painter = painterResource(id = iconRes),
+            contentDescription = title,
+            modifier = Modifier.size(24.dp),
+            colorFilter = ColorFilter.tint(NexusTheme.colors.error)
+        )
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             NexusText(
@@ -559,11 +546,10 @@ private fun SettingsDestructiveRow(
 
 @Composable
 private fun SettingsPermissionRow(
-    emoji: String,
     title: String,
     isGranted: Boolean,
     onClick: (() -> Unit)?,
-    iconRes: Int? = null
+    iconRes: Int
 ) {
     Row(
         modifier = Modifier
@@ -572,16 +558,12 @@ private fun SettingsPermissionRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (iconRes != null) {
-            Image(
-                painter = painterResource(id = iconRes),
-                contentDescription = title,
-                modifier = Modifier.size(24.dp),
-                colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
-            )
-        } else {
-            NexusText(text = emoji, style = NexusTheme.typography.h2)
-        }
+        Image(
+            painter = painterResource(id = iconRes),
+            contentDescription = title,
+            modifier = Modifier.size(24.dp),
+            colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
+        )
         Spacer(modifier = Modifier.width(16.dp))
         NexusText(
             text = title,
@@ -607,10 +589,9 @@ private fun SettingsPermissionRow(
 
 @Composable
 private fun SettingsInfoRow(
-    emoji: String,
     title: String,
     value: String,
-    iconRes: Int? = null
+    iconRes: Int
 ) {
     Row(
         modifier = Modifier
@@ -618,16 +599,12 @@ private fun SettingsInfoRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (iconRes != null) {
-            Image(
-                painter = painterResource(id = iconRes),
-                contentDescription = title,
-                modifier = Modifier.size(24.dp),
-                colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
-            )
-        } else {
-            NexusText(text = emoji, style = NexusTheme.typography.h2)
-        }
+        Image(
+            painter = painterResource(id = iconRes),
+            contentDescription = title,
+            modifier = Modifier.size(24.dp),
+            colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
+        )
         Spacer(modifier = Modifier.width(16.dp))
         NexusText(
             text = title,
@@ -660,9 +637,13 @@ private fun ThemeSelectionDialog(
     onDismiss: () -> Unit
 ) {
     val options = listOf(
-        Triple(ThemeMode.SYSTEM, "System", R.drawable.ic_theme_system),
+        Triple(ThemeMode.SYSTEM, "System Default", R.drawable.ic_theme_system),
         Triple(ThemeMode.LIGHT, "Light", R.drawable.ic_theme_light),
-        Triple(ThemeMode.DARK, "Dark", R.drawable.ic_theme_dark)
+        Triple(ThemeMode.DARK, "Dark", R.drawable.ic_theme_dark),
+        Triple(ThemeMode.SEPIA, "Sepia", R.drawable.ic_theme_sepia),
+        Triple(ThemeMode.OCEAN, "Ocean", R.drawable.ic_theme_ocean),
+        Triple(ThemeMode.FOREST, "Forest", R.drawable.ic_theme_forest),
+        Triple(ThemeMode.SUNSET, "Sunset", R.drawable.ic_theme_sunset)
     )
 
     Dialog(
@@ -767,7 +748,7 @@ private fun ThemeSelectionDialog(
                                 modifier = Modifier.weight(1f)
                             )
                             if (isSelected) {
-                                NexusText("âœ“", color = NexusTheme.colors.primary, style = NexusTheme.typography.title)
+                                NexusText("\u2713", color = NexusTheme.colors.primary, style = NexusTheme.typography.title)
                             }
                         }
                     }
@@ -947,7 +928,7 @@ private fun TimelineItem(
                 notes.forEach { note ->
                     Row(modifier = Modifier.padding(bottom = 6.dp)) {
                         NexusText(
-                            text = "â€¢",
+                            text = "\u2022",
                             style = NexusTheme.typography.body,
                             color = NexusTheme.colors.primary,
                             modifier = Modifier.padding(end = 8.dp)

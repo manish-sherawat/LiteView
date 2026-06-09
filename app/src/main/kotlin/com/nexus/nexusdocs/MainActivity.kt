@@ -77,13 +77,8 @@ class MainActivity : ComponentActivity() {
             val hapticFeedbackEnabled by preferencesRepository.hapticFeedbackEnabled
                 .collectAsState(initial = true)
 
-            val isDark = when (themeMode) {
-                ThemeMode.DARK -> true
-                ThemeMode.LIGHT -> false
-                ThemeMode.SYSTEM -> androidx.compose.foundation.isSystemInDarkTheme()
-            }
             com.nexus.core.theme.NexusDocsViewerTheme(
-                darkTheme = isDark,
+                themeMode = themeMode,
                 hapticFeedbackEnabled = hapticFeedbackEnabled
             ) {
                 val navController: NavHostController = rememberNavController()

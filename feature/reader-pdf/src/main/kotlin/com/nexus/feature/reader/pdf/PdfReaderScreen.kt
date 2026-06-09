@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,8 +23,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChanged
-import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,7 +32,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -47,6 +50,7 @@ import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import kotlin.math.roundToInt
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.Animatable
 
 @Composable
 fun PdfReaderScreen(
@@ -97,16 +101,54 @@ fun PdfReaderScreen(
                             val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 16.dp else 140.dp)
                             val bottomPadding by animateDpAsState(targetValue = if (isImmersiveMode) 16.dp else 140.dp)
                             
-                            LazyColumn(
-                                state = listState,
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(top = topPadding, start = 16.dp, end = 16.dp, bottom = bottomPadding),
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                items(state.pageCount) { pageIndex ->
-                                    LaunchedEffect(pageIndex) {
-                                        viewModel.renderPage(pageIndex, screenWidthPx - with(density) { 32.dp.roundToPx() })
+                            val coroutineScope = rememberCoroutineScope()
+                            val scaleAnim = remember { Animatable(1f) }
+                            val scale = scaleAnim.value
+                            val horizontalScrollState = rememberScrollState()
+                            val screenWidthDp = configuration.screenWidthDp.dp
+                            
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .pointerInput(Unit) {
+                                        awaitEachGesture {
+                                            awaitFirstDown(requireUnconsumed = false)
+                                            do {
+                                                val event = awaitPointerEvent()
+                                                val canceled = event.changes.any { it.isConsumed }
+                                                if (!canceled && event.changes.size > 1) {
+                                                    val zoomChange = event.calculateZoom()
+                                                    if (zoomChange != 1f) {
+                                                        val oldScale = scaleAnim.value
+                                                        val newScale = (oldScale * zoomChange).coerceIn(1f, 3f)
+                                                        val actualZoom = newScale / oldScale
+                                                        val centroid = event.calculateCentroid()
+                                                        
+                                                        coroutineScope.launch {
+                                                            scaleAnim.snapTo(newScale)
+                                                            val sx = horizontalScrollState.value
+                                                            val cx = centroid.x
+                                                            val newSx = ((sx + cx) * actualZoom - cx).roundToInt()
+                                                            horizontalScrollState.scrollTo(newSx)
+                                                        }
+                                                        event.changes.forEach { it.consume() }
+                                                    }
+                                                }
+                                            } while (!canceled && event.changes.any { it.pressed })
+                                        }
                                     }
+                                    .horizontalScroll(horizontalScrollState)
+                            ) {
+                                LazyColumn(
+                                    state = listState,
+                                    modifier = Modifier.width(screenWidthDp * scale),
+                                    contentPadding = PaddingValues(top = topPadding, start = 16.dp, end = 16.dp, bottom = bottomPadding),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    items(state.pageCount) { pageIndex ->
+                                        LaunchedEffect(pageIndex) {
+                                            viewModel.renderPage(pageIndex, screenWidthPx - with(density) { 32.dp.roundToPx() })
+                                        }
                                     
                                     val bitmap = renderedPages[pageIndex]
                                     
@@ -116,9 +158,24 @@ fun PdfReaderScreen(
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         if (bitmap != null) {
-                                            ZoomablePdfPage(
-                                                bitmap = bitmap,
-                                                onTap = { isImmersiveMode = !isImmersiveMode }
+                                            Image(
+                                                bitmap = bitmap.asImageBitmap(),
+                                                contentDescription = null,
+                                                contentScale = ContentScale.FillWidth,
+                                                colorFilter = ColorFilter.tint(Color(0xFFFBF0D9), BlendMode.Multiply),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .pointerInput(Unit) {
+                                                        detectTapGestures(
+                                                            onDoubleTap = {
+                                                                val target = if (scaleAnim.value > 1f) 1f else 2f
+                                                                coroutineScope.launch {
+                                                                    scaleAnim.animateTo(target, animationSpec = tween(300))
+                                                                }
+                                                            },
+                                                            onTap = { isImmersiveMode = !isImmersiveMode }
+                                                        )
+                                                    }
                                             )
                                         } else {
                                             Box(
@@ -131,6 +188,7 @@ fun PdfReaderScreen(
                                                 NexusText("Loading page...", color = NexusTheme.colors.textSecondary)
                                             }
                                         }
+                                    }
                                     }
                                 }
                             }
@@ -255,79 +313,4 @@ fun PdfReaderScreen(
         }
     }
 
-@Composable
-private fun ZoomablePdfPage(bitmap: Bitmap, onTap: () -> Unit = {}) {
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offset by remember { mutableStateOf(Offset.Zero) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pointerInput(Unit) {
-                detectPdfGestures(
-                    shouldConsumePan = { scale > 1f },
-                    onGesture = { pan, zoom ->
-                        scale = (scale * zoom).coerceIn(1f, 3f)
-                        if (scale > 1f) {
-                            offset += pan
-                        } else {
-                            offset = Offset.Zero
-                        }
-                    }
-                )
-            }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onDoubleTap = {
-                        scale = if (scale > 1f) 1f else 2f
-                        offset = Offset.Zero
-                    },
-                    onTap = { onTap() }
-                )
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        Image(
-            bitmap = bitmap.asImageBitmap(),
-            contentDescription = null,
-            contentScale = ContentScale.FillWidth,
-            modifier = Modifier
-                .fillMaxWidth()
-                .graphicsLayer(
-                    scaleX = scale,
-                    scaleY = scale,
-                    translationX = offset.x,
-                    translationY = offset.y
-                )
-        )
-    }
-}
-
-suspend fun PointerInputScope.detectPdfGestures(
-    shouldConsumePan: () -> Boolean,
-    onGesture: (pan: Offset, zoom: Float) -> Unit
-) {
-    awaitEachGesture {
-        awaitFirstDown(requireUnconsumed = false)
-        do {
-            val event = awaitPointerEvent()
-            val canceled = event.changes.any { it.isConsumed }
-            if (!canceled) {
-                val zoomChange = event.calculateZoom()
-                val panChange = event.calculatePan()
-                val isMultiTouch = event.changes.size > 1
-
-                if (zoomChange != 1f || panChange != Offset.Zero) {
-                    if (isMultiTouch || shouldConsumePan()) {
-                        onGesture(panChange, zoomChange)
-                        event.changes.forEach {
-                            if (it.positionChanged()) {
-                                it.consume()
-                            }
-                        }
-                    }
-                }
-            }
-        } while (!canceled && event.changes.any { it.pressed })
-    }
-}

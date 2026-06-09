@@ -54,3 +54,51 @@ val darkNexusColors = NexusColors(
     divider = Color(0xFF333333),
     error = Color(0xFFFF6B6B)
 )
+
+val sepiaNexusColors = NexusColors(
+    background = Color(0xFFFBF0D9), // Warm parchment
+    surface = Color(0xFFF2E6CD),
+    surfaceVariant = Color(0xFFE8DCC3),
+    primary = Color(0xFF5D4037),    // Soft brown accent
+    onPrimary = Color(0xFFFFFFFF),
+    textPrimary = Color(0xFF3E2723), // Espresso text
+    textSecondary = Color(0xFF795548),
+    divider = Color(0xFFD7CCC8),
+    error = Color(0xFFD32F2F)
+)
+
+val oceanNexusColors = NexusColors(
+    background = Color(0xFFE1F5FE), // Light sky blue
+    surface = Color(0xFFF1F8E9),    // Very light cyan/white
+    surfaceVariant = Color(0xFFB3E5FC),
+    primary = Color(0xFF0077B6),    // Deep ocean blue
+    onPrimary = Color(0xFFFFFFFF),
+    textPrimary = Color(0xFF263238), // Dark slate
+    textSecondary = Color(0xFF546E7A),
+    divider = Color(0xFF81D4FA),
+    error = Color(0xFFD32F2F)
+)
+
+val forestNexusColors = NexusColors(
+    background = Color(0xFFE8F5E9), // Light sage green
+    surface = Color(0xFFF1F8E9),    // Very light green/white
+    surfaceVariant = Color(0xFFC8E6C9),
+    primary = Color(0xFF2A9D8F),    // Deep forest green
+    onPrimary = Color(0xFFFFFFFF),
+    textPrimary = Color(0xFF1B2620), // Dark grey-green
+    textSecondary = Color(0xFF455A64),
+    divider = Color(0xFFA5D6A7),
+    error = Color(0xFFD32F2F)
+)
+
+val sunsetNexusColors = NexusColors(
+    background = Color(0xFFFFF3E0), // Soft peach
+    surface = Color(0xFFFFF8E1),    // Very warm white
+    surfaceVariant = Color(0xFFFFE0B2),
+    primary = Color(0xFFFF6B6B),    // Deep sunset orange
+    onPrimary = Color(0xFFFFFFFF),
+    textPrimary = Color(0xFF3E2723), // Dark warm brown
+    textSecondary = Color(0xFF5D4037),
+    divider = Color(0xFFFFCC80),
+    error = Color(0xFFD32F2F)
+)

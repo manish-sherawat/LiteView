@@ -16,7 +16,7 @@ import javax.inject.Singleton
 
 // ─── Theme Mode Enum ──────────────────────────────────────────────────────────
 
-enum class ThemeMode { LIGHT, DARK, SYSTEM }
+enum class ThemeMode { LIGHT, DARK, SYSTEM, SEPIA, OCEAN, FOREST, SUNSET }
 
 // ─── Home Screen Style Enum ───────────────────────────────────────────────────
 enum class HomeStyle { APPLE_GLASSMORPHIC, MINIMAL, CLASSIC }
@@ -41,6 +41,7 @@ class UserPreferencesRepository @Inject constructor(
         val KEEP_SCREEN_AWAKE = booleanPreferencesKey("keep_screen_awake")
         val REMEMBER_POSITION = booleanPreferencesKey("remember_position")
         val STARTUP_TO_PICKER = booleanPreferencesKey("startup_to_picker")
+        val DEFAULT_IS_GRID_VIEW = booleanPreferencesKey("default_is_grid_view")
         val HOME_STYLE = stringPreferencesKey("home_style")
         val SORT_ASCENDING = booleanPreferencesKey("sort_ascending")
         val PERMISSION_RATIONALE_SHOWN = booleanPreferencesKey("permission_rationale_shown")
@@ -71,7 +72,11 @@ class UserPreferencesRepository @Inject constructor(
         when (prefs[Keys.THEME_MODE]) {
             ThemeMode.LIGHT.name -> ThemeMode.LIGHT
             ThemeMode.DARK.name -> ThemeMode.DARK
-            else -> ThemeMode.LIGHT
+            ThemeMode.SEPIA.name -> ThemeMode.SEPIA
+            ThemeMode.OCEAN.name -> ThemeMode.OCEAN
+            ThemeMode.FOREST.name -> ThemeMode.FOREST
+            ThemeMode.SUNSET.name -> ThemeMode.SUNSET
+            else -> ThemeMode.SYSTEM
         }
     }
 
@@ -103,6 +108,9 @@ class UserPreferencesRepository @Inject constructor(
     val startupToPicker: Flow<Boolean> = context.dataStore.data.map { prefs -> prefs[Keys.STARTUP_TO_PICKER] ?: false }
     suspend fun setStartupToPicker(value: Boolean) { context.dataStore.edit { prefs -> prefs[Keys.STARTUP_TO_PICKER] = value } }
 
+    val defaultIsGridView: Flow<Boolean> = context.dataStore.data.map { prefs -> prefs[Keys.DEFAULT_IS_GRID_VIEW] ?: false }
+    suspend fun setDefaultIsGridView(value: Boolean) { context.dataStore.edit { prefs -> prefs[Keys.DEFAULT_IS_GRID_VIEW] = value } }
+
     val sortAscending: Flow<Boolean> = context.dataStore.data.map { prefs -> prefs[Keys.SORT_ASCENDING] ?: false }
     suspend fun setSortAscending(value: Boolean) { context.dataStore.edit { prefs -> prefs[Keys.SORT_ASCENDING] = value } }
 
@@ -132,6 +140,7 @@ class UserPreferencesRepository @Inject constructor(
             prefs.remove(Keys.KEEP_SCREEN_AWAKE)
             prefs.remove(Keys.REMEMBER_POSITION)
             prefs.remove(Keys.STARTUP_TO_PICKER)
+            prefs.remove(Keys.DEFAULT_IS_GRID_VIEW)
             prefs.remove(Keys.HOME_STYLE)
             prefs.remove(Keys.SORT_ASCENDING)
             prefs.remove(Keys.READER_THEME)

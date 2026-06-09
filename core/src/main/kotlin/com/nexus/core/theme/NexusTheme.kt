@@ -2,6 +2,7 @@ package com.nexus.core.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import com.nexus.core.preferences.ThemeMode
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
@@ -54,11 +55,20 @@ fun animateNexusColorsAsState(targetColors: NexusColors): NexusColors {
 
 @Composable
 fun NexusDocsViewerTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
     hapticFeedbackEnabled: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val targetColors = if (darkTheme) darkNexusColors else lightNexusColors
+    val isSystemDark = isSystemInDarkTheme()
+    val targetColors = when (themeMode) {
+        ThemeMode.LIGHT -> lightNexusColors
+        ThemeMode.DARK -> darkNexusColors
+        ThemeMode.SEPIA -> sepiaNexusColors
+        ThemeMode.OCEAN -> oceanNexusColors
+        ThemeMode.FOREST -> forestNexusColors
+        ThemeMode.SUNSET -> sunsetNexusColors
+        ThemeMode.SYSTEM -> if (isSystemDark) darkNexusColors else lightNexusColors
+    }
     val animatedColors = animateNexusColorsAsState(targetColors)
 
     CompositionLocalProvider(

@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -182,6 +183,10 @@ class DashboardViewModel @Inject constructor(
 
             launch {
                 prefsRepository.sortAscending.collect { _sortAscending.value = it }
+            }
+
+            launch {
+                _isGridView.value = prefsRepository.defaultIsGridView.first()
             }
 
             launch {
