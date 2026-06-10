@@ -20,6 +20,7 @@ import com.nexus.core.theme.NexusTheme
 fun NexusTopBar(
     title: String,
     modifier: Modifier = Modifier,
+    titleStyle: androidx.compose.ui.text.TextStyle? = null,
     navigationIcon: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
@@ -61,7 +62,7 @@ fun NexusTopBar(
             ) {
                 NexusText(
                     text = title,
-                    style = NexusTheme.typography.h2,
+                    style = titleStyle ?: NexusTheme.typography.h2,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis

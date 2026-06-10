@@ -1,0 +1,19 @@
+PDF Viewer & Pinch-to-Zoom Issues:
+
+1. Vertical Zoom Centering is Missing: 
+During a pinch-to-zoom gesture, the code calculates the centroid (`cx`) and adjusts the horizontal scroll state to keep the content under the user's fingers stable. However, it completely ignores the vertical centroid (`cy`) and does not adjust the vertical scroll state (`listState`). This causes the document to jump vertically relative to the pinch location when zooming.
+
+2. Double-Tap Zoom Ignores Tap Position:
+Double-tapping a page toggles the zoom level between 1.0x and 2.0x, but it does not adjust the horizontal or vertical scroll position to center on the exact location that was tapped. The user loses their context when zooming in.
+
+3. Performance Issues (Jank) During Pinch:
+Inside the pointer input event loop for pinch-to-zoom, the code launches a new coroutine (`coroutineScope.launch`) on every single motion event to update the horizontal scroll state using the suspending function `horizontalScrollState.scrollTo`. Launching dozens of coroutines per second during a continuous gesture is highly inefficient and causes UI jank or race conditions.
+
+4. Poor Panning Support:
+When zoomed in, the user cannot smoothly pan in both 2D directions simultaneously. They are forced to scroll vertically using the `LazyColumn` and horizontally using the `horizontalScrollState` independently, which feels unnatural compared to standard image or PDF viewers.
+
+5. Hardcoded Zoom Limits:
+The maximum zoom level is hardcoded to 3.0x (`coerceIn(1f, 3f)`), which might be insufficient for reading small text or examining diagrams in detail. Double tap zoom is also hardcoded to 2.0x.
+
+6. Double Tap Gesture Intercepts Touches:
+The `detectTapGestures` is applied to every single page Image individually. This means double tapping is constrained per page rather than treating the entire viewer as a single zoomable canvas.

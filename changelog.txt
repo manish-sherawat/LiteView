@@ -1,0 +1,13 @@
+🎉 Version 1.4.8 Changelog 🎉
+
+✨ Features & UI Improvements ✨
+* 📱 Bottom Sheet Menu: Replaced the standard dropdown for PDF options (the three vertical dots) with a beautiful, modern Bottom Sheet that smoothly slides up from the bottom of the screen.
+* 🎨 Custom Action Icons: Introduced gorgeous new custom iconography for PDF options including Rotate, Rename, Favorite, and Print.
+* 🔍 Search Result Highlighting: Searching for text in a PDF now draws accurate, semi-transparent yellow highlight boxes directly over the matched text on the document.
+* 🔤 Refined Typography: Reduced the font size of the active document's filename in the top navigation bar to reduce crowding and improve aesthetics.
+* 🔄 Quick Rotate: Added a dedicated rotate button to the top bar allowing instant 90-degree page rotation.
+
+🐛 Bug Fixes & Stability 🛠️
+* 🔎 Pinch-to-Zoom Overhaul: Completely rewrote the gesture engine for the PDF viewer. Pinch-to-zoom is now buttery smooth, correctly scaling visually without glitching outside the page layout or abruptly jumping around.
+* 📏 Search Bar Alignment: Fixed a bug where the search bar would visually overlap the top navigation icons when opened.
+* 🚀 In-App Updater Logic: Resolved a frustrating bug where the app would constantly prompt you to download the same update you were currently running. The version parsing engine is now far more robust at detecting identical versions.

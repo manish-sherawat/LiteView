@@ -120,8 +120,11 @@ class AppUpdater @Inject constructor(
     
     private fun isNewerVersion(latest: String, current: String): Boolean {
         try {
-            val latestParts = latest.split(".").map { it.toIntOrNull() ?: 0 }
-            val currentParts = current.split(".").map { it.toIntOrNull() ?: 0 }
+            val latestClean = latest.replace(Regex("[^0-9.]"), "").trim('.')
+            val currentClean = current.replace(Regex("[^0-9.]"), "").trim('.')
+            
+            val latestParts = latestClean.split(".").map { it.toIntOrNull() ?: 0 }
+            val currentParts = currentClean.split(".").map { it.toIntOrNull() ?: 0 }
             
             val length = maxOf(latestParts.size, currentParts.size)
             for (i in 0 until length) {

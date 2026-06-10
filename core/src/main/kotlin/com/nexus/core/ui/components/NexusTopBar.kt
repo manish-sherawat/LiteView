@@ -135,6 +135,7 @@ fun NexusCollapsingTopBar(
 fun NexusTopBar(
     title: String,
     modifier: Modifier = Modifier,
+    titleStyle: androidx.compose.ui.text.TextStyle? = null,
     navigationIcon: (@Composable () -> Unit)? = null,
     actions: (@Composable () -> Unit)? = null
 ) {
@@ -153,7 +154,7 @@ fun NexusTopBar(
         }
         NexusText(
             text = title,
-            style = NexusTheme.typography.title,
+            style = titleStyle ?: NexusTheme.typography.title,
             color = NexusTheme.colors.textPrimary,
             maxLines = 1,
             modifier = Modifier

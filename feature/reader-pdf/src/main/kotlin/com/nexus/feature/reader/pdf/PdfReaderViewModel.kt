@@ -103,6 +103,9 @@ class PdfReaderViewModel @Inject constructor(
     private val _searchResults = MutableStateFlow<List<Int>>(emptyList())
     val searchResults: StateFlow<List<Int>> = _searchResults.asStateFlow()
 
+    private val _searchHighlights = MutableStateFlow<Map<Int, List<android.graphics.RectF>>>(emptyMap())
+    val searchHighlights: StateFlow<Map<Int, List<android.graphics.RectF>>> = _searchHighlights.asStateFlow()
+
     private val _currentSearchMatchIndex = MutableStateFlow(-1)
     val currentSearchMatchIndex: StateFlow<Int> = _currentSearchMatchIndex.asStateFlow()
     
@@ -287,18 +290,50 @@ class PdfReaderViewModel @Inject constructor(
         searchJob?.cancel()
         if (query.isBlank()) {
             _searchResults.value = emptyList()
+            _searchHighlights.value = emptyMap()
             _currentSearchMatchIndex.value = -1
         } else {
             searchJob = viewModelScope.launch(Dispatchers.Default) {
                 val matches = mutableListOf<Int>()
+                val highlightsMap = mutableMapOf<Int, List<android.graphics.RectF>>()
+                val doc = mupdfDocument
+                
                 pdfTextByPage.forEachIndexed { index, text ->
                     kotlinx.coroutines.yield()
                     if (text.contains(query, ignoreCase = true)) {
                         matches.add(index)
+                        
+                        if (doc != null) {
+                            try {
+                                val page = doc.loadPage(index)
+                                val rect = page.bounds
+                                val width = rect.x1 - rect.x0
+                                val height = rect.y1 - rect.y0
+                                
+                                val quads = page.search(query)
+                                val rectList = mutableListOf<android.graphics.RectF>()
+                                if (quads != null) {
+                                    for (qArray in quads) {
+                                        for (q in qArray) {
+                                            val left = minOf(q.ul_x, q.ll_x) / width
+                                            val top = minOf(q.ul_y, q.ur_y) / height
+                                            val right = maxOf(q.ur_x, q.lr_x) / width
+                                            val bottom = maxOf(q.ll_y, q.lr_y) / height
+                                            rectList.add(android.graphics.RectF(left, top, right, bottom))
+                                        }
+                                    }
+                                }
+                                highlightsMap[index] = rectList
+                                page.destroy()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
                     }
                 }
                 withContext(Dispatchers.Main) {
                     _searchResults.value = matches
+                    _searchHighlights.value = highlightsMap
                     _currentSearchMatchIndex.value = if (matches.isNotEmpty()) 0 else -1
                 }
             }
@@ -371,6 +406,67 @@ class PdfReaderViewModel @Inject constructor(
                     Toast.makeText(context, "Failed to share PDF: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+    }
+
+    fun printPdf(context: Context, displayName: String) {
+        try {
+            val printManager = context.getSystemService(Context.PRINT_SERVICE) as? android.print.PrintManager ?: return
+            
+            val printAdapter = object : android.print.PrintDocumentAdapter() {
+                override fun onLayout(
+                    oldAttributes: android.print.PrintAttributes?,
+                    newAttributes: android.print.PrintAttributes,
+                    cancellationSignal: android.os.CancellationSignal?,
+                    callback: LayoutResultCallback,
+                    extras: android.os.Bundle?
+                ) {
+                    if (cancellationSignal?.isCanceled == true) {
+                        callback.onLayoutCancelled()
+                        return
+                    }
+                    val info = android.print.PrintDocumentInfo.Builder(displayName)
+                        .setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
+                        .setPageCount(android.print.PrintDocumentInfo.PAGE_COUNT_UNKNOWN)
+                        .build()
+                    callback.onLayoutFinished(info, true)
+                }
+
+                override fun onWrite(
+                    pages: Array<out android.print.PageRange>?,
+                    destination: ParcelFileDescriptor,
+                    cancellationSignal: android.os.CancellationSignal?,
+                    callback: WriteResultCallback?
+                ) {
+                    var inStream: InputStream? = null
+                    var outStream: FileOutputStream? = null
+                    try {
+                        val uriStr = currentUri ?: return
+                        val uri = Uri.parse(uriStr)
+                        inStream = if (tempFile != null && tempFile!!.exists()) {
+                            java.io.FileInputStream(tempFile!!)
+                        } else if (uri.scheme == "file") {
+                            java.io.FileInputStream(File(uri.path ?: ""))
+                        } else {
+                            context.contentResolver.openInputStream(uri)
+                        }
+                        outStream = FileOutputStream(destination.fileDescriptor)
+                        
+                        inStream?.copyTo(outStream)
+                        
+                        callback?.onWriteFinished(arrayOf(android.print.PageRange.ALL_PAGES))
+                    } catch (e: Exception) {
+                        callback?.onWriteFailed(e.message)
+                    } finally {
+                        inStream?.close()
+                        outStream?.close()
+                    }
+                }
+            }
+            
+            printManager.print(displayName, printAdapter, null)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Print failed: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
