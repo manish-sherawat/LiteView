@@ -45,7 +45,7 @@ val EmphasizedDecelerateEasing: Easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f
 val EmphasizedAccelerateEasing: Easing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
 
 /** Standard — subtle non-spatial transitions (fades, color changes) */
-val StandardEasing: Easing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+val StandardEasing: Easing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 
 /** EaseInOutSine — looping / shimmer animations */
 val EaseInOutSine: Easing = CubicBezierEasing(0.37f, 0f, 0.63f, 1f)
@@ -67,7 +67,7 @@ const val DurationLong2  = 500
 /** Press-down feedback: snappy with a micro-bounce */
 fun <T> pressSpring() = spring<T>(
     stiffness    = Spring.StiffnessMediumLow,
-    dampingRatio = Spring.DampingRatioLowBouncy
+    dampingRatio = Spring.DampingRatioMediumBouncy
 )
 
 /** Smooth enter/exit: no overshoot (nav bar, card arrival) */
@@ -103,7 +103,7 @@ fun <T> navPillSpring() = spring<T>(
 // ─── springBounceClick ───────────────────────────────────────────────────────
 fun Modifier.springBounceClick(
     enabled: Boolean = true,
-    scaleDown: Float = 0.96f,
+    scaleDown: Float = 0.92f,
     onClick: () -> Unit
 ): Modifier = composed {
     val interactionSource = remember { MutableInteractionSource() }
@@ -152,12 +152,12 @@ fun Modifier.fadeSlideIn(
 
     val animatedAlpha by animateFloatAsState(
         targetValue   = targetAlpha,
-        animationSpec = tween(DurationMedium2, easing = EmphasizedDecelerateEasing),
+        animationSpec = tween(DurationShort3, easing = EmphasizedDecelerateEasing),
         label         = "fadeAlpha"
     )
     val animatedTranslationYProgress by animateFloatAsState(
         targetValue   = targetTranslationY,
-        animationSpec = tween(DurationMedium3, easing = EmphasizedDecelerateEasing),
+        animationSpec = tween(DurationShort4, easing = EmphasizedDecelerateEasing),
         label         = "translationYProgress"
     )
 

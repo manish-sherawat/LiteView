@@ -22,18 +22,21 @@ fun NexusTopBar(
     modifier: Modifier = Modifier,
     titleStyle: androidx.compose.ui.text.TextStyle? = null,
     navigationIcon: (@Composable () -> Unit)? = null,
+    outerVerticalPadding: androidx.compose.ui.unit.Dp = 12.dp,
+    innerVerticalPadding: androidx.compose.ui.unit.Dp = 12.dp,
+    iconSize: androidx.compose.ui.unit.Dp = 48.dp,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = outerVerticalPadding),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (navigationIcon != null) {
             NexusSurface(
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(iconSize),
                 shape = androidx.compose.foundation.shape.CircleShape,
                 color = NexusTheme.colors.surfaceVariant,
                 elevation = 8.dp
@@ -57,7 +60,7 @@ fun NexusTopBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = 16.dp, vertical = innerVerticalPadding),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 NexusText(

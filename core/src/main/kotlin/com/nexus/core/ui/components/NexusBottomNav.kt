@@ -120,14 +120,7 @@ private fun NexusBottomNavIcon(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
 
-    val pressScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.88f else 1f,
-        animationSpec = pressSpring(),
-        label = "iconPressScale"
-    )
 
     val iconScale by animateFloatAsState(
         targetValue   = if (isSelected) 1.12f else 1f,
@@ -167,9 +160,9 @@ private fun NexusBottomNavIcon(
     Box(
         modifier = Modifier
             .size(52.dp)
-            .scale(pressScale)
             .springBounceClick(
                 enabled = true,
+                scaleDown = 0.88f,
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center
@@ -217,7 +210,7 @@ private fun BoxScope.BadgeDot(count: Int) {
             .offset(x = 10.dp, y = (-10).dp)
             .size(if (count > 9) 16.dp else 8.dp)
             .clip(CircleShape)
-            .background(Color.Red)
+            .background(NexusTheme.colors.error)
             .align(Alignment.TopEnd),
         contentAlignment = Alignment.Center
     ) {

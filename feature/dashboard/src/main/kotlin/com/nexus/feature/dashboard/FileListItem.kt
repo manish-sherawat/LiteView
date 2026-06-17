@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -46,7 +47,7 @@ import java.util.Locale
 import com.nexus.core.navigation.LocalSharedTransitionScope
 import com.nexus.core.navigation.LocalAnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import com.nexus.core.ui.animations.pressSpring
+import com.nexus.core.ui.animations.*
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -56,14 +57,11 @@ fun FileListItem(
     isStarred: Boolean,
     onToggleStarred: () -> Unit,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
     onRemove: () -> Unit,
     onShowDetails: () -> Unit,
     onShare: () -> Unit,
     onRename: (String) -> Unit,
     modifier: Modifier = Modifier,
-    isSelectionMode: Boolean = false,
-    isSelected: Boolean = false,
     isOpening: Boolean = false
 ) {
     val context = LocalContext.current
@@ -102,14 +100,20 @@ fun FileListItem(
     }
 
     NexusCard(
-        accentColor = if (isSelected) NexusTheme.colors.primary else accentColor,
+        accentColor = accentColor,
         onClick = onClick,
-        onLongClick = onLongClick,
         enabled = isAccessible,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 0.dp, vertical = 4.dp)
+            .padding(horizontal = 0.dp, vertical = 6.dp)
     ) {
+        var thumbnail by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+        androidx.compose.runtime.LaunchedEffect(doc.uri) {
+            if (docType == DocumentType.PDF) {
+                thumbnail = PdfThumbnailCache.getThumbnail(context, doc.uri)
+            }
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -121,34 +125,36 @@ fun FileListItem(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
-                        .clip(NexusTheme.shapes.small)
-                        .background(accentColor.copy(alpha = 0.14f)),
+                        .size(80.dp)
+                        .clip(NexusTheme.shapes.medium)
+                        .background(if (thumbnail != null) NexusTheme.colors.surfaceVariant else accentColor.copy(alpha = 0.15f))
+                        .then(if (thumbnail == null && docType == DocumentType.PDF) Modifier.shimmerEffect() else Modifier),
                     contentAlignment = Alignment.Center
                 ) {
-                    FileTypeIcon(type = docType, size = 28.dp, drawContainer = false)
-                }
-
-                if (isSelectionMode) {
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(NexusTheme.shapes.small)
-                            .background(if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.surfaceVariant)
-                            .clickable { onClick() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (isSelected) {
-                            NexusText("✓", color = NexusTheme.colors.onPrimary)
+                    androidx.compose.animation.Crossfade(
+                        targetState = thumbnail,
+                        animationSpec = androidx.compose.animation.core.tween(300),
+                        label = "thumbnailCrossfade"
+                    ) { bmp ->
+                        if (bmp != null) {
+                            androidx.compose.foundation.Image(
+                                bitmap = bmp,
+                                contentDescription = "Thumbnail",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            )
+                        } else {
+                            FileTypeIcon(type = docType, size = 48.dp, drawContainer = false)
                         }
                     }
+
+
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(16.dp))
 
                 Column(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Row(
@@ -157,7 +163,7 @@ fun FileListItem(
                     ) {
                         NexusText(
                             text = doc.fileName,
-                            style = NexusTheme.typography.title,
+                            style = NexusTheme.typography.title.copy(fontWeight = FontWeight.SemiBold),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
@@ -179,17 +185,18 @@ fun FileListItem(
                     )
                 }
 
-                Box(modifier = Modifier.padding(end = 8.dp)) {
+                Box {
                     if (isOpening) {
                         NexusText("⏳", color = accentColor)
                     } else {
                         Box(
                             modifier = Modifier
-                                .size(48.dp)
+                                .size(40.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
                                 .clickable { menuExpanded = true },
                             contentAlignment = Alignment.Center
                         ) {
-                            NexusText("⋮", style = NexusTheme.typography.h2, color = NexusTheme.colors.textSecondary)
+                            NexusText("⋮", style = NexusTheme.typography.h1, color = NexusTheme.colors.textSecondary)
                         }
                     }
                     if (menuExpanded) {
@@ -246,31 +253,31 @@ fun FileListItem(
                     animationSpec = pressSpring(),
                     label = "progressFill"
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(4.dp)
+                            .height(6.dp)
                             .clip(NexusTheme.shapes.pill)
-                            .background(NexusTheme.colors.textSecondary.copy(alpha = 0.1f))
+                            .background(NexusTheme.colors.surfaceVariant)
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(animatedProgress)
-                                .height(4.dp)
+                                .height(6.dp)
                                 .clip(NexusTheme.shapes.pill)
                                 .background(accentColor)
                         )
                     }
                     NexusText(
                         text = "$progressPct%",
-                        style = NexusTheme.typography.caption,
-                        color = NexusTheme.colors.textSecondary
+                        style = NexusTheme.typography.caption.copy(fontWeight = FontWeight.Bold),
+                        color = accentColor
                     )
                 }
             }

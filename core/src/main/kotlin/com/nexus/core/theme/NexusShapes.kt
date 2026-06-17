@@ -27,9 +27,9 @@ val LocalNexusShapes = staticCompositionLocalOf {
 }
 
 val defaultNexusShapes = NexusShapes(
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(24.dp),
-    large = RoundedCornerShape(32.dp),
+    small = RoundedCornerShape(8.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(24.dp),
     pill = RoundedCornerShape(50),
     circle = CircleShape
 )

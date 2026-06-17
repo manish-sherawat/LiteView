@@ -32,8 +32,8 @@ val LocalNexusColors = compositionLocalOf {
 }
 
 val lightNexusColors = NexusColors(
-    background = Color(0xFFF8F9FA),
-    surface = Color(0xFFFFFFFF),
+    background = Color(0xFFF1F1F3),
+    surface = Color(0xFFFCFCFE),
     surfaceVariant = Color(0xFFF1F3F5),
     primary = Color(0xFF000000), // Minimal black accent
     onPrimary = Color(0xFFFFFFFF),
@@ -67,17 +67,7 @@ val sepiaNexusColors = NexusColors(
     error = Color(0xFFD32F2F)
 )
 
-val oceanNexusColors = NexusColors(
-    background = Color(0xFFE1F5FE), // Light sky blue
-    surface = Color(0xFFF1F8E9),    // Very light cyan/white
-    surfaceVariant = Color(0xFFB3E5FC),
-    primary = Color(0xFF0077B6),    // Deep ocean blue
-    onPrimary = Color(0xFFFFFFFF),
-    textPrimary = Color(0xFF263238), // Dark slate
-    textSecondary = Color(0xFF546E7A),
-    divider = Color(0xFF81D4FA),
-    error = Color(0xFFD32F2F)
-)
+
 
 val forestNexusColors = NexusColors(
     background = Color(0xFFE8F5E9), // Light sage green

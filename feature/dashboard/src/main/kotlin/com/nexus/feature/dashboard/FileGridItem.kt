@@ -46,7 +46,7 @@ import com.nexus.core.ui.components.FileTypeIcon
 import com.nexus.core.ui.components.NexusCard
 import com.nexus.core.ui.components.NexusDialog
 import com.nexus.feature.dashboard.data.RecentDocument
-import com.nexus.core.ui.animations.pressSpring
+import com.nexus.core.ui.animations.*
 
 @Composable
 fun FileGridItem(
@@ -55,14 +55,11 @@ fun FileGridItem(
     isStarred: Boolean,
     onToggleStarred: () -> Unit,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
     onRemove: () -> Unit,
     onShowDetails: () -> Unit,
     onShare: () -> Unit,
     onRename: (String) -> Unit,
     modifier: Modifier = Modifier,
-    isSelectionMode: Boolean = false,
-    isSelected: Boolean = false,
     isOpening: Boolean = false
 ) {
     val context = LocalContext.current
@@ -98,32 +95,28 @@ fun FileGridItem(
     }
 
     NexusCard(
-        accentColor = if (isSelected) NexusTheme.colors.primary else accentColor,
+        accentColor = accentColor,
         onClick = onClick,
-        onLongClick = onLongClick,
         enabled = isAccessible,
         modifier = modifier
-            .aspectRatio(0.7f)
-            .padding(4.dp)
+            .padding(6.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
-        ) {
-            var thumbnail by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
-            LaunchedEffect(doc.uri) {
-                if (docType == DocumentType.PDF) {
-                    thumbnail = PdfThumbnailCache.getThumbnail(context, doc.uri)
-                }
+        var thumbnail by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+        LaunchedEffect(doc.uri) {
+            if (docType == DocumentType.PDF) {
+                thumbnail = PdfThumbnailCache.getThumbnail(context, doc.uri)
             }
+        }
 
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(96.dp)
-                    .clip(NexusTheme.shapes.small)
-                    .background(if (thumbnail != null) NexusTheme.colors.surfaceVariant else accentColor.copy(alpha = 0.14f)),
+                    .aspectRatio(1.2f)
+                    .background(if (thumbnail != null) NexusTheme.colors.surfaceVariant else accentColor.copy(alpha = 0.15f))
+                    .then(if (thumbnail == null && docType == DocumentType.PDF) Modifier.shimmerEffect() else Modifier),
                 contentAlignment = Alignment.Center
             ) {
                 Crossfade(
@@ -139,205 +132,160 @@ fun FileGridItem(
                             contentScale = androidx.compose.ui.layout.ContentScale.Crop
                         )
                     } else {
-                        FileTypeIcon(type = docType, size = 36.dp, drawContainer = false)
+                        FileTypeIcon(type = docType, size = 64.dp, drawContainer = false)
                     }
                 }
 
-                val overlayAlpha by animateFloatAsState(
-                    targetValue = if (isSelectionMode) 1f else 0f,
-                    animationSpec = pressSpring(),
-                    label = "selectionOverlayAlpha"
-                )
-                val overlayScale by animateFloatAsState(
-                    targetValue = if (isSelectionMode) 1f else 0.4f,
-                    animationSpec = pressSpring(),
-                    label = "selectionOverlayScale"
-                )
-                val checkAlpha by animateFloatAsState(
-                    targetValue = if (isSelected) 1f else 0f,
-                    animationSpec = pressSpring(),
-                    label = "checkAlpha"
-                )
-                val checkScale by animateFloatAsState(
-                    targetValue = if (isSelected) 1f else 0.3f,
-                    animationSpec = pressSpring(),
-                    label = "checkScale"
-                )
-                val overlayBgColor by animateColorAsState(
-                    targetValue = if (isSelected) NexusTheme.colors.primary
-                                  else NexusTheme.colors.surfaceVariant.copy(alpha = 0.6f),
-                    animationSpec = androidx.compose.animation.core.tween(200),
-                    label = "overlayBg"
-                )
 
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(4.dp)
-                        .size(24.dp)
-                        .clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(overlayBgColor)
-                        .graphicsLayer {
-                            alpha = overlayAlpha
-                            scaleX = overlayScale
-                            scaleY = overlayScale
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    NexusText(
-                        text = "✓",
-                        color = NexusTheme.colors.onPrimary,
-                        modifier = Modifier
-                            .graphicsLayer {
-                                alpha = checkAlpha
-                                scaleX = checkScale
-                                scaleY = checkScale
-                            }
-                    )
-                }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.SpaceBetween
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(NexusTheme.colors.surface)
+                    .padding(16.dp)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        NexusText(
-                            text = doc.fileName,
-                            style = NexusTheme.typography.body,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        if (isStarred) {
-                            AnimatedVisibility(
-                                visible = isStarred,
-                                enter = scaleIn(animationSpec = pressSpring()) + fadeIn(),
-                                exit = scaleOut(animationSpec = pressSpring()) + fadeOut()
-                            ) {
-                                NexusText("⭐")
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    NexusText(
-                        text = if (isAccessible) "${formatDate(doc.lastOpenedAt)} • ${docType.name}" else "Missing",
-                        style = NexusTheme.typography.caption,
-                        color = if (isAccessible) NexusTheme.colors.textSecondary else NexusTheme.colors.error
-                    )
-                }
-
-                Box(modifier = Modifier.padding(end = 4.dp)) {
-                    if (isOpening) {
-                        NexusText("⏳", color = accentColor)
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clickable { menuExpanded = true },
-                            contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            NexusText("⋮", style = NexusTheme.typography.h2, color = NexusTheme.colors.textSecondary)
+                            NexusText(
+                                text = doc.fileName,
+                                style = NexusTheme.typography.body.copy(fontWeight = FontWeight.SemiBold),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            if (isStarred) {
+                                AnimatedVisibility(
+                                    visible = isStarred,
+                                    enter = scaleIn(animationSpec = pressSpring()) + fadeIn(),
+                                    exit = scaleOut(animationSpec = pressSpring()) + fadeOut()
+                                ) {
+                                    NexusText("⭐")
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        NexusText(
+                            text = if (isAccessible) "${formatDate(doc.lastOpenedAt)} • ${docType.name}" else "Missing",
+                            style = NexusTheme.typography.caption,
+                            color = if (isAccessible) NexusTheme.colors.textSecondary else NexusTheme.colors.error
+                        )
+                    }
+
+                    Box(modifier = Modifier.padding(start = 8.dp)) {
+                        if (isOpening) {
+                            NexusText("⏳", color = accentColor)
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(androidx.compose.foundation.shape.CircleShape)
+                                    .clickable { menuExpanded = true },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                NexusText("⋮", style = NexusTheme.typography.h2, color = NexusTheme.colors.textSecondary)
+                            }
+                        }
+                        if (menuExpanded) {
+                            FileOptionsDialog(
+                                fileName = doc.fileName,
+                                isStarred = isStarred,
+                                onDismissRequest = { menuExpanded = false },
+                                onShare = onShare,
+                                onRename = { renameDialogExpanded = true },
+                                onToggleStarred = onToggleStarred,
+                                onRemove = onRemove,
+                                onShowDetails = onShowDetails
+                            )
+                        }
+
+                        if (renameDialogExpanded) {
+                            NexusDialog(
+                                onDismissRequest = { renameDialogExpanded = false },
+                                title = { NexusText("Rename File", style = NexusTheme.typography.h2) },
+                                text = {
+                                    com.nexus.core.ui.NexusTextField(
+                                        value = newFileName,
+                                        onValueChange = { newFileName = it },
+                                        placeholder = "File name"
+                                    )
+                                },
+                                confirmButton = {
+                                    NexusText(
+                                        "Save",
+                                        color = NexusTheme.colors.primary,
+                                        modifier = Modifier.clickable { 
+                                            if (newFileName.isNotBlank()) {
+                                                onRename(newFileName)
+                                                renameDialogExpanded = false
+                                            }
+                                        }.padding(8.dp)
+                                    )
+                                },
+                                dismissButton = {
+                                    NexusText(
+                                        "Cancel",
+                                        color = NexusTheme.colors.textSecondary,
+                                        modifier = Modifier.clickable { renameDialogExpanded = false }.padding(8.dp)
+                                    )
+                                }
+                            )
                         }
                     }
-                    if (menuExpanded) {
-                        FileOptionsDialog(
-                            fileName = doc.fileName,
-                            isStarred = isStarred,
-                            onDismissRequest = { menuExpanded = false },
-                            onShare = onShare,
-                            onRename = { renameDialogExpanded = true },
-                            onToggleStarred = onToggleStarred,
-                            onRemove = onRemove,
-                            onShowDetails = onShowDetails
-                        )
-                    }
-
-                    if (renameDialogExpanded) {
-                        NexusDialog(
-                            onDismissRequest = { renameDialogExpanded = false },
-                            title = { NexusText("Rename File", style = NexusTheme.typography.h2) },
-                            text = {
-                                com.nexus.core.ui.NexusTextField(
-                                    value = newFileName,
-                                    onValueChange = { newFileName = it },
-                                    placeholder = "File name"
-                                )
-                            },
-                            confirmButton = {
-                                NexusText(
-                                    "Save",
-                                    color = NexusTheme.colors.primary,
-                                    modifier = Modifier.clickable { 
-                                        if (newFileName.isNotBlank()) {
-                                            onRename(newFileName)
-                                            renameDialogExpanded = false
-                                        }
-                                    }.padding(8.dp)
-                                )
-                            },
-                            dismissButton = {
-                                NexusText(
-                                    "Cancel",
-                                    color = NexusTheme.colors.textSecondary,
-                                    modifier = Modifier.clickable { renameDialogExpanded = false }.padding(8.dp)
-                                )
-                            }
-                        )
-                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                NexusText(
-                    text = formatFileSize(doc.fileSizeBytes),
-                    style = NexusTheme.typography.caption,
-                    color = NexusTheme.colors.textSecondary
-                )
-                
-                if (showProgress) {
-                    NexusText(
-                        text = "$progressPct%",
-                        style = NexusTheme.typography.caption,
-                        color = accentColor
-                    )
-                }
-            }
-
-            if (showProgress) {
-                val animatedProgress by animateFloatAsState(
-                    targetValue = progressPct / 100f,
-                    animationSpec = pressSpring(),
-                    label = "gridProgressFill"
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .clip(NexusTheme.shapes.pill)
-                        .background(NexusTheme.colors.textSecondary.copy(alpha = 0.1f))
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
+                    NexusText(
+                        text = formatFileSize(doc.fileSizeBytes),
+                        style = NexusTheme.typography.caption,
+                        color = NexusTheme.colors.textSecondary
+                    )
+                    
+                    if (showProgress) {
+                        NexusText(
+                            text = "$progressPct%",
+                            style = NexusTheme.typography.caption.copy(fontWeight = FontWeight.Bold),
+                            color = accentColor
+                        )
+                    }
+                }
+
+                if (showProgress) {
+                    val animatedProgress by animateFloatAsState(
+                        targetValue = progressPct / 100f,
+                        animationSpec = pressSpring(),
+                        label = "gridProgressFill"
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(animatedProgress)
+                            .fillMaxWidth()
                             .height(4.dp)
                             .clip(NexusTheme.shapes.pill)
-                            .background(accentColor)
-                    )
+                            .background(NexusTheme.colors.surfaceVariant)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(animatedProgress)
+                                .height(4.dp)
+                                .clip(NexusTheme.shapes.pill)
+                                .background(accentColor)
+                        )
+                    }
                 }
             }
         }

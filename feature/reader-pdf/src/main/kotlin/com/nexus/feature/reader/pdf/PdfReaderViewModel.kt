@@ -48,7 +48,9 @@ sealed class PdfReaderUiState {
     data object Loading : PdfReaderUiState()
     data class Success(
         val pageCount: Int,
-        val currentPage: Int = 0
+        val currentPage: Int = 0,
+        val fileSize: Long = 0L,
+        val lastModified: Long = 0L
     ) : PdfReaderUiState()
     data class Error(val message: String) : PdfReaderUiState()
 }
@@ -270,7 +272,11 @@ class PdfReaderViewModel @Inject constructor(
                     }
 
                     withContext(Dispatchers.Main) {
-                        _uiState.value = PdfReaderUiState.Success(pageCount = count)
+                        _uiState.value = PdfReaderUiState.Success(
+                            pageCount = count,
+                            fileSize = fileSize,
+                            lastModified = lastModified
+                        )
                     }
                 } catch (e: Throwable) {
                     withContext(Dispatchers.Main) {

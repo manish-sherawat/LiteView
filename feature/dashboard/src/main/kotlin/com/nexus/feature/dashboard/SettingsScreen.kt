@@ -180,7 +180,6 @@ fun SettingsScreen(
                             ThemeMode.LIGHT -> "Light"
                             ThemeMode.DARK -> "Dark"
                             ThemeMode.SEPIA -> "Sepia"
-                            ThemeMode.OCEAN -> "Ocean"
                             ThemeMode.FOREST -> "Forest"
                             ThemeMode.SUNSET -> "Sunset"
                             ThemeMode.SYSTEM -> "System Default"
@@ -641,7 +640,6 @@ private fun ThemeSelectionDialog(
         Triple(ThemeMode.LIGHT, "Light", R.drawable.ic_theme_light),
         Triple(ThemeMode.DARK, "Dark", R.drawable.ic_theme_dark),
         Triple(ThemeMode.SEPIA, "Sepia", R.drawable.ic_theme_sepia),
-        Triple(ThemeMode.OCEAN, "Ocean", R.drawable.ic_theme_ocean),
         Triple(ThemeMode.FOREST, "Forest", R.drawable.ic_theme_forest),
         Triple(ThemeMode.SUNSET, "Sunset", R.drawable.ic_theme_sunset)
     )

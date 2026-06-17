@@ -64,7 +64,6 @@ fun NexusDocsViewerTheme(
         ThemeMode.LIGHT -> lightNexusColors
         ThemeMode.DARK -> darkNexusColors
         ThemeMode.SEPIA -> sepiaNexusColors
-        ThemeMode.OCEAN -> oceanNexusColors
         ThemeMode.FOREST -> forestNexusColors
         ThemeMode.SUNSET -> sunsetNexusColors
         ThemeMode.SYSTEM -> if (isSystemDark) darkNexusColors else lightNexusColors

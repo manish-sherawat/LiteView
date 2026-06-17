@@ -10,8 +10,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.animation.core.spring
 import com.nexus.core.ui.animations.springBounceClick
 import com.nexus.core.ui.animations.fadeSlideIn
@@ -94,8 +96,8 @@ fun DashboardScreen(
         LazyVerticalGrid(
             columns = if (uiState.isGridView) GridCells.Fixed(2) else GridCells.Fixed(1),
             modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             contentPadding = PaddingValues(top = 48.dp, bottom = 180.dp)
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -157,7 +159,7 @@ fun DashboardScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { 
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.springBounceClick { 
                             val nextSort = SortOrder.entries[(uiState.sortOrder.ordinal + 1) % SortOrder.entries.size]
                             viewModel.setSortOrder(nextSort)
                         }) {
@@ -172,14 +174,14 @@ fun DashboardScreen(
                                 contentDescription = "Sort direction",
                                 modifier = Modifier
                                     .size(20.dp)
-                                    .clickable { viewModel.toggleSortDirection() },
+                                    .springBounceClick { viewModel.toggleSortDirection() },
                                 colorFilter = ColorFilter.tint(NexusTheme.colors.textSecondary)
                             )
                         }
                         
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { viewModel.toggleGridView() }.padding(4.dp)
+                            modifier = Modifier.springBounceClick { viewModel.toggleGridView() }.padding(4.dp)
                         ) {
                             Image(
                                 painter = painterResource(id = if (uiState.isGridView) R.drawable.ic_view_list else R.drawable.ic_view_grid),
@@ -236,10 +238,10 @@ fun DashboardScreen(
                     }
                 }
             } else {
-                items(uiState.documents, key = { it.doc.uri }) { uiModel ->
+                itemsIndexed(uiState.documents, key = { _, it -> it.doc.uri }) { index, uiModel ->
                     if (uiState.isGridView) {
                         FileGridItem(
-                            modifier = Modifier.animateItem().fadeSlideIn(),
+                            modifier = Modifier.animateItem().fadeSlideIn(delay = index * 15),
                             doc = uiModel.doc,
                             isAccessible = uiModel.isAccessible,
                             isStarred = uiState.starredUris.contains(uiModel.doc.uri),
@@ -253,17 +255,14 @@ fun DashboardScreen(
                                     )
                                 }
                             },
-                            onLongClick = { viewModel.toggleSelection(uiModel.doc.uri) },
                             onRemove = { viewModel.removeDocument(uiModel.doc.uri) },
                             onShowDetails = { detailsDialogDoc = uiModel.doc },
                             onShare = { viewModel.shareDocument(uiModel.doc.uri) },
-                            onRename = { newName -> viewModel.renameDocument(uiModel.doc.uri, newName) },
-                            isSelectionMode = uiState.isSelectionMode,
-                            isSelected = uiState.selectedUris.contains(uiModel.doc.uri)
+                            onRename = { newName -> viewModel.renameDocument(uiModel.doc.uri, newName) }
                         )
                     } else {
                         FileListItem(
-                            modifier = Modifier.animateItem().fadeSlideIn(),
+                            modifier = Modifier.animateItem().fadeSlideIn(delay = index * 15),
                             doc = uiModel.doc,
                             isAccessible = uiModel.isAccessible,
                             isStarred = uiState.starredUris.contains(uiModel.doc.uri),
@@ -277,13 +276,10 @@ fun DashboardScreen(
                                     )
                                 }
                             },
-                            onLongClick = { viewModel.toggleSelection(uiModel.doc.uri) },
                             onRemove = { viewModel.removeDocument(uiModel.doc.uri) },
                             onShowDetails = { detailsDialogDoc = uiModel.doc },
                             onShare = { viewModel.shareDocument(uiModel.doc.uri) },
-                            onRename = { newName -> viewModel.renameDocument(uiModel.doc.uri, newName) },
-                            isSelectionMode = uiState.isSelectionMode,
-                            isSelected = uiState.selectedUris.contains(uiModel.doc.uri)
+                            onRename = { newName -> viewModel.renameDocument(uiModel.doc.uri, newName) }
                         )
                     }
                 }
@@ -316,34 +312,16 @@ fun DashboardScreen(
     }
 }
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun TabButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
     val bgColor = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.surfaceVariant
     val textColor = if (isSelected) NexusTheme.colors.onPrimary else NexusTheme.colors.textPrimary
-    
-    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (isPressed) 0.96f else 1f,
-        animationSpec = androidx.compose.animation.core.spring(
-            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy
-        ),
-        label = "pressScale"
-    )
 
     Box(
         modifier = Modifier
-            .scale(scale)
+            .springBounceClick(scaleDown = 0.90f, onClick = onClick)
             .clip(NexusTheme.shapes.pill)
             .background(bgColor)
-            .combinedClickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-                onLongClick = onClick
-            )
             .padding(horizontal = 24.dp, vertical = 12.dp)
     ) {
         NexusText(

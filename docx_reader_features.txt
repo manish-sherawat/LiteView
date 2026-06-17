@@ -1,0 +1,287 @@
+
+<style>
+@keyframes fadeUp    { from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn    { from{opacity:0}to{opacity:1} }
+@keyframes scaleIn   { from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)} }
+@keyframes orbitA    { from{transform:rotate(0deg) translateX(80px) rotate(0deg)} to{transform:rotate(360deg) translateX(80px) rotate(-360deg)} }
+@keyframes orbitB    { from{transform:rotate(180deg) translateX(60px) rotate(-180deg)} to{transform:rotate(540deg) translateX(60px) rotate(-540deg)} }
+@keyframes orbitC    { from{transform:rotate(90deg) translateX(104px) rotate(-90deg)} to{transform:rotate(450deg) translateX(104px) rotate(-450deg)} }
+@keyframes arcDraw   { from{stroke-dashoffset:502}to{stroke-dashoffset:0} }
+@keyframes pulse     { 0%,100%{transform:scale(1)}50%{transform:scale(1.05)} }
+@keyframes barFill   { from{width:0}to{width:72%} }
+@keyframes blink     { 0%,49%{opacity:1}50%,100%{opacity:0} }
+@keyframes stepSlide { from{opacity:0;transform:translateX(6px)}to{opacity:1;transform:translateX(0)} }
+@keyframes tagFloat  { 0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)} }
+@keyframes dotSeq    { 0%,66%,100%{opacity:.2}33%{opacity:1} }
+
+* { box-sizing:border-box; margin:0; padding:0; }
+
+.wrap {
+  background:#fff;
+  border:0.5px solid #e8e8e8;
+  border-radius:24px;
+  padding:48px 44px 40px;
+  display:flex; flex-direction:column; align-items:center;
+  min-height:600px;
+  position:relative; overflow:hidden;
+}
+
+.grid-bg {
+  position:absolute; inset:0; pointer-events:none; border-radius:24px;
+  background-image: linear-gradient(#f4f4f4 1px,transparent 1px), linear-gradient(90deg,#f4f4f4 1px,transparent 1px);
+  background-size:36px 36px;
+  opacity:.6;
+}
+
+.top-bar {
+  width:100%; display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:40px;
+  animation: fadeIn .5s ease both;
+}
+
+.top-pill {
+  display:flex; align-items:center; gap:6px;
+  background:#f7f7f7; border:0.5px solid #e8e8e8; border-radius:20px;
+  padding:5px 12px;
+  font-size:12px; color:#aaa; letter-spacing:.03em;
+}
+.top-pill i { font-size:13px; color:#ccc; }
+
+.top-icons { display:flex; gap:8px; }
+.top-icon {
+  width:28px; height:28px; border-radius:8px;
+  border:0.5px solid #ebebeb; background:#fff;
+  display:flex; align-items:center; justify-content:center;
+}
+.top-icon i { font-size:13px; color:#ccc; }
+
+.orbit-stage {
+  position:relative; width:180px; height:180px;
+  display:flex; align-items:center; justify-content:center;
+  margin-bottom:32px;
+  animation: scaleIn .6s cubic-bezier(.34,1.56,.64,1) .1s both;
+}
+
+.r1 { position:absolute; width:130px; height:130px; border-radius:50%; border:0.5px solid #ebebeb; }
+.r2 { position:absolute; width:174px; height:174px; border-radius:50%; border:0.5px dashed #f0f0f0; }
+
+.arc-svg { position:absolute; top:0; left:0; width:100%; height:100%; }
+
+.orb {
+  position:absolute; top:50%; left:50%;
+  width:30px; height:30px; margin:-15px 0 0 -15px;
+  border:0.5px solid #e4e4e4; border-radius:9px; background:#fff;
+  display:flex; align-items:center; justify-content:center;
+  transform-origin:0 0;
+}
+.orb i { font-size:14px; color:#bbb; }
+.orb-a { animation:orbitA 9s linear infinite; }
+.orb-b { animation:orbitB 9s linear infinite; }
+.orb-c { animation:orbitC 14s linear infinite; }
+
+.core {
+  width:64px; height:64px; border-radius:18px;
+  border:1px solid #e0e0e0; background:#fff;
+  display:flex; align-items:center; justify-content:center;
+  animation:pulse 3s ease-in-out infinite; z-index:2;
+}
+.core i { font-size:28px; color:#111; }
+
+.brand-row {
+  display:flex; align-items:center; gap:10px; margin-bottom:6px;
+  animation: fadeUp .6s ease .3s both;
+}
+.brand-icon {
+  width:36px; height:36px; border-radius:10px;
+  border:0.5px solid #e0e0e0;
+  display:flex; align-items:center; justify-content:center;
+}
+.brand-icon i { font-size:18px; color:#111; }
+.brand-name {
+  font-size:30px; font-weight:500; color:#111;
+  letter-spacing:-.02em;
+}
+.brand-name span { font-weight:400; color:#bbb; }
+
+.tagline {
+  font-size:14px; color:#bbb; letter-spacing:.05em;
+  margin-bottom:36px;
+  animation: fadeIn .6s ease .5s both;
+}
+
+.feature-strip {
+  display:flex; gap:10px; margin-bottom:36px;
+  animation: fadeUp .6s ease .55s both;
+}
+.feat-chip {
+  display:flex; align-items:center; gap:6px;
+  border:0.5px solid #ebebeb; border-radius:20px;
+  padding:6px 14px; background:#fafafa;
+  font-size:12px; color:#888;
+}
+.feat-chip i { font-size:13px; color:#ccc; }
+
+.progress-zone {
+  width:280px;
+  animation: fadeUp .6s ease .7s both;
+}
+
+.prog-header {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:10px;
+}
+.prog-label { font-size:13px; color:#bbb; letter-spacing:.03em; }
+.prog-pct   { font-size:13px; font-weight:500; color:#999; }
+
+.track {
+  width:100%; height:2px; background:#f0f0f0; border-radius:2px;
+  overflow:hidden; margin-bottom:20px;
+}
+.fill {
+  height:100%; width:0; background:#111; border-radius:2px;
+  animation:barFill 3s cubic-bezier(.4,0,.2,1) 1s both;
+}
+
+.step-list { display:flex; flex-direction:column; gap:7px; margin-bottom:24px; }
+.step-item {
+  display:flex; align-items:center; gap:8px;
+  font-size:12px; color:#ccc;
+  animation: stepSlide .4s ease both;
+}
+.step-item.done   { color:#888; }
+.step-item.active { color:#111; }
+.step-dot {
+  width:5px; height:5px; border-radius:50%; background:#e8e8e8; flex-shrink:0;
+}
+.step-item.done   .step-dot { background:#bbb; }
+.step-item.active .step-dot { background:#111; animation:pulse 1s ease-in-out infinite; }
+
+.dot-loader { display:flex; justify-content:center; gap:6px; }
+.dl { width:4px; height:4px; border-radius:50%; background:#ddd; animation:dotSeq 1.2s ease-in-out infinite; }
+.dl:nth-child(2){animation-delay:.2s;}
+.dl:nth-child(3){animation-delay:.4s;}
+
+.float-tags {
+  position:absolute; right:40px; top:120px;
+  display:flex; flex-direction:column; gap:8px;
+  animation: fadeIn .8s ease 1s both;
+}
+.ftag {
+  display:flex; align-items:center; gap:6px;
+  border:0.5px solid #ebebeb; border-radius:8px;
+  padding:6px 10px; background:#fff;
+  font-size:11px; color:#ccc;
+  animation:tagFloat 3s ease-in-out infinite;
+}
+.ftag:nth-child(2){animation-delay:.6s;}
+.ftag:nth-child(3){animation-delay:1.2s;}
+.ftag i { font-size:12px; color:#ddd; }
+
+.ver-badge {
+  position:absolute; bottom:22px; left:50%; transform:translateX(-50%);
+  font-size:11px; color:#ddd; letter-spacing:.06em;
+  animation:fadeIn 1s ease 1.2s both;
+}
+</style>
+
+<h2 class="sr-only">Lite View document reader app splash screen with orbital icon animation, feature chips, and step-by-step loading progress.</h2>
+
+<div class="wrap">
+  <div class="grid-bg"></div>
+
+  <div class="top-bar" aria-hidden="true">
+    <div class="top-pill"><i class="ti ti-circle-dot"></i> Live</div>
+    <div class="top-icons">
+      <div class="top-icon"><i class="ti ti-wifi"></i></div>
+      <div class="top-icon"><i class="ti ti-bell"></i></div>
+      <div class="top-icon"><i class="ti ti-settings"></i></div>
+    </div>
+  </div>
+
+  <div class="float-tags" aria-hidden="true">
+    <div class="ftag"><i class="ti ti-file-text"></i> PDF</div>
+    <div class="ftag"><i class="ti ti-file-type-doc"></i> Docs</div>
+    <div class="ftag"><i class="ti ti-file-spreadsheet"></i> Sheets</div>
+  </div>
+
+  <div class="orbit-stage" aria-hidden="true">
+    <div class="r1"></div>
+    <div class="r2"></div>
+
+    <svg class="arc-svg" viewBox="0 0 180 180">
+      <circle cx="90" cy="90" r="80" fill="none" stroke="#111" stroke-width="1"
+        stroke-dasharray="502" stroke-dashoffset="502"
+        stroke-linecap="round"
+        style="animation:arcDraw 2.2s cubic-bezier(.4,0,.2,1) .2s both;transform-origin:90px 90px;transform:rotate(-90deg);" />
+    </svg>
+
+    <div class="orb orb-a"><i class="ti ti-bookmark"></i></div>
+    <div class="orb orb-b"><i class="ti ti-highlight"></i></div>
+    <div class="orb orb-c"><i class="ti ti-search"></i></div>
+
+    <div class="core"><i class="ti ti-book-2"></i></div>
+  </div>
+
+  <div class="brand-row">
+    <div class="brand-icon"><i class="ti ti-book-2"></i></div>
+    <div class="brand-name">Lite<span>View</span></div>
+  </div>
+  <p class="tagline">Read smarter. Stay lighter.</p>
+
+  <div class="feature-strip" aria-hidden="true">
+    <div class="feat-chip"><i class="ti ti-file-text"></i> Documents</div>
+    <div class="feat-chip"><i class="ti ti-bookmark"></i> Bookmarks</div>
+    <div class="feat-chip"><i class="ti ti-highlight"></i> Highlights</div>
+  </div>
+
+  <div class="progress-zone" role="status" aria-label="Loading application">
+    <div class="prog-header">
+      <span class="prog-label" id="prog-label">Loading library…</span>
+      <span class="prog-pct" id="prog-pct">0%</span>
+    </div>
+    <div class="track"><div class="fill"></div></div>
+
+    <div class="step-list" id="step-list">
+      <div class="step-item active" data-i="0"><div class="step-dot"></div>Initialising app</div>
+      <div class="step-item"       data-i="1"><div class="step-dot"></div>Loading fonts</div>
+      <div class="step-item"       data-i="2"><div class="step-dot"></div>Syncing bookmarks</div>
+      <div class="step-item"       data-i="3"><div class="step-dot"></div>Restoring session</div>
+      <div class="step-item"       data-i="4"><div class="step-dot"></div>Ready</div>
+    </div>
+
+    <div class="dot-loader" aria-hidden="true">
+      <div class="dl"></div><div class="dl"></div><div class="dl"></div>
+    </div>
+  </div>
+
+  <span class="ver-badge">Version 2.0</span>
+</div>
+
+<script>
+const steps = [
+  {label:'Loading library…',   pct:'18%'},
+  {label:'Loading fonts…',     pct:'36%'},
+  {label:'Syncing bookmarks…', pct:'55%'},
+  {label:'Restoring session…', pct:'78%'},
+  {label:'Ready',              pct:'100%'},
+];
+const items = document.querySelectorAll('.step-item');
+const lbl   = document.getElementById('prog-label');
+const pct   = document.getElementById('prog-pct');
+let cur = 0;
+
+const advance = () => {
+  if (cur > 0) {
+    items[cur-1].classList.remove('active');
+    items[cur-1].classList.add('done');
+  }
+  if (cur < items.length) {
+    items[cur].classList.add('active');
+    lbl.textContent = steps[cur].label;
+    pct.textContent = steps[cur].pct;
+    cur++;
+    if (cur < steps.length) setTimeout(advance, 700);
+  }
+};
+setTimeout(advance, 1100);
+</script>

@@ -16,7 +16,7 @@ import javax.inject.Singleton
 
 // ─── Theme Mode Enum ──────────────────────────────────────────────────────────
 
-enum class ThemeMode { LIGHT, DARK, SYSTEM, SEPIA, OCEAN, FOREST, SUNSET }
+enum class ThemeMode { LIGHT, DARK, SYSTEM, SEPIA, FOREST, SUNSET }
 
 // ─── Home Screen Style Enum ───────────────────────────────────────────────────
 enum class HomeStyle { APPLE_GLASSMORPHIC, MINIMAL, CLASSIC }
@@ -73,7 +73,6 @@ class UserPreferencesRepository @Inject constructor(
             ThemeMode.LIGHT.name -> ThemeMode.LIGHT
             ThemeMode.DARK.name -> ThemeMode.DARK
             ThemeMode.SEPIA.name -> ThemeMode.SEPIA
-            ThemeMode.OCEAN.name -> ThemeMode.OCEAN
             ThemeMode.FOREST.name -> ThemeMode.FOREST
             ThemeMode.SUNSET.name -> ThemeMode.SUNSET
             else -> ThemeMode.SYSTEM

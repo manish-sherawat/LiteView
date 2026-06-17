@@ -31,6 +31,7 @@ import com.nexus.feature.dashboard.SettingsScreen
 import com.nexus.feature.reader.office.OfficeReaderScreen
 import com.nexus.feature.reader.pdf.PdfReaderScreen
 import com.nexus.feature.reader.text.TextReaderScreen
+import com.nexus.nexusdocs.ui.splash.NexusSplashScreen
 
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -62,7 +63,7 @@ fun NexusNavHost(
         ) {
             NavHost(
                 navController = navController,
-                startDestination = NexusRoute.Dashboard.route,
+                startDestination = NexusRoute.Splash.route,
                 modifier = modifier,
                 // ── Forward push: new screen slides in from right ──────────────────
                 // M3 Emphasized Decelerate: fast travel → gentle landing
@@ -103,6 +104,19 @@ fun NexusNavHost(
                     )
                 }
             ) {
+                // ── Splash ────────────────────────────────────────────────────────────
+                composable(route = NexusRoute.Splash.route) {
+                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
+                        NexusSplashScreen(
+                            onSplashComplete = {
+                                navController.navigate(NexusRoute.Dashboard.route) {
+                                    popUpTo(NexusRoute.Splash.route) { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+                }
+
                 // ── Dashboard ─────────────────────────────────────────────────────────
                 composable(route = NexusRoute.Dashboard.route) {
                     CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {

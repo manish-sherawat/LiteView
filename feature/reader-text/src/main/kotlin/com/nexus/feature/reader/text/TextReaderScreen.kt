@@ -121,6 +121,9 @@ fun TextReaderScreen(
             ) {
                 NexusTopBar(
                     title = displayName,
+                    outerVerticalPadding = 4.dp,
+                    innerVerticalPadding = 8.dp,
+                    iconSize = 40.dp,
                     navigationIcon = {
                         Box(
                             modifier = Modifier
@@ -132,7 +135,7 @@ fun TextReaderScreen(
                             androidx.compose.foundation.Image(
                                 painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_back),
                                 contentDescription = "Back",
-                                modifier = Modifier.size(24.dp),
+                                modifier = Modifier.size(20.dp),
                                 colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(com.nexus.core.theme.NexusTheme.colors.textPrimary)
                             )
                         }

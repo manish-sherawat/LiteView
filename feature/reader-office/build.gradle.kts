@@ -41,6 +41,8 @@ dependencies {
 
     implementation(libs.compose.animation)
     implementation(libs.compose.foundation)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons.extended)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
 
@@ -54,6 +56,7 @@ dependencies {
     // Apache POI — DOCX/XLSX/PPTX parsing
     implementation(libs.apache.poi)
     implementation(libs.apache.poi.ooxml)
+    implementation(libs.apache.poi.scratchpad)
     implementation(libs.log4j.api)
     implementation(libs.aalto.xml)
 

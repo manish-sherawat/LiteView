@@ -23,6 +23,10 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.first
 import com.nexus.feature.dashboard.data.RecentDocumentDao
 import com.nexus.core.preferences.UserPreferencesRepository
+import org.apache.poi.hwpf.HWPFDocument
+import org.apache.poi.poifs.filesystem.POIFSFileSystem
+import org.apache.poi.poifs.crypt.EncryptionInfo
+import org.apache.poi.poifs.crypt.Decryptor
 
 // ─── Office Content Models ────────────────────────────────────────────────────
 
@@ -65,7 +69,10 @@ sealed class OfficeReaderUiState {
     data class DocxReady(
         val htmlContent: String,
         val headings: List<DocxHeading> = emptyList(),
-        val showOutline: Boolean = false
+        val showOutline: Boolean = false,
+        val author: String? = null,
+        val creationDate: String? = null,
+        val wordCount: Int? = null
     ) : OfficeReaderUiState()
 
     data class XlsxReady(
@@ -79,6 +86,8 @@ sealed class OfficeReaderUiState {
         val searchMatches: List<Pair<Int, Int>> = emptyList(),
         val currentMatchIndex: Int = 0
     ) : OfficeReaderUiState()
+
+    data class PasswordRequired(val encodedUri: String, val docType: String) : OfficeReaderUiState()
 
     data class Error(val message: String) : OfficeReaderUiState()
 }
@@ -127,9 +136,11 @@ class OfficeReaderViewModel @Inject constructor(
         }
     }
 
-    fun loadDocument(encodedUri: String, docType: String) {
+    fun loadDocument(encodedUri: String, docType: String, password: String? = null) {
         viewModelScope.launch {
-            _uiState.value = OfficeReaderUiState.Loading()
+            if (password == null) {
+                _uiState.value = OfficeReaderUiState.Loading()
+            }
             withContext(Dispatchers.IO) {
                 try {
                     val uriStr = URLDecoder.decode(
@@ -164,7 +175,8 @@ class OfficeReaderViewModel @Inject constructor(
                     }
 
                     val result = when (docType.uppercase()) {
-                        "DOCX" -> parseDocx(inputStream)
+                        "DOCX" -> parseDocx(inputStream, password)
+                        "DOC"  -> parseDoc(inputStream)
                         "XLSX" -> parseXlsx(inputStream)
                         else   -> throw UnsupportedOperationException("Unsupported type: $docType")
                     }
@@ -181,6 +193,10 @@ class OfficeReaderViewModel @Inject constructor(
                     }
 
                     withContext(Dispatchers.Main) { _uiState.value = result }
+                } catch (e: org.apache.poi.EncryptedDocumentException) {
+                    withContext(Dispatchers.Main) {
+                        _uiState.value = OfficeReaderUiState.PasswordRequired(encodedUri, docType)
+                    }
                 } catch (e: Throwable) {
                     withContext(Dispatchers.Main) {
                         _uiState.value = OfficeReaderUiState.Error(
@@ -319,12 +335,65 @@ class OfficeReaderViewModel @Inject constructor(
         }
     }
 
+    private suspend fun parseDoc(stream: java.io.InputStream): OfficeReaderUiState {
+        HWPFDocument(stream).use { doc ->
+            val sb = StringBuilder(1024 * 64)
+            sb.append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>body { margin: 0; padding: 16px; padding-top: 72px; padding-bottom: 80px; font-family: sans-serif; font-size: 16px; line-height: 1.7; color: #1a1a1a; word-wrap: break-word; } p { margin: 0.4em 0; } .dark-mode { color: #e8e8e8; } strong { font-weight: bold; } em { font-style: italic; } s { text-decoration: line-through; }</style></head><body><div id=\"content\">\n")
+
+            val range = doc.range
+            for (i in 0 until range.numParagraphs()) {
+                if (i % 20 == 0) kotlinx.coroutines.yield()
+                val para = range.getParagraph(i)
+                val alignStr = when(para.justification) {
+                    1 -> "center"
+                    2 -> "right"
+                    3 -> "justify"
+                    else -> "left"
+                }
+                sb.append("<p style=\"text-align:$alignStr\">")
+                for (j in 0 until para.numCharacterRuns()) {
+                    val run = para.getCharacterRun(j)
+                    val text = run.text().replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    if (text.isBlank() && text.isEmpty()) continue
+                    var span = text
+                    if (run.isBold) span = "<strong>$span</strong>"
+                    if (run.isItalic) span = "<em>$span</em>"
+                    if (run.isStrikeThrough) span = "<s>$span</s>"
+                    sb.append(span)
+                }
+                sb.append("</p>\n")
+            }
+            sb.append("\n</div></body></html>")
+            
+            return OfficeReaderUiState.DocxReady(
+                htmlContent = sb.toString(),
+                headings = emptyList()
+            )
+        }
+    }
+
     // ── DOCX → HTML Parser ────────────────────────────────────────────────────
     // Converts the Word document to a self-contained HTML string.
     // Images are embedded as base64 data URIs (no temp files needed).
 
-    private suspend fun parseDocx(stream: java.io.InputStream): OfficeReaderUiState {
-        XWPFDocument(stream).use { doc ->
+    private suspend fun parseDocx(stream: java.io.InputStream, password: String? = null): OfficeReaderUiState {
+        var finalStream = stream
+        var poifsToClose: POIFSFileSystem? = null
+
+        if (password != null) {
+            val poifs = POIFSFileSystem(stream)
+            poifsToClose = poifs
+            val info = EncryptionInfo(poifs)
+            val decryptor = Decryptor.getInstance(info)
+            if (!decryptor.verifyPassword(password)) {
+                poifs.close()
+                return OfficeReaderUiState.Error("Incorrect password.")
+            }
+            finalStream = decryptor.getDataStream(poifs)
+        }
+
+        try {
+            XWPFDocument(finalStream).use { doc ->
             val headings = mutableListOf<DocxHeading>()
             val sb = StringBuilder(1024 * 64) // preallocate 64 KB
 
@@ -400,6 +469,25 @@ class OfficeReaderViewModel @Inject constructor(
             val bodyElements = doc.bodyElements
             val total = bodyElements.size
 
+            val author = try { doc.properties.coreProperties.creator } catch (_: Exception) { null }
+            val creationDate = try { doc.properties.coreProperties.created?.toString() } catch (_: Exception) { null }
+            var totalWords = 0
+
+            val headers = try { doc.headerList } catch (_: Exception) { emptyList() }
+            if (headers.isNotEmpty()) {
+                sb.append("<div style=\"opacity: 0.6; border-bottom: 1px solid #ccc; padding-bottom: 8px; margin-bottom: 16px;\">\n")
+                for (header in headers) {
+                    for (element in header.bodyElements) {
+                        if (element is org.apache.poi.xwpf.usermodel.XWPFParagraph) {
+                            appendParagraphHtml(element, doc, sb, headings)
+                        } else if (element is org.apache.poi.xwpf.usermodel.XWPFTable) {
+                            appendTableHtml(element, sb)
+                        }
+                    }
+                }
+                sb.append("</div>\n")
+            }
+
             for ((idx, element) in bodyElements.withIndex()) {
                 if (idx % 20 == 0) {
                     _uiState.value = OfficeReaderUiState.Loading(
@@ -411,22 +499,74 @@ class OfficeReaderViewModel @Inject constructor(
                 when (element.elementType) {
                     org.apache.poi.xwpf.usermodel.BodyElementType.PARAGRAPH -> {
                         val para = element as org.apache.poi.xwpf.usermodel.XWPFParagraph
+                        totalWords += (para.text ?: "").split(Regex("\\s+")).count { it.isNotBlank() }
                         appendParagraphHtml(para, doc, sb, headings)
                     }
                     org.apache.poi.xwpf.usermodel.BodyElementType.TABLE -> {
                         val table = element as org.apache.poi.xwpf.usermodel.XWPFTable
+                        for (row in table.rows) {
+                            for (cell in row.tableCells) {
+                                totalWords += (cell.text ?: "").split(Regex("\\s+")).count { it.isNotBlank() }
+                            }
+                        }
                         appendTableHtml(table, sb)
                     }
                     else -> {}
                 }
             }
 
+            val footers = try { doc.footerList } catch (_: Exception) { emptyList() }
+            if (footers.isNotEmpty()) {
+                sb.append("<div style=\"opacity: 0.6; border-top: 1px solid #ccc; padding-top: 8px; margin-top: 16px;\">\n")
+                for (footer in footers) {
+                    for (element in footer.bodyElements) {
+                        if (element is org.apache.poi.xwpf.usermodel.XWPFParagraph) {
+                            appendParagraphHtml(element, doc, sb, headings)
+                        } else if (element is org.apache.poi.xwpf.usermodel.XWPFTable) {
+                            appendTableHtml(element, sb)
+                        }
+                    }
+                }
+                sb.append("</div>\n")
+            }
+
+            val footnotes = try { doc.footnotes } catch (_: Exception) { emptyList() }
+            val endnotes = try { doc.endnotes } catch (_: Exception) { emptyList() }
+            if (footnotes.isNotEmpty() || endnotes.isNotEmpty()) {
+                sb.append("<hr style=\"margin-top: 40px;\">\n<div style=\"font-size: 0.85em; opacity: 0.8;\">\n")
+                for (footnote in footnotes) {
+                    sb.append("<div id=\"footnote_${footnote.id}\"><b><a href=\"#\">[${footnote.id}]</a></b> ")
+                    for (element in footnote.bodyElements) {
+                        if (element is org.apache.poi.xwpf.usermodel.XWPFParagraph) {
+                            appendParagraphHtml(element, doc, sb, headings)
+                        }
+                    }
+                    sb.append("</div>\n")
+                }
+                for (endnote in endnotes) {
+                    sb.append("<div id=\"endnote_${endnote.id}\"><b><a href=\"#\">[${endnote.id}]</a></b> ")
+                    for (element in endnote.bodyElements) {
+                        if (element is org.apache.poi.xwpf.usermodel.XWPFParagraph) {
+                            appendParagraphHtml(element, doc, sb, headings)
+                        }
+                    }
+                    sb.append("</div>\n")
+                }
+                sb.append("</div>\n")
+            }
+
             sb.append("\n</div></body></html>")
 
             return OfficeReaderUiState.DocxReady(
                 htmlContent = sb.toString(),
-                headings = headings
+                headings = headings,
+                author = author,
+                creationDate = creationDate,
+                wordCount = totalWords
             )
+            }
+        } finally {
+            poifsToClose?.close()
         }
     }
 
@@ -452,30 +592,55 @@ class OfficeReaderViewModel @Inject constructor(
             else                      -> "left"
         }
 
+        val spacingBefore = try { para.spacingBefore.toDouble() / 20.0 } catch (_: Exception) { null }
+        val spacingAfter = try { para.spacingAfter.toDouble() / 20.0 } catch (_: Exception) { null }
+        val spacingBetween = try { para.spacingBetween.toDouble() / 240.0 } catch (_: Exception) { null }
+        val indentLeft = try { para.indentationLeft.toDouble() / 20.0 } catch (_: Exception) { null }
+        val indentRight = try { para.indentationRight.toDouble() / 20.0 } catch (_: Exception) { null }
+        val indentFirstLine = try { para.indentationFirstLine.toDouble() / 20.0 } catch (_: Exception) { null }
+        val isPageBreak = try { para.isPageBreak } catch (_: Exception) { false }
+        val bookmarks = try { para.ctp.bookmarkStartList.map { it.name } } catch (_: Exception) { emptyList() }
+        val pStyles = buildString {
+            append("text-align:$alignStr;")
+            if (spacingBefore != null && spacingBefore > 0) append("margin-top:${spacingBefore}pt;")
+            if (spacingAfter != null && spacingAfter > 0) append("margin-bottom:${spacingAfter}pt;")
+            if (spacingBetween != null && spacingBetween > 0) append("line-height:${spacingBetween};")
+            if (indentLeft != null && indentLeft > 0 && !isList) append("margin-left:${indentLeft}pt;")
+            if (indentRight != null && indentRight > 0) append("margin-right:${indentRight}pt;")
+            if (indentFirstLine != null && indentFirstLine > 0 && !isList) append("text-indent:${indentFirstLine}pt;")
+        }
+
         // Check if paragraph text is blank (skip empty paragraphs unless heading)
         val rawText = try { para.text ?: "" } catch (_: Exception) { "" }
 
+        val anchorsHtml = bookmarks.joinToString("") { "<a id=\"$it\"></a>" }
+        val finalIdAttr = if (isHeading) "id=\"h_${headings.size}\"" else ""
+
+        if (isPageBreak) {
+            sb.append("<hr class=\"page-break\">\n")
+        }
+
         if (isHeading) {
-            val anchorId = "h_${headings.size}"
             val headingText = rawText.trim()
             if (headingText.isNotEmpty()) {
-                headings.add(DocxHeading(text = headingText, level = headingLevel, anchorId = anchorId))
+                headings.add(DocxHeading(text = headingText, level = headingLevel, anchorId = "h_${headings.size}"))
             }
-            sb.append("""<h$headingLevel id="$anchorId" style="text-align:$alignStr">""")
+            sb.append("""<h$headingLevel $finalIdAttr style="$pStyles">$anchorsHtml""")
             appendRunsHtml(para, doc, sb)
             sb.append("</h$headingLevel>\n")
         } else if (isList) {
             val indent = (listLevel + 1) * 20
             val bullet = if (listLevel % 2 == 0) "&#8226;" else "&#9702;"
-            sb.append("""<p style="text-align:$alignStr;margin-left:${indent}px">$bullet&nbsp;""")
+            val listStyles = "$pStyles;margin-left:${indent}px"
+            sb.append("""<p $finalIdAttr style="$listStyles">$anchorsHtml$bullet&nbsp;""")
             appendRunsHtml(para, doc, sb)
             sb.append("</p>\n")
         } else {
             if (rawText.isBlank()) {
                 // Small vertical gap for blank lines
-                sb.append("<p style=\"margin:4px 0\">&nbsp;</p>\n")
+                sb.append("<p $finalIdAttr style=\"margin:4px 0\">$anchorsHtml&nbsp;</p>\n")
             } else {
-                sb.append("""<p style="text-align:$alignStr">""")
+                sb.append("""<p $finalIdAttr style="$pStyles">$anchorsHtml""")
                 appendRunsHtml(para, doc, sb)
                 sb.append("</p>\n")
             }
@@ -517,14 +682,25 @@ class OfficeReaderViewModel @Inject constructor(
                 val isStrike    = try { run.isStrikeThrough } catch (_: Exception) { false }
                 val colorHex    = try { run.color?.let { if (it.length == 6) "#$it" else null } } catch (_: Exception) { null }
                 val fontSize    = try { run.fontSizeAsDouble?.toInt()?.takeIf { it > 0 } } catch (_: Exception) { null }
+                val vAlign      = try { run.verticalAlignment?.toString()?.lowercase() } catch (_: Exception) { null }
+                val isSubscript = vAlign == "subscript"
+                val isSuperscript = vAlign == "superscript"
+                val highlightColor = try { run.textHighlightColor?.toString()?.takeIf { it != "none" && it.isNotBlank() } } catch (_: Exception) { null }
 
                 val isHyperlink = run is org.apache.poi.xwpf.usermodel.XWPFHyperlinkRun
                 val url = if (isHyperlink) {
                     try {
-                        val id = (run as org.apache.poi.xwpf.usermodel.XWPFHyperlinkRun).hyperlinkId
-                        doc.getHyperlinkByID(id)?.url
+                        val hr = run as org.apache.poi.xwpf.usermodel.XWPFHyperlinkRun
+                        if (!hr.anchor.isNullOrEmpty()) {
+                            "#" + hr.anchor
+                        } else {
+                            doc.getHyperlinkByID(hr.hyperlinkId)?.url
+                        }
                     } catch (_: Exception) { null }
                 } else null
+
+                val footnoteIds = try { run.ctr?.footnoteReferenceList?.map { it.id } ?: emptyList() } catch (_: Exception) { emptyList() }
+                val endnoteIds = try { run.ctr?.endnoteReferenceList?.map { it.id } ?: emptyList() } catch (_: Exception) { emptyList() }
 
                 // HTML-escape text
                 val escaped = text
@@ -537,6 +713,7 @@ class OfficeReaderViewModel @Inject constructor(
                 val styles = buildString {
                     if (colorHex != null) append("color:$colorHex;")
                     if (fontSize != null) append("font-size:${fontSize}pt;")
+                    if (highlightColor != null) append("background-color:$highlightColor;")
                 }
 
                 var span = escaped
@@ -544,8 +721,16 @@ class OfficeReaderViewModel @Inject constructor(
                 if (isItalic)    span = "<em>$span</em>"
                 if (isUnderline) span = "<u>$span</u>"
                 if (isStrike)    span = "<s>$span</s>"
+                if (isSubscript) span = "<sub>$span</sub>"
+                if (isSuperscript) span = "<sup>$span</sup>"
                 if (styles.isNotEmpty()) span = """<span style="$styles">$span</span>"""
-                if (url != null) span = """<a href="${htmlEscape(url)}">$span</a>"""
+                if (url != null) {
+                    if (url.startsWith("#")) span = """<a href="$url">$span</a>"""
+                    else span = """<a href="${htmlEscape(url)}">$span</a>"""
+                }
+
+                for (fnId in footnoteIds) span += "<sup><a href=\"#footnote_$fnId\">[$fnId]</a></sup>"
+                for (enId in endnoteIds) span += "<sup><a href=\"#endnote_$enId\">[$enId]</a></sup>"
 
                 sb.append(span)
             } catch (_: Exception) { /* skip bad run */ }
@@ -557,33 +742,68 @@ class OfficeReaderViewModel @Inject constructor(
         table: org.apache.poi.xwpf.usermodel.XWPFTable,
         sb: StringBuilder
     ) {
+        val rowSpans = mutableMapOf<Pair<Int, Int>, Int>()
+        for (rIdx in table.rows.indices) {
+            val row = table.rows[rIdx]
+            for (cIdx in row.tableCells.indices) {
+                val cell = row.tableCells[cIdx]
+                val tcPr = try { cell.ctTc?.tcPr } catch (_: Exception) { null }
+                val vMergeNode = try { tcPr?.vMerge } catch (_: Exception) { null }
+                val vMergeVal = try { vMergeNode?.`val` } catch (_: Exception) { null }
+                if (vMergeVal == org.openxmlformats.schemas.wordprocessingml.x2006.main.STMerge.RESTART) {
+                    var span = 1
+                    for (nextR in rIdx + 1 until table.rows.size) {
+                        val nextRow = table.rows[nextR]
+                        val nextCell = if (cIdx < nextRow.tableCells.size) nextRow.tableCells[cIdx] else break
+                        val nextTcPr = try { nextCell.ctTc?.tcPr } catch (_: Exception) { null }
+                        val nextVMergeNode = try { nextTcPr?.vMerge } catch (_: Exception) { null }
+                        val nextVMergeVal = try { nextVMergeNode?.`val` } catch (_: Exception) { null }
+                        val isContinue = nextVMergeNode != null && nextVMergeVal != org.openxmlformats.schemas.wordprocessingml.x2006.main.STMerge.RESTART
+                        if (isContinue) span++ else break
+                    }
+                    if (span > 1) rowSpans[Pair(rIdx, cIdx)] = span
+                }
+            }
+        }
+
         sb.append("<table>\n")
         table.rows.forEachIndexed { rowIdx, row ->
             sb.append("<tr>")
-            for (cell in row.tableCells) {
+            row.tableCells.forEachIndexed { cIdx, cell ->
                 val tag = if (rowIdx == 0) "th" else "td"
                 val tcPr = try { cell.ctTc?.tcPr } catch (_: Exception) { null }
 
-                // Compute accurate colSpan from w:gridSpan
                 val colSpan = try {
                     tcPr?.gridSpan?.`val`?.toInt()?.coerceAtLeast(1) ?: 1
                 } catch (_: Exception) { 1 }
 
-                // Skip cells that are vertical merge continuations
-                val vMergeVal = try { tcPr?.vMerge?.`val` } catch (_: Exception) { null }
-                val isVMergeContinue = vMergeVal == org.openxmlformats.schemas.wordprocessingml.x2006.main.STMerge.CONTINUE
-                if (isVMergeContinue) continue
+                val vMergeNode = try { tcPr?.vMerge } catch (_: Exception) { null }
+                val vMergeVal = try { vMergeNode?.`val` } catch (_: Exception) { null }
+                val isVMergeContinue = vMergeNode != null && vMergeVal != org.openxmlformats.schemas.wordprocessingml.x2006.main.STMerge.RESTART
+                if (isVMergeContinue) return@forEachIndexed
+
+                val rSpan = rowSpans[Pair(rowIdx, cIdx)] ?: 1
+
+                val bgColor = try { cell.color?.takeIf { it.length == 6 && it != "auto" } } catch (_: Exception) { null }
+                val vAlign = try { cell.verticalAlignment } catch (_: Exception) { null }
+                val vAlignStr = when (vAlign) {
+                    org.apache.poi.xwpf.usermodel.XWPFTableCell.XWPFVertAlign.CENTER -> "middle"
+                    org.apache.poi.xwpf.usermodel.XWPFTableCell.XWPFVertAlign.BOTTOM -> "bottom"
+                    else -> "top"
+                }
 
                 val colSpanAttr = if (colSpan > 1) """ colspan="$colSpan"""" else ""
-                sb.append("<$tag$colSpanAttr>")
+                val rowSpanAttr = if (rSpan > 1) """ rowspan="$rSpan"""" else ""
+                val bgAttr = if (bgColor != null) "background-color:#$bgColor;" else ""
+                val alignAttr = "vertical-align:$vAlignStr;"
 
-                // Render cell content as paragraphs
+                sb.append("<$tag$colSpanAttr$rowSpanAttr style=\"$bgAttr$alignAttr\">")
+
                 var firstPara = true
                 for (para in cell.paragraphs) {
                     val cellText = try { para.text ?: "" } catch (_: Exception) { "" }
                     if (cellText.isBlank() && firstPara) { firstPara = false; continue }
                     if (!firstPara) sb.append("<br>")
-                    // Inline runs for formatting
                     try {
                         appendRunsHtmlSimple(para, sb)
                     } catch (_: Exception) {

@@ -51,6 +51,9 @@ enum class DocumentType {
 
 sealed class NexusRoute(val route: String) {
 
+    // Splash screen - initial startup
+    data object Splash : NexusRoute("splash")
+
     // Dashboard — main entry point showing recent files
     data object Dashboard : NexusRoute("dashboard")
 
