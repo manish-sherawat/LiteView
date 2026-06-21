@@ -23,6 +23,7 @@ import androidx.compose.ui.window.Dialog
 import com.nexus.core.theme.NexusTheme
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.components.NexusButton
+import com.nexus.core.ui.components.NexusTopBar
 import com.nexus.core.R
 
 @Composable
@@ -75,18 +76,12 @@ fun ScannerReviewScreen(
             .statusBarsPadding()
     ) {
         // Top Bar
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            NexusText(
-                text = "Review (${selectedPageIndex + 1}/${scannedPages.size})",
-                style = NexusTheme.typography.title,
-                color = NexusTheme.colors.textPrimary
-            )
-            NexusButton(text = "Save", onClick = onFinish)
-        }
+        NexusTopBar(
+            title = "Review (${selectedPageIndex + 1}/${scannedPages.size})",
+            actions = {
+                NexusButton(text = "Save", onClick = onFinish)
+            }
+        )
 
         // Preview
         Box(

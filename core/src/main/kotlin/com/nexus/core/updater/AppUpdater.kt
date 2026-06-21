@@ -44,8 +44,11 @@ class AppUpdater @Inject constructor(
             withContext(Dispatchers.IO) {
                 val url = URL("https://api.github.com/repos/$githubOwner/$githubRepo/releases/latest")
                 val connection = url.openConnection() as HttpURLConnection
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
                 connection.requestMethod = "GET"
                 connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+                connection.setRequestProperty("User-Agent", "LiteView-AppUpdater")
                 
                 if (connection.responseCode == HttpURLConnection.HTTP_OK) {
                     val reader = BufferedReader(InputStreamReader(connection.inputStream))
@@ -80,6 +83,8 @@ class AppUpdater @Inject constructor(
                     }
                 } else if (connection.responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
                     _updateState.value = UpdateState.Error("Repository or release not found. Please check your GitHub username and repository name in AppUpdater.kt.")
+                } else if (connection.responseCode == HttpURLConnection.HTTP_GATEWAY_TIMEOUT) {
+                    _updateState.value = UpdateState.Error("GitHub API timeout (504). Your network or ISP may be blocking access, or GitHub is down.")
                 } else {
                     _updateState.value = UpdateState.Error("Failed to check for updates. Code: ${connection.responseCode}")
                 }
@@ -145,8 +150,11 @@ class AppUpdater @Inject constructor(
             try {
                 val url = URL("https://api.github.com/repos/$githubOwner/$githubRepo/releases")
                 val connection = url.openConnection() as HttpURLConnection
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
                 connection.requestMethod = "GET"
                 connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+                connection.setRequestProperty("User-Agent", "LiteView-AppUpdater")
                 
                 if (connection.responseCode == HttpURLConnection.HTTP_OK) {
                     val reader = BufferedReader(InputStreamReader(connection.inputStream))

@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,6 +23,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nexus.core.theme.NexusTheme
 import com.nexus.core.ui.NexusText
+import com.nexus.core.ui.NexusSurface
 
 @Composable
 fun NexusCollapsingTopBar(
@@ -142,28 +147,94 @@ fun NexusTopBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(NexusTheme.colors.surface.copy(alpha = 0.6f))
-            .padding(horizontal = 16.dp)
-            .height(64.dp)
+            .background(NexusTheme.colors.surface.copy(alpha = 0.92f))
             .statusBarsPadding()
     ) {
-        if (navigationIcon != null) {
-            Box(modifier = Modifier.align(Alignment.CenterStart)) {
-                navigationIcon()
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .padding(horizontal = 16.dp)
+        ) {
+            if (navigationIcon != null) {
+                Box(modifier = Modifier.align(Alignment.CenterStart)) {
+                    navigationIcon()
+                }
+            }
+            NexusText(
+                text = title,
+                style = titleStyle ?: NexusTheme.typography.title,
+                color = NexusTheme.colors.textPrimary,
+                maxLines = 1,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .basicMarquee()
+                    .padding(horizontal = 48.dp)
+            )
+            if (actions != null) {
+                Row(modifier = Modifier.align(Alignment.CenterEnd)) {
+                    actions()
+                }
             }
         }
-        NexusText(
-            text = title,
-            style = titleStyle ?: NexusTheme.typography.title,
-            color = NexusTheme.colors.textPrimary,
-            maxLines = 1,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .basicMarquee()
-                .padding(horizontal = 48.dp)
-        )
-        if (actions != null) {
-            Row(modifier = Modifier.align(Alignment.CenterEnd)) {
+    }
+}
+
+@Composable
+fun NexusPillTopBar(
+    title: String,
+    modifier: Modifier = Modifier,
+    titleStyle: androidx.compose.ui.text.TextStyle? = null,
+    navigationIcon: (@Composable () -> Unit)? = null,
+    outerVerticalPadding: androidx.compose.ui.unit.Dp = 12.dp,
+    innerVerticalPadding: androidx.compose.ui.unit.Dp = 12.dp,
+    iconSize: androidx.compose.ui.unit.Dp = 48.dp,
+    actions: @Composable RowScope.() -> Unit = {}
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp, vertical = outerVerticalPadding),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (navigationIcon != null) {
+            NexusSurface(
+                modifier = Modifier.size(iconSize),
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = NexusTheme.colors.surfaceVariant,
+                elevation = 8.dp
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    navigationIcon()
+                }
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+        }
+
+        NexusSurface(
+            modifier = Modifier.weight(1f),
+            shape = NexusTheme.shapes.pill,
+            color = NexusTheme.colors.surfaceVariant,
+            elevation = 8.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = innerVerticalPadding),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                NexusText(
+                    text = title,
+                    style = titleStyle ?: NexusTheme.typography.h2,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                
                 actions()
             }
         }

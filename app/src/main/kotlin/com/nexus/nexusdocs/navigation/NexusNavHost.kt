@@ -32,6 +32,7 @@ import com.nexus.feature.reader.office.OfficeReaderScreen
 import com.nexus.feature.reader.pdf.PdfReaderScreen
 import com.nexus.feature.reader.text.TextReaderScreen
 import com.nexus.nexusdocs.ui.splash.NexusSplashScreen
+import com.nexus.nexusdocs.ui.UnsupportedFileScreen
 
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -69,7 +70,7 @@ fun NexusNavHost(
                 // M3 Emphasized Decelerate: fast travel → gentle landing
                 enterTransition = {
                     slideInHorizontally(
-                        initialOffsetX = { fullWidth -> (fullWidth * 0.08f).toInt() },
+                        initialOffsetX = { fullWidth -> (fullWidth * 0.15f).toInt() },
                         animationSpec  = tween(DurationMedium3, easing = EmphasizedDecelerateEasing)
                     ) + fadeIn(
                         animationSpec = tween(DurationMedium2, easing = EmphasizedDecelerateEasing)
@@ -79,7 +80,7 @@ fun NexusNavHost(
                 // M3 Emphasized Accelerate: gentle start → fast exit
                 exitTransition = {
                     slideOutHorizontally(
-                        targetOffsetX  = { fullWidth -> -(fullWidth * 0.08f).toInt() },
+                        targetOffsetX  = { fullWidth -> -(fullWidth * 0.15f).toInt() },
                         animationSpec  = tween(DurationMedium2, easing = EmphasizedAccelerateEasing)
                     ) + fadeOut(
                         animationSpec = tween(DurationShort4, easing = EmphasizedAccelerateEasing)
@@ -88,7 +89,7 @@ fun NexusNavHost(
                 // ── Back pop: previous screen slides back in from left ─────────────
                 popEnterTransition = {
                     slideInHorizontally(
-                        initialOffsetX = { fullWidth -> -(fullWidth * 0.08f).toInt() },
+                        initialOffsetX = { fullWidth -> -(fullWidth * 0.15f).toInt() },
                         animationSpec  = tween(DurationMedium3, easing = EmphasizedDecelerateEasing)
                     ) + fadeIn(
                         animationSpec = tween(DurationMedium2, easing = EmphasizedDecelerateEasing)
@@ -97,7 +98,7 @@ fun NexusNavHost(
                 // ── Back pop: current screen slides out to right ───────────────────
                 popExitTransition = {
                     slideOutHorizontally(
-                        targetOffsetX  = { fullWidth -> (fullWidth * 0.08f).toInt() },
+                        targetOffsetX  = { fullWidth -> (fullWidth * 0.15f).toInt() },
                         animationSpec  = tween(DurationMedium2, easing = EmphasizedAccelerateEasing)
                     ) + fadeOut(
                         animationSpec = tween(DurationShort4, easing = EmphasizedAccelerateEasing)
@@ -180,7 +181,7 @@ fun NexusNavHost(
                 }
 
                 // ── Unsupported File ──────────────────────────────────────────────────
-                composable(route = "reader/unsupported/{fileName}") { backStackEntry ->
+                composable(route = NexusRoute.Unsupported.ROUTE) { backStackEntry ->
                     val fileName = backStackEntry.arguments?.getString("fileName")
                         ?.let { java.net.URLDecoder.decode(java.net.URLDecoder.decode(it, "UTF-8"), "UTF-8") } ?: "Unknown file"
                     CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
@@ -192,56 +193,3 @@ fun NexusNavHost(
     }
 }
 
-// ─── Unsupported File Screen ──────────────────────────────────────────────────
-
-@Composable
-private fun UnsupportedFileScreen(fileName: String, onBack: () -> Unit) {
-    BackHandler { onBack() }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(com.nexus.core.theme.NexusTheme.colors.surface)
-    ) {
-        NexusTopBar(
-            title = "Unsupported File",
-            navigationIcon = {
-                com.nexus.core.ui.NexusText(
-                    text = "🔙",
-                    style = com.nexus.core.theme.NexusTheme.typography.title,
-                    modifier = Modifier.clickable { onBack() }.padding(8.dp)
-                )
-            }
-        )
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(32.dp)
-            ) {
-                com.nexus.core.ui.NexusText(
-                    text = "🚫",
-                    style = com.nexus.core.theme.NexusTheme.typography.h1,
-                    modifier = Modifier.size(72.dp)
-                )
-                com.nexus.core.ui.NexusText(
-                    text = "Unsupported File Type",
-                    style = com.nexus.core.theme.NexusTheme.typography.title,
-                    color = com.nexus.core.theme.NexusTheme.colors.textPrimary
-                )
-                com.nexus.core.ui.NexusText(
-                    text = "\"$fileName\" cannot be opened.\nSupported: PDF, DOCX, XLSX, TXT",
-                    style = com.nexus.core.theme.NexusTheme.typography.body,
-                    color = com.nexus.core.theme.NexusTheme.colors.textSecondary,
-                    textAlign = TextAlign.Center
-                )
-                com.nexus.core.ui.components.NexusButton(
-                    text = "Go Back",
-                    onClick = onBack
-                )
-            }
-        }
-    }
-}

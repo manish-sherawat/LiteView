@@ -11,6 +11,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.getValue
@@ -24,8 +25,10 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Dp
@@ -119,7 +122,7 @@ fun Modifier.springBounceClick(
 
     androidx.compose.runtime.LaunchedEffect(isPressed) {
         if (isPressed && enabled && hapticFeedbackEnabled) {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         }
     }
 
@@ -130,6 +133,46 @@ fun Modifier.springBounceClick(
             indication        = null,
             enabled           = enabled,
             onClick           = onClick
+        )
+}
+
+@androidx.compose.foundation.ExperimentalFoundationApi
+fun Modifier.springBounceCombinedClick(
+    enabled: Boolean = true,
+    scaleDown: Float = 0.92f,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null
+): Modifier = composed {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue  = if (isPressed && enabled) scaleDown else 1f,
+        animationSpec = pressSpring(),
+        label        = "pressScaleCombined"
+    )
+
+    val hapticFeedbackEnabled = LocalHapticFeedbackEnabled.current
+    val haptic = LocalHapticFeedback.current
+
+    androidx.compose.runtime.LaunchedEffect(isPressed) {
+        if (isPressed && enabled && hapticFeedbackEnabled) {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+    }
+
+    this
+        .scale(scale)
+        .combinedClickable(
+            interactionSource = interactionSource,
+            indication        = null,
+            enabled           = enabled,
+            onClick           = onClick,
+            onLongClick       = onLongClick?.let {
+                {
+                    if (hapticFeedbackEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    it()
+                }
+            }
         )
 }
 
@@ -144,8 +187,10 @@ fun Modifier.fadeSlideIn(
     val density  = LocalDensity.current
     val offsetYPx = remember(offsetY) { with(density) { offsetY.toPx() } }
 
+    val cappedDelay = minOf(delay, 200)
+
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        if (delay > 0) kotlinx.coroutines.delay(delay.toLong())
+        if (cappedDelay > 0) kotlinx.coroutines.delay(cappedDelay.toLong())
         targetAlpha        = 1f
         targetTranslationY = 0f
     }
@@ -183,11 +228,14 @@ fun Modifier.shimmerEffect(): Modifier = composed {
         label = "shimmerX"
     )
 
+    val isLight = com.nexus.core.theme.NexusTheme.colors.surfaceVariant.luminance() > 0.5f
+    val shimmerColor = if (isLight) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.30f)
+
     this.drawWithContent {
         drawContent()
         val bandStart = shimmerX * size.width
         val gradient  = Brush.linearGradient(
-            colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.30f), Color.Transparent),
+            colors = listOf(Color.Transparent, shimmerColor, Color.Transparent),
             start  = Offset(bandStart, 0f),
             end    = Offset(bandStart + size.width * 0.6f, 0f)
         )

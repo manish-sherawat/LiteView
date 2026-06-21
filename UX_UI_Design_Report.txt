@@ -1,0 +1,1227 @@
+================================================================================
+   LITEVIEW (NexusDocsViewer) — COMPREHENSIVE UX / UI / DESIGN / TYPOGRAPHY
+                         IMPROVEMENT REPORT
+           Generated: 2026-06-21  |  Analyst: Antigravity AI
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+  1. Executive Summary
+  2. Typography System
+  3. Color & Theming
+  4. Shape & Spacing System
+  5. Splash Screen
+  6. Navigation (Bottom Nav + NavHost)
+  7. Dashboard Screen
+     7a. Header & Search
+     7b. Tab Row
+     7c. File List Item
+     7d. File Grid Item
+     7e. Empty State
+  8. Settings Screen
+  9. PDF Reader Screen
+ 10. Text Reader Screen
+ 11. Office Reader Screen
+ 12. Scanner Feature
+ 13. Unsupported File Screen
+ 14. Dialogs & Overlays
+ 15. Animation System
+ 16. Accessibility
+ 17. Micro-Interaction Consistency
+ 18. Error & Loading States
+ 19. General Layout / Padding Audit
+ 20. Priority Action Matrix
+
+
+================================================================================
+  1. EXECUTIVE SUMMARY
+================================================================================
+
+LiteView is a well-structured, clean document-viewer application built with Jetpack
+Compose following a multi-module architecture. The animation system is one of its
+strongest assets — it employs a custom liquid-blob bottom nav, spring physics on
+press interactions, M3 easing curves on navigation transitions, and a carefully
+choreographed splash sequence. The codebase is clearly written and demonstrates
+deliberate design thinking.
+
+However, several recurring issues reduce the overall UX quality:
+
+  [A] Typography falls back to FontFamily.SansSerif (the system default) rather
+      than a curated, brand-consistent typeface like Inter, Nunito, or Outfit.
+      This is the single highest-impact change available.
+
+  [B] The NexusSearchBar lacks a leading search icon, making it feel unfinished.
+
+  [C] The "⋮" context-menu trigger in file items uses a plain text character
+      instead of a proper vector icon, causing size/weight inconsistencies.
+
+  [D] The UnsupportedFileScreen uses an emoji (🔙) as the back-button icon,
+      which is inconsistent with the rest of the app.
+
+  [E] The scanner feature shows only a blank Box while Google's ML Kit UI loads,
+      giving no user feedback during what can be a 1–3 second wait.
+
+  [F] Loading states across all readers show plain undecorated text ("Loading
+      PDF..."), which should be replaced with shimmer/skeleton placeholders.
+
+  [G] The NexusTopBar (used in Settings and UnsupportedFile) is 64 dp tall
+      BEFORE statusBarsPadding(), which means the actual height varies between
+      devices — a container height should not include top insets directly.
+
+  [H] Page indicator and floating bottom bar in the PDF reader overlap on small
+      screens because both are pinned to BottomCenter with hardcoded dp offsets
+      instead of being stacked in a proper Column.
+
+  [I] Colors defined in the component level (FileListItem, FileGridItem) use
+      raw Color(0xFF...) literals duplicated in both files — these should be
+      centralized in NexusColors or a companion object.
+
+  [J] The NexusButton renders its label using NexusTheme.typography.label (12 sp)
+      — too small for a primary action element; labels in buttons should be at
+      least 14 sp.
+
+
+================================================================================
+  2. TYPOGRAPHY SYSTEM
+================================================================================
+
+FILE: core/src/main/kotlin/com/nexus/core/theme/NexusTypography.kt
+
+CURRENT STATE:
+  All styles use FontFamily.SansSerif — this maps to whatever the device's
+  default sans-serif font is (Roboto on most Android devices). There is no
+  custom Google Font loaded, no letter-spacing tuning on body/label styles,
+  and no line-height defined.
+
+  Scale snapshot:
+    h1     — 30 sp / Bold
+    h2     — 22 sp / Bold
+    title  — 16 sp / SemiBold
+    body   — 14 sp / Normal
+    label  — 12 sp / Medium
+    caption— 11 sp / Normal
+
+ISSUES FOUND:
+
+  [T-1] No custom font family. The app has no distinguishing typographic voice.
+        Impact: CRITICAL — visible on every single screen.
+
+  [T-2] No line-height (lineHeight) set on any style. Long body text and the
+        text-reader content will feel cramped at the default multiplier (~1.2x).
+        Impact: HIGH — most visible in TextReaderScreen and Settings descriptions.
+
+  [T-3] No letter-spacing defined for body or label styles. The title style on
+        the splash screen manually sets letterSpacing = (-0.5).sp inline,
+        indicating the system-level styles do not carry tracking.
+        Impact: MEDIUM — inconsistency between what the theme declares and what
+        individual screens patch inline.
+
+  [T-4] The h1 style (30 sp) is applied inline at 36 sp in DashboardScreen
+        (.copy(fontSize = 36.sp)). This bypasses the design system. Either
+        add a "display" style to the scale or use the declared h1 size.
+        Impact: MEDIUM.
+
+  [T-5] Caption style at 11 sp is borderline too small for readability on
+        low-density screens (mdpi). WCAG SC 1.4.4 recommends text be resizable;
+        11 sp is also below Android's own minimum recommended touch-readable
+        size of 12 sp.
+        Impact: MEDIUM — affects file subtitle metadata row and settings
+        description rows.
+
+  [T-6] NexusButton uses typography.label (12 sp) for button labels. Buttons
+        should use at least body (14 sp) or a dedicated "button" style at 14 sp
+        with Medium weight and ~0.5 sp letter-spacing (Material 3 convention).
+        Impact: MEDIUM.
+
+  [T-7] Splash screen wordmark is defined with entirely inline TextStyle objects
+        (fontSize = 38.sp, FontWeight.Bold / FontWeight.Light) — completely
+        outside the design system. If branding changes, this is a manual patch.
+        Impact: LOW (isolated to splash).
+
+RECOMMENDATIONS:
+
+  1. Add a Google Font (Inter, Nunito, or Outfit) via the Compose fonts dependency.
+     Create a FontFamily constant in NexusTypography.kt and apply it to all styles.
+
+     Example addition to build.gradle.kts (app):
+       implementation("androidx.compose.ui:ui-text-google-fonts:<version>")
+
+     Then in NexusTypography.kt:
+       val NexusFontFamily = FontFamily(
+           Font(GoogleFont("Inter"), FontWeight.Normal),
+           Font(GoogleFont("Inter"), FontWeight.Medium),
+           Font(GoogleFont("Inter"), FontWeight.SemiBold),
+           Font(GoogleFont("Inter"), FontWeight.Bold),
+           Font(GoogleFont("Inter"), FontWeight.Light)
+       )
+
+  2. Add lineHeight to body and caption:
+       body    -> lineHeight = 22.sp
+       caption -> lineHeight = 18.sp
+
+  3. Add a dedicated "buttonLabel" style:
+       buttonLabel = TextStyle(
+           fontFamily = NexusFontFamily,
+           fontWeight = FontWeight.SemiBold,
+           fontSize   = 14.sp,
+           letterSpacing = 0.5.sp
+       )
+
+  4. Increase caption from 11 sp → 12 sp.
+
+  5. Add a "display" style at 36 sp / Bold with -1 sp letterSpacing to cover
+     the DashboardScreen title. Remove the inline .copy(fontSize = 36.sp) call.
+
+
+================================================================================
+  3. COLOR & THEMING
+================================================================================
+
+FILE: core/src/main/kotlin/com/nexus/core/theme/NexusColors.kt
+      core/src/main/kotlin/com/nexus/core/theme/NexusTheme.kt
+      feature/dashboard/src/main/kotlin/com/nexus/feature/dashboard/FileListItem.kt
+      feature/dashboard/src/main/kotlin/com/nexus/feature/dashboard/FileGridItem.kt
+
+CURRENT STATE:
+  The app has 5 themes: Light, Dark, Sepia, Forest, Sunset. The color-switching
+  animation is implemented correctly using animateColorAsState with a spring
+  spec, giving a smooth theme transition.
+
+  Colors are stored in an @Immutable data class (NexusColors), which is correct
+  for Compose stability. Composition Locals are used properly.
+
+ISSUES FOUND:
+
+  [C-1] CRITICAL — Hard-coded Color literals in feature layer.
+        FileListItem.kt and FileGridItem.kt both independently define:
+          PDF  -> Color(0xFFC4362A)
+          DOCX -> Color(0xFF3B7DD8)
+          XLSX -> Color(0xFF2E9E5B)
+          TXT  -> Color(0xFF7C5CBF)
+        These are duplicated between the two files and are not part of the
+        design system. If a type color needs to change, it must be updated in
+        2 places. They should be moved to a central DocumentTypeColors object or
+        the NexusColors data class.
+
+  [C-2] The SettingsPermissionRow uses Color.Green (the raw Android Color.Green
+        = 0xFF00FF00, which is extremely saturated / garish). This should be
+        replaced with a softer accessible green, e.g. Color(0xFF4CAF50) or a
+        new "success" token added to NexusColors.
+        Impact: MEDIUM — visible in Settings → Permissions.
+
+  [C-3] The search highlight in PdfReaderScreen uses Color(0x66FFEB3B) defined
+        as an inline comment-only constant. This should be a token.
+        Impact: LOW.
+
+  [C-4] The Sepia and Forest themes are not tested in the shadow/elevation context.
+        The NexusCard uses spotColor = Color.Black.copy(alpha = 0.08f) which
+        will look odd against the warm Sepia (#FBF0D9) background — it may need
+        a warm-tinted shadow for those themes.
+        Impact: LOW–MEDIUM (aesthetic).
+
+  [C-5] The Forest and Sunset themes define a "primary" accent color, but the
+        NexusBottomNav blob uses NexusTheme.colors.primary.copy(alpha = 0.15f)
+        — meaning the blob color changes with each theme. This is good behavior,
+        but the blob in the Sunset theme (primary = 0xFFFF6B6B / red) will look
+        quite red. Ensure blob colors are visually tested across all 5 themes.
+
+  [C-6] No semantic color token for "success" or "warning". The only semantic
+        color beyond primary is "error". Adding success (#4CAF50) and warning
+        (#FF9800) tokens would allow the permission row, update dialogs, and
+        progress bars to use color meaningfully.
+        Impact: MEDIUM (future-proofing, also fixes C-2).
+
+RECOMMENDATIONS:
+
+  1. Create a companion object DocumentAccentColors in the :core module:
+       object DocumentAccentColors {
+           val PDF  = Color(0xFFC4362A)
+           val DOCX = Color(0xFF3B7DD8)
+           val XLSX = Color(0xFF2E9E5B)
+           val TXT  = Color(0xFF7C5CBF)
+           val UNKNOWN = Color(0xFF3B7DD8)
+       }
+     Remove duplicate definitions from FileListItem and FileGridItem.
+
+  2. Add success and warning tokens to NexusColors.
+
+  3. Replace Color.Green with Color(0xFF4CAF50) or the new success token.
+
+
+================================================================================
+  4. SHAPE & SPACING SYSTEM
+================================================================================
+
+FILE: core/src/main/kotlin/com/nexus/core/theme/NexusShapes.kt
+
+CURRENT STATE:
+  Shapes are well-defined:
+    small  = 8 dp
+    medium = 16 dp
+    large  = 24 dp
+    pill   = 50 % (RoundedCornerShape(50))
+    circle = CircleShape
+
+ISSUES FOUND:
+
+  [S-1] The Dashboard LazyVerticalGrid uses .padding(horizontal = 24.dp) on the
+        grid container, but the FileListItem has .padding(horizontal = 0.dp,
+        vertical = 6.dp) — resulting in 0 horizontal padding on the card itself.
+        Since the grid already has 24 dp side padding, card-level 0 dp is fine,
+        but the FileGridItem uses .padding(6.dp) which causes a total 30 dp
+        effective padding on grid items — larger than the 24 dp on list items.
+        This asymmetry means grid and list views have slightly different apparent
+        widths. Unify these: use 0 dp on both items and let the grid/column
+        container handle side insets.
+        Impact: MEDIUM — minor visual inconsistency.
+
+  [S-2] The NexusTopBar is 64.dp tall + statusBarsPadding(). The height modifier
+        is applied BEFORE the status bar padding, meaning the bar is always
+        64 dp of visible content regardless of the status bar, which is correct.
+        However, the bar background is set to surface.copy(alpha = 0.6f) —
+        semi-transparent, which means the background bleeds through on scroll.
+        This is intentional (frosted glass effect), but there is no blur applied
+        (requires RenderEffect / modifier on API 31+). On API 30 and below, it
+        just looks semi-transparent gray with no blur.
+        Recommendation: Either add a blur effect on API 31+ (using
+        RenderEffect.createBlurEffect()) or increase the background alpha to
+        0.92f for consistency across APIs.
+        Impact: MEDIUM.
+
+  [S-3] Dashboard contentPadding has top = 48 dp but there is no top bar / app
+        bar. The 48 dp top padding appears to just be whitespace. If the
+        NexusCollapsingTopBar is not used on Dashboard, the 48 dp is wasted
+        vertical real estate on a screen where users want to see files quickly.
+        Consider reducing to 16–24 dp.
+        Impact: LOW–MEDIUM.
+
+  [S-4] The PDF page surfaces use NexusTheme.shapes.small (8 dp). Pages from
+        academic or business documents typically look better with 0 dp radius
+        (or 4 dp max) — the 8 dp rounding clips page corners in a way that makes
+        real documents look artificial.
+        Impact: LOW.
+
+  [S-5] The NexusSearchBar has a hardcoded height of 52 dp. On small screens
+        or in landscape, this can feel cramped. Use wrapContentHeight() with a
+        minHeight of 48 dp or 52 dp instead.
+        Impact: LOW.
+
+
+================================================================================
+  5. SPLASH SCREEN
+================================================================================
+
+FILE: app/src/main/kotlin/com/nexus/nexusdocs/ui/splash/NexusSplashScreen.kt
+
+CURRENT STATE:
+  A 4-phase custom Compose splash animation:
+    Phase 1: Logo drops from above with spring bounce (~700 ms)
+    Phase 2: Corner-fold wiggle + accent dot pop + tagline fade-in
+    Phase 3: Wink / heartbeat blink on the accent dot
+    Phase 4: Scale-up + fade-out exit
+
+  Colors are manually duplicated from the theme using isSystemInDarkTheme()
+  rather than reading from NexusTheme.colors.
+
+ISSUES FOUND:
+
+  [SP-1] CRITICAL — Color duplication. The splash screen duplicates 7 color
+         definitions that are already declared in lightNexusColors / darkNexusColors.
+         If the theme colors change, the splash colors will be out of sync.
+         However, reading from NexusTheme.colors at splash time is valid since
+         the theme is already provided. Replace manual color reads with
+         NexusTheme.colors.* references.
+
+  [SP-2] Total splash duration before onSplashComplete() is called:
+           delay(460) + delay(680) + delay(350) + delay(380) + tween(420) ≈ 2.3 s
+         This is too long. Material 3 splash guidance recommends 500–800 ms max.
+         Users who open the app frequently will find this tedious. Recommendation:
+         Trim the "breathe" hold (delay(380)) to 100 ms, making total ≈ 1.9 s.
+         Ideally target 1.2–1.5 s total.
+         Impact: HIGH — directly affects perceived performance.
+
+  [SP-3] The wordmark "NexusDocs" uses two separate NexusText calls with
+         FontWeight.Bold and FontWeight.Light rendered side by side. If the app
+         is rebranded to "LiteView" (as seen in DashboardScreen title and Settings
+         "Up to Date" dialog), the splash still shows "NexusDocs". This is an
+         inconsistency: the app shows "LiteView" in the dashboard but "NexusDocs"
+         on the splash. The branding should be unified.
+         Impact: HIGH — brand consistency.
+
+  [SP-4] The tagline "Open anything" is styled with letterSpacing = 2.8.sp —
+         a heavy all-caps tracking style typically used for labels. But the text
+         is mixed-case with no uppercase transformation, so the wide spacing
+         reads as awkward. Either uppercase the text via textTransform or reduce
+         letter-spacing to 1.2 sp.
+         Impact: LOW–MEDIUM.
+
+  [SP-5] The exit animation scales up (exitScale → 1.09f) while fading out. This
+         is a subtle zooming-out-to-reveal effect. On very low-end devices this
+         combined with Compose composition of the dashboard screen could cause a
+         visible jank frame. Profile on a low-end device (2GB RAM) if not already
+         done.
+         Impact: LOW (performance risk).
+
+
+================================================================================
+  6. NAVIGATION (Bottom Nav + NavHost)
+================================================================================
+
+FILES: app/src/main/kotlin/com/nexus/nexusdocs/MainActivity.kt
+       app/src/main/kotlin/com/nexus/nexusdocs/navigation/NexusNavHost.kt
+       core/src/main/kotlin/com/nexus/core/ui/components/NexusBottomNav.kt
+
+CURRENT STATE:
+  A floating pill-style bottom nav with a custom liquid-blob physics animation.
+  The blob uses a leading/trailing Animatable pair with spring lags to simulate
+  a stretching liquid effect. Icons bounce on selection. The nav slides in/out
+  using AnimatedVisibility with spring/tween specs.
+
+  Navigation transitions use M3 easing: forward push slides right → left with
+  EmphasizedDecelerate, back pop slides left → right.
+
+ISSUES FOUND:
+
+  [N-1] The bottom nav has only 3 items: Home, Add (+), Settings. The "Add" item
+        uses route "action_add_file" and is handled as a special case in the
+        onItemSelected callback. This is a workaround — the route string
+        "action_add_file" is a phantom route that never maps to a real Composable
+        in the NavHost. While this works, it is fragile: any code that
+        iterates over nav items and checks route equality will produce confusing
+        results. Consider using a sealed class NavAction instead of a raw String
+        route for the Add item.
+        Impact: MEDIUM (maintainability/bug risk).
+
+  [N-2] Both selectedIconRes and unselectedIconRes in all three nav items point
+        to the SAME drawable resource:
+          Home: ic_home / ic_home
+          Add:  ic_scan_fab / ic_scan_fab
+          Settings: ic_settings / ic_settings
+        The NexusBottomNavIcon code has logic to switch between selected/
+        unselected icons, but since both point to the same resource, there is
+        no visual differentiation of selection state beyond the tint color and
+        the blob position. Consider adding filled variants for selected state
+        (e.g., ic_home_filled, ic_settings_filled).
+        Impact: MEDIUM — standard nav pattern uses filled/outlined icon pairs.
+
+  [N-3] The liquid blob alpha fades in on first render (blobAlpha → 1f via
+        tween(240)). However, on the very first composition there is a 1-frame
+        flash where all three items are rendered but the blob hasn't appeared
+        yet. The blobAlpha starts at 0 so the blob is invisible, but the items
+        are already visible. This is intentional per the code but can look like
+        a flash of unstyled nav items on first load. Consider delaying the icon
+        appearance slightly or starting them at alpha 0 and fading in together
+        with the blob.
+        Impact: LOW.
+
+  [N-4] The bottom nav uses modifier.padding(horizontal = 32.dp, vertical = 16.dp)
+        plus navigationBarsPadding(). On devices with wide gesture nav bars
+        (e.g., 3-button nav), the combined bottom spacing can be excessive.
+        Consider capping the bottom nav at a maximum total bottom offset.
+        Impact: LOW.
+
+  [N-5] NexusNavHost defines the "reader/unsupported/{fileName}" route inline as
+        a hard-coded string instead of a NexusRoute entry. This is inconsistent
+        with all other routes that use NexusRoute sealed class constants.
+        Impact: LOW (maintainability).
+
+  [N-6] The nav transition slide amount is fullWidth * 0.08f (8%). This is a
+        very subtle shift. Material 3 guidance for container transforms uses
+        ~15–20% of screen width for a push navigation. At 8%, the transition
+        can be imperceptible on small screens or to users not looking closely.
+        Consider bumping to 12–15%.
+        Impact: LOW–MEDIUM (feel/quality).
+
+
+================================================================================
+  7. DASHBOARD SCREEN
+================================================================================
+
+FILE: feature/dashboard/src/main/kotlin/com/nexus/feature/dashboard/DashboardScreen.kt
+
+  7a. HEADER & SEARCH
+  -------------------
+
+  ISSUES:
+
+    [D-1] "LiteView" text uses .copy(fontSize = 36.sp) inline override of h1.
+          See Typography [T-4]. The h1 style declares 30 sp; the actual render
+          is 36 sp due to the copy. This means the design system says 30 but
+          the screen shows 36.
+
+    [D-2] The NexusSearchBar has no leading search icon. Industry convention
+          (Google, Apple, Material 3) puts a search magnifying glass icon at the
+          leading end of the search bar. Without it, the component looks like a
+          generic text field.
+          Impact: MEDIUM — discoverability issue for new users.
+
+    [D-3] The scanner icon button (ic_text_scan) in the top-right is 32 dp in
+          size with 8 dp padding = 40 dp touch target. Material 3 minimum touch
+          target is 48 dp × 48 dp. This is 8 dp too small.
+          Impact: MEDIUM — accessibility / touch precision.
+
+    [D-4] The header ("LiteView" + scan icon) has no vertical padding between
+          itself and the status bar — only the contentPadding(top = 48.dp) on
+          the LazyVerticalGrid separates them. This means the title appears
+          immediately below where the status bar ends, with 48 dp of gap.
+          Consider using a proper sticky header approach where the title area
+          has its own statusBarsPadding() and a defined top padding of 16–24 dp.
+          Impact: LOW–MEDIUM.
+
+  7b. TAB ROW
+  -----------
+
+  ISSUES:
+
+    [D-5] The NexusTabRow tab selection does NOT animate the selected-state
+          indicator. The background color change is immediate (no animation
+          spec in the clickable → background logic). While the color token uses
+          NexusTheme.colors.primary which has a color spring, the tab container
+          background is set directly via .background(if (isSelected) ...) with
+          no animateColorAsState. Add animateColorAsState to the tab background
+          for a smooth selection transition.
+          Impact: MEDIUM.
+
+    [D-6] Tab labels ("All", "Recent", "Starred") use typography.body (14 sp /
+          Normal). Material 3 tab labels are typically label-large (14 sp /
+          Medium). They should have Medium weight to read as actionable controls.
+          Impact: LOW.
+
+  7c. FILE LIST ITEM  (FileListItem.kt)
+  --------------------------------------
+
+  ISSUES:
+
+    [D-7] The context-menu trigger is implemented as:
+            NexusText("⋮", style = NexusTheme.typography.h1, ...)
+          This uses a Unicode vertical ellipsis rendered as text. It has no
+          vector-level sizing guarantees, and the h1 style (30 sp / Bold) makes
+          it larger than intended — the tap area is 40 dp × 40 dp. Replace with
+          a vector icon (ic_more_vert already imported in PdfReaderScreen via
+          material.icons!) wrapped in a NexusIconButton.
+          Impact: MEDIUM.
+
+    [D-8] Progress bar for reading progress is shown when lastScrollIndex > 0.
+          If the user has only opened the first page (index 0), the bar is hidden.
+          But a document opened 0 pages is also "in progress" conceptually.
+          Consider showing the bar when the document has been opened at least once
+          (track lastOpenedAt instead of lastScrollIndex).
+          Impact: LOW.
+
+    [D-9] The thumbnail area for non-PDF files shows an accent-color tinted
+          background with a FileTypeIcon. For DOCX and XLSX files, this looks
+          decent. However, DOCX files with the same blue as XLSX will
+          conflict — both use different shades of blue but the icon may be hard
+          to distinguish. Differentiating by icon shape (which is already done
+          in FileTypeIcon.kt) is good, but ensure the icons are clearly different
+          for color-blind users.
+          Impact: LOW–MEDIUM (accessibility).
+
+    [D-10] The subtitle line concatenates: "TYPE · SIZE · N pages · DATE"
+           This is a dense information row. On small screens or with long file
+           names, the subtitle can be very cramped. Consider breaking date and
+           size into a second row or using a more readable separator (·).
+           Impact: LOW.
+
+    [D-11] The inaccessible state (file moved/deleted) only disables the click
+           and dims the card via .alpha(0.5f) in NexusCard. There is no visual
+           explanation of WHY the file is inaccessible. The FileGridItem shows
+           "Missing" text in error color, but FileListItem does NOT show this
+           indicator — it just dims. Add a "File missing" label or a warning
+           icon to FileListItem for inaccessible documents.
+           Impact: MEDIUM.
+
+  7d. FILE GRID ITEM  (FileGridItem.kt)
+  --------------------------------------
+
+  ISSUES:
+
+    [D-12] The grid item uses an aspectRatio(1.2f) for the thumbnail area.
+           A ratio of 1.2 is wider than tall, which is landscape-oriented. Most
+           documents (A4, Letter) are portrait. Consider 0.75f (portrait) or
+           use the actual PDF first-page aspect ratio once the thumbnail is loaded.
+           Impact: MEDIUM — thumbnail looks unnatural for portrait documents.
+
+    [D-13] The grid item displays a star emoji ("⭐") for starred files instead of
+           the vector ic_star used in FileListItem. Emoji rendering varies by
+           device/API level. Use the vector drawable for consistency.
+           Impact: LOW.
+
+    [D-14] Grid item context menu trigger ("⋮") is 32 dp × 32 dp — smaller than
+           the list item version (40 dp × 40 dp). Touch targets should be
+           consistently ≥ 48 dp. See D-7.
+           Impact: MEDIUM.
+
+  7e. EMPTY STATE
+  ---------------
+
+  ISSUES:
+
+    [D-15] The empty state icon container is 96 dp with an inner icon at 48 dp.
+           The icon is tinted with NexusTheme.colors.primary (black in light mode).
+           A black icon on a light background with 10% alpha container looks very
+           faint in light mode. Use a more visible alpha (20–25%) or use a softer
+           colored accent for the container.
+           Impact: MEDIUM.
+
+    [D-16] Empty state for the "ALL" tab says "Tap + Add in the nav bar to import
+           documents." but the nav bar middle item is labeled "Add" — not "+ Add".
+           The instruction text and the actual label should match.
+           Impact: LOW.
+
+
+================================================================================
+  8. SETTINGS SCREEN
+================================================================================
+
+FILE: feature/dashboard/src/main/kotlin/com/nexus/feature/dashboard/SettingsScreen.kt
+
+CURRENT STATE:
+  A LazyColumn of grouped setting rows using NexusCard as section containers.
+  Each row has an icon, title, optional subtitle, and a control (switch, value,
+  or chevron). Dialogs are used for theme selection and changelog viewing.
+
+ISSUES FOUND:
+
+  [ST-1] The NexusTopBar in Settings applies statusBarsPadding() inside a fixed
+         64 dp height Box. This means the bar's visible content is always 64 dp,
+         and the status bar padding is added ON TOP of that, making the actual
+         bar taller than 64 dp. The statusBarsPadding() should be outside or the
+         64 dp should represent the MINIMUM height. Currently it works correctly
+         on most devices, but the height = 64.dp modifier combined with the
+         statusBarsPadding inside is redundant and may clip content on tall status
+         bars. See General Layout [G-1].
+         Impact: MEDIUM.
+
+  [ST-2] The Settings back navigation uses a clickable Image (ic_back) with
+         .clickable { onBack() } but WITHOUT the springBounceClick modifier.
+         Every other interactive element in the app uses springBounceClick.
+         This is inconsistent — the back button has no press-scale feedback.
+         Impact: MEDIUM — microinteraction inconsistency.
+
+  [ST-3] The ">" chevron in SettingsNavRow is a plain NexusText(">") — using a
+         greater-than sign. This should be a small vector icon (ic_chevron_right
+         or similar) for proper alignment and consistent weight.
+         Impact: MEDIUM.
+
+  [ST-4] The ThemeSelectionDialog appears at the bottom of the screen (a bottom
+         sheet style). It supports swipe-to-dismiss via detectVerticalDragGestures
+         with a 100f threshold. However, there is NO animated drag indicator
+         showing how far the user has swiped — the sheet just jumps to dismiss
+         when the threshold is crossed. A proper BottomSheet should animate the
+         drag offset in real-time.
+         Impact: MEDIUM — UX quality.
+
+  [ST-5] The ThemeSelectionDialog does not animate into view — it appears
+         instantly (Dialog with no enter animation). The NexusDialog has a
+         scaleIn enter animation, but the ThemeSelectionDialog uses a raw
+         Dialog composable. Add an enter animation (slideInVertically from
+         bottom) for consistency with the bottom-sheet metaphor.
+         Impact: LOW–MEDIUM.
+
+  [ST-6] The "Clear Cache" dialog uses NexusText as the confirm button:
+           NexusText("Clear Cache", color = error, modifier = Modifier.clickable {...})
+         This is a dangerous action but uses a plain text tap target without
+         any visual button affordance (no background, no border, just colored
+         text). For destructive dialogs, the confirm button should have a more
+         prominent danger button style (e.g., outlined button in error color).
+         Impact: MEDIUM — safety-critical UX.
+
+  [ST-7] Settings sections have no spacing between the section label and the
+         card — the label (NexusText) has .padding(start = 16.dp, bottom = 8.dp)
+         but no top spacing. Since items are arranged with spacedBy(20.dp), the
+         visual separation between the bottom of one section card and the top of
+         the next section label is only 20 dp. This is sufficient but tighter
+         than the 24–28 dp typically seen in well-spaced settings UIs.
+         Impact: LOW.
+
+  [ST-8] The ChangelogDialog uses fillMaxHeight(0.85f) — 85% of screen height.
+         On landscape orientation or tablets this will be too short or too wide.
+         The dialog should use adaptive sizing or be constrained to a maxHeight.
+         Impact: LOW.
+
+  [ST-9] The "Startup to Picker" setting bypasses the Home screen. If this is
+         enabled, users may not realize they can change it (since Settings is
+         accessed from the Home screen they bypass). The subtitle says "Bypass
+         the Home screen and open file picker" — consider adding a note like
+         "(Long-press the app icon to access Settings)" to help users recover.
+         Impact: LOW (edge-case UX).
+
+
+================================================================================
+  9. PDF READER SCREEN
+================================================================================
+
+FILE: feature/reader-pdf/src/main/kotlin/com/nexus/feature/reader/pdf/PdfReaderScreen.kt
+
+CURRENT STATE:
+  A feature-rich PDF reader with:
+  - Custom gesture handling (pinch-zoom, double-tap, pan)
+  - Immersive mode (tap to show/hide UI)
+  - Page search with text highlights
+  - Page rotation
+  - Horizontal / vertical layout toggle
+  - Background mode toggle (Original, Paper/Sepia, Eye Comfort, Inverted)
+  - Right-edge drag scrollbar
+  - Floating bottom action bar
+  - Page indicator pill
+
+ISSUES FOUND:
+
+  [P-1] CRITICAL — Loading state shows plain text "Loading PDF...":
+          Box(contentAlignment = Center) {
+            NexusText("Loading PDF...", color = NexusTheme.colors.textSecondary)
+          }
+        This should be replaced with a skeleton/shimmer placeholder that
+        approximates the PDF page layout (e.g., 2–3 shimmer page rectangles).
+        Impact: HIGH — first impression on every document open.
+
+  [P-2] The page indicator and the floating action bar both anchor to
+        BottomCenter with different bottom padding:
+          Page indicator: padding(bottom = 132.dp)
+          Action bar:     padding(bottom = 32.dp)
+        This works on most screens but is entirely hardcoded. On phones with
+        very tall navigation bars (gesture nav = ~48 dp, 3-button = ~56 dp),
+        these offsets may overlap the system navigation area or each other.
+        Both should be wrapped together in a Column anchored to BottomCenter
+        with navigationBarsPadding() applied once.
+        Impact: HIGH — layout breakage on some devices.
+
+  [P-3] The Rename dialog in the PDF reader uses Material3's AlertDialog
+        (androidx.compose.material3.AlertDialog) while the rest of the app
+        uses the custom NexusDialog. This is an inconsistency — the M3 dialog
+        will use the device's M3 theme colors, not NexusTheme colors.
+        Impact: MEDIUM.
+
+  [P-4] The floating bottom action bar uses Material3 IconButton components
+        (androidx.compose.material3.IconButton) which are inconsistent with the
+        rest of the app that uses NexusIconButton. The M3 IconButton has its own
+        ripple and hover behavior that may not match NexusTheme.
+        Impact: MEDIUM.
+
+  [P-5] The zoom pan-clamp logic only clamps on gesture END:
+          if (scale <= 1f) { snap to 0,0 }
+          else { clamp to maxX / minX }
+        During the gesture, offsetX and offsetY are not clamped — meaning a user
+        can fling the content far outside bounds during a fast pan, and it snaps
+        back only on pointer release. This can feel jarring. Apply soft boundary
+        clamping during the gesture as well.
+        Impact: MEDIUM — pan feel.
+
+  [P-6] The right-edge scrollbar thumb is only 8 dp wide (width = 8.dp, height
+        = 48.dp). This is a very small target for the vertical drag gesture.
+        The interaction zone (BoxWithConstraints) is 32 dp wide, which is the
+        actual touch area. However, the visual indicator (8 dp) is much smaller
+        than what the user touches, creating a disconnect between touch target
+        and visual representation.
+        Impact: LOW–MEDIUM.
+
+  [P-7] The search bar appears 110 dp from the top (padding(top = 110.dp)) —
+        this positions it just below the top pill bar. However, when the pill
+        bar collapses (immersive mode), the search bar is only shown when
+        isSearchMode && !isImmersiveMode, so they should not conflict. But the
+        110 dp hardcode means that if the top bar height ever changes, the search
+        bar position must be manually updated.
+        Impact: LOW.
+
+  [P-8] "Loading page..." placeholder boxes are all hardcoded at height = 400.dp.
+        A portrait A4 page at screen width renders to approximately
+        (screenWidth * 1.414) dp tall — on a 400 dp wide screen this would be
+        ~566 dp. The 400 dp placeholder creates layout shift when the real page
+        loads at its actual height, causing the list to reflow and jump.
+        The placeholder height should be calculated from the screen width with
+        the A4 ratio or use the last known bitmap dimensions.
+        Impact: HIGH — scroll position jumps on page load.
+
+  [P-9] The ViewModal (view settings sheet) and GoToPage dialog use Dialog with
+        full-screen properties. The GoToPage dialog wraps a basic TextField in an
+        AlertDialog from Material3 — inconsistent with NexusDialog.
+        Impact: MEDIUM.
+
+  [P-10] When backgroundMode == Inverted, the PDF content appears correct but
+         the NexusSurface that wraps each page still uses the theme surface color.
+         This means white/light surface borders are visible around inverted pages.
+         In inverted mode, page container backgrounds should use a dark surface
+         color to match the inverted content.
+         Impact: LOW–MEDIUM (visual).
+
+
+================================================================================
+ 10. TEXT READER SCREEN
+================================================================================
+
+FILE: feature/reader-text/src/main/kotlin/com/nexus/feature/reader/text/TextReaderScreen.kt
+
+CURRENT STATE:
+  A simple LazyColumn rendering text lines with line numbers on the left.
+  Immersive mode is supported (tap to toggle top bar). No search, no font-size
+  control.
+
+ISSUES FOUND:
+
+  [TR-1] CRITICAL MISSING FEATURE — No font size control for the text reader.
+         Users reading plain text files often want to increase font size. There
+         is no settings panel or quick action. Even a simple font-size slider
+         in a bottom sheet (like the PDF view modal) would significantly improve
+         usability.
+         Impact: HIGH — reader usability.
+
+  [TR-2] Line numbers are shown for every line. For large text files this is
+         useful (code files, logs), but for prose text files (README, notes),
+         line numbers add visual noise. Consider making line numbers optional
+         (toggle in a settings panel).
+         Impact: MEDIUM.
+
+  [TR-3] The text content uses default body style (14 sp, Normal) with no
+         lineHeight set. Reading long paragraphs at 14 sp with default line
+         height (~16–17 sp) is tiring. For a text reader, line-height of 1.6×
+         (22–24 sp) is a standard readability best practice.
+         Impact: HIGH — core readability.
+
+  [TR-4] The loading state shows "Loading..." as plain text — same issue as
+         PDF [P-1]. Replace with a shimmer of text lines.
+         Impact: MEDIUM.
+
+  [TR-5] There is no word-wrap control. Text uses the default TextOverflow
+         behavior. Very long lines (URLs, code without line breaks) will either
+         clip or wrap in unexpected ways.
+         Impact: LOW.
+
+  [TR-6] There is no horizontal scroll for lines wider than the screen. Users
+         reading code files with long lines cannot view the full line without
+         word wrap. Consider a toggle between "wrap" and "scroll" modes.
+         Impact: MEDIUM.
+
+
+================================================================================
+ 11. OFFICE READER SCREEN
+================================================================================
+
+FILE: feature/reader-office/src/main/kotlin/com/nexus/feature/reader/office/OfficeReaderScreen.kt
+
+(Full source not read — based on module structure and known patterns)
+
+ISSUES FOUND:
+
+  [OR-1] The Office reader likely shares the same loading state issues [P-1].
+         Verify the loading state uses a skeleton placeholder, not plain text.
+
+  [OR-2] DOCX rendering in Android typically uses WebView or a custom renderer.
+         If WebView is used, WebView theming (light/dark mode) must be explicitly
+         set via WebSettings.forceDark (API 29) or via algorithmic darkening
+         (API 33) to match NexusTheme.
+         Impact: HIGH — dark theme consistency.
+
+  [OR-3] XLSX spreadsheets are typically rendered as HTML tables in a WebView.
+         Horizontal scrolling on wide tables is not clearly communicated to
+         users. Consider adding a "Swipe horizontally to see more columns"
+         hint on first open.
+         Impact: MEDIUM.
+
+
+================================================================================
+ 12. SCANNER FEATURE
+================================================================================
+
+FILE: feature/scanner/src/main/kotlin/com/nexus/feature/scanner/ui/ScannerScreen.kt
+      feature/scanner/src/main/kotlin/com/nexus/feature/scanner/ui/ScannerReviewScreen.kt
+      feature/scanner/src/main/kotlin/com/nexus/feature/scanner/ui/ScannerSaveScreen.kt
+
+CURRENT STATE:
+  The ScannerScreen delegates to Google ML Kit GmsDocumentScanning. When
+  SCANNER_MODE_FULL is requested, it calls getStartScanIntent() and launches
+  the intent. While waiting for the intent, it shows:
+    Box(modifier = Modifier.fillMaxSize().background(NexusTheme.colors.background))
+  — a completely blank screen.
+
+ISSUES FOUND:
+
+  [SC-1] CRITICAL — Blank screen during scanner initialization. The
+         getStartScanIntent() call can take 1–3 seconds on first launch (ML Kit
+         downloads models). The user sees a plain blank screen with no loading
+         indicator during this time.
+         Recommendation: Show a loading spinner (CircularProgressIndicator or a
+         custom animated dots) with a "Preparing scanner..." label while waiting
+         for the intent.
+         Impact: HIGH — perceived hang / crash suspicion.
+
+  [SC-2] The GENERATING_PDF state shows "Saving PDF..." as plain centered text.
+         This should include a progress indicator (indeterminate spinner) and
+         potentially a progress value if the PDF generator can provide progress
+         callbacks.
+         Impact: MEDIUM.
+
+  [SC-3] DONE state triggers onBack() via LaunchedEffect — this immediately
+         navigates away without any success confirmation. Consider showing a
+         brief success toast (already done: "Saved successfully!") but also
+         navigating the user back to the dashboard where they can see the newly
+         saved document highlighted.
+         Impact: LOW–MEDIUM.
+
+  [SC-4] The scanner inherits from the existing nav infrastructure but the
+         scanner does not use the NexusPillTopBar for the Review/Save screens.
+         Verify that ScannerReviewScreen and ScannerSaveScreen have consistent
+         top bars matching the rest of the app.
+         Impact: MEDIUM (not verified — source not read).
+
+
+================================================================================
+ 13. UNSUPPORTED FILE SCREEN
+================================================================================
+
+FILE: app/src/main/kotlin/com/nexus/nexusdocs/navigation/NexusNavHost.kt
+      (UnsupportedFileScreen is defined inline at the bottom of NexusNavHost.kt)
+
+CURRENT STATE:
+  A simple screen with a top bar, a 🚫 emoji icon, a title, a description,
+  and a "Go Back" NexusButton. The back button in the top bar uses:
+    NexusText(text = "🔙", style = NexusTheme.typography.title, modifier = ...)
+
+ISSUES FOUND:
+
+  [U-1] The back button uses an emoji 🔙 — inconsistent with every other
+        screen in the app which uses ic_back (a vector drawable). This emoji
+        also looks different across Android versions and OEM overlays.
+        Impact: HIGH — inconsistency.
+
+  [U-2] The 🚫 icon is an emoji rendered via NexusText. Using Modifier.size(72.dp)
+        on a Text composable does not actually constrain the emoji glyph size —
+        size() on a Text only constrains the composable's layout bounds. The
+        emoji will render at whatever the h1 text size is (30 sp).
+        Replace with a vector illustration or a properly-sized Icon composable.
+        Impact: MEDIUM.
+
+  [U-3] The error message: '"filename.xyz" cannot be opened. Supported: PDF, DOCX,
+        XLSX, TXT' lists four types but the actual app also handles TXT via
+        TextReaderScreen. Ensure the list is accurate (it appears correct).
+        However, if PowerPoint (.pptx) or other types are added in the future,
+        this hardcoded string will be stale. Consider reading supported types
+        from a central constant.
+        Impact: LOW (maintainability).
+
+  [U-4] The UnsupportedFileScreen is defined inside NexusNavHost.kt as a private
+        function — a reasonable choice for a simple screen, but as complexity
+        grows, this should be extracted to its own file.
+        Impact: LOW (maintainability).
+
+
+================================================================================
+ 14. DIALOGS & OVERLAYS
+================================================================================
+
+FILES: core/src/main/kotlin/com/nexus/core/ui/components/NexusComponents.kt (NexusDialog)
+       feature/dashboard/src/main/kotlin/com/nexus/feature/dashboard/FileOptionsDialog.kt
+
+ISSUES FOUND:
+
+  [DL-1] FileOptionsDialog.kt was not read but is referenced from FileListItem
+         and FileGridItem. Verify that this dialog uses NexusDialog (not raw
+         Dialog composable) and follows the same visual language.
+
+  [DL-2] The NexusDialog uses scaleIn(initialScale = 0.8f) + fadeIn() as the
+         enter animation but does not specify the DIALOG_DISMISS animation exit
+         — the exit is only scaleOut(0.8f) + fadeOut() which is symmetrical and
+         correct. However, on very fast dismiss taps, the exit animation may feel
+         slow. The exit spec should use a faster tween (150 ms) vs the enter
+         spring.
+         Impact: LOW.
+
+  [DL-3] The dialog title uses NexusTheme.typography.h2 (22 sp / Bold). For a
+         dialog title this is appropriate, but the dialog body uses
+         NexusText with default style (NexusTheme.typography.body) — which is
+         fine. However, in the File Details dialog the text uses NexusText
+         with implicit default style (no explicit style parameter), which will
+         pick up whatever the default NexusText style resolves to. Ensure the
+         default is body.
+         Impact: LOW.
+
+  [DL-4] Dialog confirm/dismiss buttons are implemented as NexusText with a
+         clickable modifier and 8 dp padding. This is a minimalist approach but
+         the touch area is very small — approximately 8 dp padding + text width.
+         For a touch-friendly dialog, buttons should be at least 48 dp tall.
+         Using NexusButton (isOutlined = true) for dismiss and filled for confirm
+         would improve both discoverability and touch accuracy.
+         Impact: MEDIUM.
+
+
+================================================================================
+ 15. ANIMATION SYSTEM
+================================================================================
+
+FILE: core/src/main/kotlin/com/nexus/core/ui/animations/Animations.kt
+
+CURRENT STATE:
+  Well-designed animation utilities:
+  - M3 easing curves (EmphasizedDecelerateEasing, EmphasizedAccelerateEasing, etc.)
+  - Duration tokens (DurationShort1 to DurationLong2)
+  - Spring physics presets (pressSpring, entrySpring, selectionSpring, etc.)
+  - springBounceClick modifier (press scale + haptic)
+  - fadeSlideIn modifier (staggered list entry)
+  - shimmerEffect modifier
+
+ISSUES FOUND:
+
+  [AN-1] The fadeSlideIn modifier starts items at alpha = 0 (targetAlpha = 0f)
+         and translationY = 1f (which is 1 × offsetY = 30.dp off-screen). The
+         animation delay is in milliseconds (15 ms per item), which means with
+         50 files, the last item starts animating at 750 ms. This is noticeable
+         — items appear to load in a wave. Consider capping the maximum delay at
+         ~200 ms (delay = min(index * 15, 200)) to avoid the wave becoming too
+         pronounced on large lists.
+         Impact: MEDIUM.
+
+  [AN-2] springBounceClick triggers HapticFeedbackType.LongPress on every press-
+         down (isPressed == true). LongPress haptic is typically a stronger /
+         longer vibration compared to a regular click haptic. For rapid tapping
+         (quickly opening files), this could feel excessive. Consider using
+         HapticFeedbackType.TextHandleMove (or a click vibration if available)
+         for a lighter haptic on regular press interactions.
+         Impact: LOW–MEDIUM.
+
+  [AN-3] The shimmerEffect uses a white shimmer band (Color.White.copy(alpha=0.30f)).
+         In dark mode, a white shimmer band is correct. But in light mode, a
+         white shimmer on a light surface (surfaceVariant = 0xFFF1F3F5) is very
+         faint — virtually invisible. In light mode, the shimmer should use a
+         slightly darker semi-transparent overlay instead.
+         Impact: MEDIUM — shimmer is invisible in light mode.
+
+  [AN-4] The colorSpring uses NoBouncy damping. Color transitions feel smooth.
+         However, theme transitions take the full spring duration to settle
+         (~500–800 ms depending on stiffness). If a user rapidly switches themes,
+         multiple springs are running concurrently. While Compose handles this
+         correctly via animation reconciliation, it may cause momentary desaturation
+         on low-end devices.
+         Impact: LOW.
+
+  [AN-5] No SharedElement transition is implemented for the document open action
+         (Dashboard → Reader). The SharedTransitionLayout and LocalSharedTransitionScope
+         are set up in NexusNavHost, and SharedTransitionLocals.kt defines
+         LocalSharedTransitionScope / LocalAnimatedVisibilityScope — but no
+         actual sharedElement() modifier is applied to any element.
+         SharedElement transitions from file card → reader would be a high-impact
+         visual improvement.
+         Impact: MEDIUM–HIGH (quality / polish).
+
+
+================================================================================
+ 16. ACCESSIBILITY
+================================================================================
+
+ISSUES FOUND:
+
+  [A11Y-1] Touch Targets. Multiple interactive elements are below the 48 dp
+           minimum:
+             - Scanner icon in Dashboard header: ~40 dp (see D-3)
+             - Context menu "⋮" in FileGridItem: 32 dp (see D-14)
+             - Context menu "⋮" in FileListItem: 40 dp (see D-7)
+             - Dialog text buttons: variable, often < 48 dp (see DL-4)
+           All must be ≥ 48 dp × 48 dp per Material 3 and Android guidelines.
+
+  [A11Y-2] Content Descriptions. Verify that ALL Image() composables have
+           non-null contentDescription. A quick grep shows several places with
+           contentDescription = null (e.g., PDF page images). For decorative
+           images this is correct, but for interactive images (back button,
+           context menu, etc.) content descriptions are mandatory for screen
+           reader support.
+
+  [A11Y-3] Semantic roles. The NexusSwitch component does not use
+           Modifier.semantics { role = Role.Switch; toggleableState = ... }
+           — screen readers cannot interpret it as a switch. The
+           Modifier.toggleable() semantic should be applied.
+           Impact: HIGH for screen reader users.
+
+  [A11Y-4] The NexusSearchBar uses BasicTextField without any semantic label.
+           Add Modifier.semantics { contentDescription = "Search files" } so
+           screen readers announce the field purpose.
+           Impact: MEDIUM.
+
+  [A11Y-5] Color-only status indication. The permission row in Settings uses
+           a colored dot (green/red) plus text. The text alone makes the meaning
+           clear, so this is acceptable. However, verify the dot is at least
+           8 dp × 8 dp — it currently is (size(8.dp)), which may be too small
+           for low-vision users to see clearly.
+           Impact: LOW–MEDIUM.
+
+  [A11Y-6] Caption text at 11 sp may be unreadable for users with low vision
+           who rely on the system font scale but do NOT use TalkBack. Compose
+           sp units do respect font scaling, so this is partially mitigated.
+           Impact: LOW.
+
+
+================================================================================
+ 17. MICRO-INTERACTION CONSISTENCY
+================================================================================
+
+ISSUES FOUND:
+
+  [MI-1] Not all interactive elements use springBounceClick. Examples:
+           - Settings back button (clickable only, no spring) — see ST-2
+           - NexusCard uses NexusTheme.shapes.large with combinedClickable
+             (indication = null) but does NOT use springBounceClick — it has
+             its own scale animation via interactionSource.collectIsPressedAsState().
+             This is a DIFFERENT spring from pressSpring() and produces
+             slightly different feel.
+           Standardize: all tappable elements should use springBounceClick.
+
+  [MI-2] The NexusTabRow tab selection has no spring animation. Tab items
+         are .clickable without scale feedback. See D-5.
+
+  [MI-3] The ThemeSelectionDialog rows use plain .clickable {} — no bounce.
+         See ST-4.
+
+  [MI-4] Cursor brush in NexusSearchBar uses SolidColor(NexusTheme.colors.primary)
+         which in dark mode is White — correct. In light mode it is Black —
+         also correct. However, the cursor in BasicTextField is always the
+         same color regardless of theme because it reads primary at composition
+         time. If the user switches themes while a text field is focused, the
+         cursor color updates via the color spring — this is handled correctly
+         since NexusTheme.colors is animated.
+
+  [MI-5] Long-press on file items opens the options dialog (FileOptionsDialog)
+         via onLongClick in NexusCard. The "⋮" button also opens the dialog via
+         tap. Both work, but the long-press has no visual feedback (no haptic
+         in the NexusCard combinedClickable, no scale animation on long-press).
+         A subtle haptic on long-press completion would improve the feel.
+         Impact: LOW.
+
+
+================================================================================
+ 18. ERROR & LOADING STATES
+================================================================================
+
+GLOBAL ISSUES:
+
+  [EL-1] Consistent loading: ALL screens (PDF, Text, Office, Scanner) show
+         loading as plain text. None use shimmer/skeleton. This is the single
+         biggest quality gap in the user experience on first impression.
+         Priority: HIGH.
+
+  [EL-2] Error states across readers show the error message string directly
+         (e.g., "state.message") with a "Go Back" button. Real error messages
+         from PDFium or file IO will be technical / cryptic. Consider mapping
+         common errors to user-friendly messages:
+           - "Permission denied" → "This file is no longer accessible. It may
+             have been moved or deleted."
+           - "Out of memory" → "This file is too large to open. Try closing
+             other apps."
+           - Generic fallback: "Something went wrong. The file could not be
+             opened."
+         Impact: MEDIUM.
+
+  [EL-3] Network errors in Settings (Update check, Changelog) show a generic
+         NexusDialog with the error message. Consider adding a retry button
+         directly in the error dialog for these network operations.
+         Impact: LOW.
+
+  [EL-4] The Dashboard shows no loading indicator while scanning storage.
+         The isPermissionGranted → viewModel.scanStorage() call is synchronous
+         in terms of triggering, but the actual scan may take time on large
+         storage. During this window, the empty state ("No files found") appears
+         before files populate. Consider showing a "Scanning storage..." indicator
+         or delaying the empty state display until the scan is confirmed complete.
+         Impact: MEDIUM.
+
+
+================================================================================
+ 19. GENERAL LAYOUT / PADDING AUDIT
+================================================================================
+
+  [GL-1] The NexusTopBar has a hardcoded height = 64.dp inside which
+         statusBarsPadding() is applied. This is unusual — typically the
+         statusBarsPadding should add height to the bar, not be included within
+         the fixed 64 dp. The current implementation means the status bar
+         area is counted inside the 64 dp, making the actual content area of
+         the top bar (64 - statusBarHeight) dp. On a device with 24 dp status
+         bar, the content area is 40 dp — tight. Use fillMaxWidth() with
+         wrapContentHeight() and statusBarsPadding() OUTSIDE the content row.
+
+  [GL-2] The PDF reader uses hardcoded bottomPadding = 90.dp for the list's
+         contentPadding when not in immersive mode. This should be dynamically
+         calculated based on the actual height of the floating bottom bar +
+         navigationBarsPadding to avoid overlap.
+
+  [GL-3] Every screen applies .background(NexusTheme.colors.background) as
+         the root modifier, which is correct. However, the NexusSurface
+         composable internally applies its own background. Ensure that when
+         NexusSurface is used as a root container, the outer Box does not also
+         apply a background (double background is wasteful).
+
+  [GL-4] The FileListItem has padding: outer 0.dp + vertical 6.dp, inner 16.dp.
+         Total vertical: 6 + 16 + 16 + 6 = 44 dp padding + content.
+         The FileGridItem has outer 6.dp (all sides) + inner 16.dp column.
+         These are close but not identical — consider aligning to a 12 dp
+         outer / 16 dp inner standard for both.
+
+  [GL-5] Multiple LazyColumn/Grid instances use contentPadding bottom = 120.dp
+         or 180.dp to clear the floating nav. 180 dp is used on the Dashboard
+         grid (contentPadding(bottom = 180.dp)). The floating nav itself is
+         approximately: 52 dp (pill height) + 16 dp (vertical padding) + 16 dp
+         (outer padding top) + navigationBarsPadding (~16-48 dp device-dependent).
+         On many devices, 180 dp is excessive. Consider using
+         WindowInsets.navigationBars to calculate this dynamically.
+         Impact: MEDIUM — excessive wasted space at the bottom of lists.
+
+
+================================================================================
+ 20. PRIORITY ACTION MATRIX
+================================================================================
+
+The following table ranks issues by IMPACT × EFFORT.
+Priority: [P1] = Do first, [P2] = Important, [P3] = Nice to have.
+
+PRIORITY  ISSUE     AREA              DESCRIPTION
+--------  -------   ---------------   ------------------------------------------
+  P1      [T-1]     Typography        Add Inter/Nunito/Outfit Google Font
+  P1      [EL-1]    Loading States    Replace ALL "Loading..." text with shimmer
+  P1      [P-8]     PDF Reader        Fix page placeholder height (layout shift)
+  P1      [SP-3]    Splash Screen     Unify branding: "NexusDocs" vs "LiteView"
+  P1      [SP-2]    Splash Screen     Reduce total splash duration to ~1.2–1.5 s
+  P1      [SC-1]    Scanner           Add loading indicator before scanner launch
+  P1      [TR-3]    Text Reader       Increase line-height for readability
+
+  P2      [D-2]     Dashboard         Add leading search icon to NexusSearchBar
+  P2      [C-1]     Color System      Centralize document type accent colors
+  P2      [C-2]     Color System      Replace Color.Green with proper success token
+  P2      [AN-3]    Animations        Fix shimmer visibility in light mode
+  P2      [AN-5]    Animations        Implement SharedElement transition (card→reader)
+  P2      [P-2]     PDF Reader        Fix floating bottom bar/page indicator layout
+  P2      [P-3]     PDF Reader        Replace Material3 AlertDialog with NexusDialog
+  P2      [N-2]     Navigation        Add filled/outlined icon variants for nav items
+  P2      [TR-1]    Text Reader       Add font-size control to text reader
+  P2      [ST-2]    Settings          Add springBounceClick to back button
+  P2      [ST-3]    Settings          Replace ">" text with vector chevron icon
+  P2      [ST-4]    Settings          Animate bottom-sheet swipe-to-dismiss in real-time
+  P2      [ST-6]    Settings          Improve destructive dialog confirm button style
+  P2      [U-1]     Unsupported File  Replace 🔙 emoji with ic_back vector icon
+  P2      [D-7]     Dashboard         Replace "⋮" text with vector icon in list items
+  P2      [D-11]    Dashboard         Add "File missing" label to inaccessible list items
+  P2      [A11Y-1]  Accessibility     Fix all sub-48dp touch targets
+  P2      [A11Y-3]  Accessibility     Add semantic role to NexusSwitch
+  P2      [T-2]     Typography        Add lineHeight to body and caption styles
+  P2      [T-6]     Typography        Increase NexusButton label to 14 sp
+
+  P3      [D-12]    Dashboard         Fix grid thumbnail aspect ratio (portrait)
+  P3      [D-13]    Dashboard         Replace ⭐ emoji with vector star in grid item
+  P3      [D-5]     Dashboard         Animate tab selection background
+  P3      [N-1]     Navigation        Replace phantom route string with sealed action
+  P3      [S-2]     Shapes/Spacing    Improve top bar blur on API 31+
+  P3      [P-5]     PDF Reader        Apply pan clamping during gesture (not just on release)
+  P3      [TR-2]    Text Reader       Make line numbers optional toggle
+  P3      [TR-6]    Text Reader       Add horizontal scroll / word-wrap toggle
+  P3      [SC-2]    Scanner           Add progress indicator for PDF generation
+  P3      [AN-1]    Animations        Cap stagger delay maximum at ~200ms
+  P3      [AN-2]    Animations        Use lighter haptic for regular press (not LongPress type)
+  P3      [T-4]     Typography        Add "display" style to replace inline .copy(fontSize=36.sp)
+  P3      [SP-4]    Splash            Fix tagline letter-spacing for mixed-case text
+  P3      [GL-5]    Layout            Use WindowInsets to calculate list bottom padding
+
+--------------------------------------------------------------------------------
+
+END OF REPORT
+Total issues identified: 67
+Critical (P1): 7
+Important (P2): 24
+Nice-to-have (P3): 14
+Low-impact / style (unlisted minor): 22
+
+================================================================================

@@ -104,7 +104,7 @@ class DocumentReaderRouterImpl @Inject constructor(
                 }
                 DocumentType.UNKNOWN -> {
                     // Navigate to a dedicated "unsupported file" screen
-                    controller.navigate("reader/unsupported/$encodedName")
+                    controller.navigate(NexusRoute.Unsupported(encodedName).buildRoute())
                 }
             }
         }

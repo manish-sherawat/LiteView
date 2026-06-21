@@ -73,11 +73,11 @@ fun FileListItem(
     
     val accentColor = remember(docType) {
         when (docType) {
-            DocumentType.PDF  -> Color(0xFFC4362A)
-            DocumentType.DOCX -> Color(0xFF3B7DD8)
-            DocumentType.XLSX -> Color(0xFF2E9E5B)
-            DocumentType.TXT  -> Color(0xFF7C5CBF)
-            else              -> Color(0xFF3B7DD8)
+            DocumentType.PDF  -> com.nexus.core.theme.DocumentAccentColors.PDF
+            DocumentType.DOCX -> com.nexus.core.theme.DocumentAccentColors.DOCX
+            DocumentType.XLSX -> com.nexus.core.theme.DocumentAccentColors.XLSX
+            DocumentType.TXT  -> com.nexus.core.theme.DocumentAccentColors.TXT
+            else              -> com.nexus.core.theme.DocumentAccentColors.UNKNOWN
         }
     }
 
@@ -88,9 +88,10 @@ fun FileListItem(
     }
 
     val pageCountStr = if (cachedPageCount != null) " · $cachedPageCount pages" else ""
-    val subtitle = "${docType.name} · ${formatFileSize(doc.fileSizeBytes)}$pageCountStr · ${formatDate(doc.lastOpenedAt)}"
+    val subtitle1 = "${docType.name} • ${formatFileSize(doc.fileSizeBytes)}"
+    val subtitle2 = "Opened ${formatDate(doc.lastOpenedAt)}$pageCountStr"
 
-    val showProgress = doc.lastScrollIndex > 0
+    val showProgress = doc.lastOpenedAt > 0L
     val progressPct = remember(doc.lastScrollIndex, cachedPageCount) {
         if (cachedPageCount != null && cachedPageCount > 0) {
             ((doc.lastScrollIndex + 1).toFloat() / cachedPageCount * 100).toInt().coerceIn(1, 100)
@@ -105,7 +106,7 @@ fun FileListItem(
         enabled = isAccessible,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 0.dp, vertical = 6.dp)
+            .padding(0.dp)
     ) {
         var thumbnail by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
         androidx.compose.runtime.LaunchedEffect(doc.uri) {
@@ -174,30 +175,48 @@ fun FileListItem(
                                 enter = scaleIn(animationSpec = pressSpring()) + fadeIn(),
                                 exit = scaleOut(animationSpec = pressSpring()) + fadeOut()
                             ) {
-                                NexusText("⭐")
+                                androidx.compose.foundation.Image(
+                                    painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_star),
+                                    contentDescription = "Starred",
+                                    modifier = Modifier.size(20.dp),
+                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(NexusTheme.colors.primary)
+                                )
                             }
                         }
                     }
                     NexusText(
-                        text = subtitle,
+                        text = subtitle1,
                         style = NexusTheme.typography.caption,
                         color = NexusTheme.colors.textSecondary
                     )
+                    NexusText(
+                        text = subtitle2,
+                        style = NexusTheme.typography.caption,
+                        color = NexusTheme.colors.textSecondary.copy(alpha = 0.7f)
+                    )
+                    if (!isAccessible) {
+                        NexusText("File missing", color = NexusTheme.colors.error, style = NexusTheme.typography.caption)
+                    }
                 }
 
                 Box {
                     if (isOpening) {
                         NexusText("⏳", color = accentColor)
                     } else {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(androidx.compose.foundation.shape.CircleShape)
-                                .clickable { menuExpanded = true },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            NexusText("⋮", style = NexusTheme.typography.h1, color = NexusTheme.colors.textSecondary)
-                        }
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(androidx.compose.foundation.shape.CircleShape)
+                                    .clickable { menuExpanded = true },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                androidx.compose.foundation.Image(
+                                    painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_more_vert),
+                                    contentDescription = "More Options",
+                                    modifier = Modifier.size(24.dp),
+                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(NexusTheme.colors.textSecondary)
+                                )
+                            }
                     }
                     if (menuExpanded) {
                         FileOptionsDialog(

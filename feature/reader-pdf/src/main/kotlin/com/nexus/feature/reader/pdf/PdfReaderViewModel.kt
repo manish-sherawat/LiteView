@@ -415,6 +415,47 @@ class PdfReaderViewModel @Inject constructor(
         }
     }
 
+    fun renameFile(encodedUri: String, newName: String, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val uriStr = URLDecoder.decode(URLDecoder.decode(encodedUri, StandardCharsets.UTF_8.toString()), StandardCharsets.UTF_8.toString())
+                val uri = Uri.parse(uriStr)
+                
+                var success = false
+                var newUri: Uri? = null
+                
+                withContext(Dispatchers.IO) {
+                    if (uri.scheme == "file") {
+                        val file = File(uri.path ?: "")
+                        val newFile = File(file.parent, newName)
+                        success = file.renameTo(newFile)
+                        if (success) {
+                            newUri = Uri.fromFile(newFile)
+                        }
+                    } else {
+                        newUri = android.provider.DocumentsContract.renameDocument(context.contentResolver, uri, newName)
+                        success = newUri != null
+                    }
+                }
+                
+                if (success && newUri != null) {
+                    _displayName.value = newName
+                    withContext(Dispatchers.Main) {
+                        onResult(true, newUri.toString())
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        onResult(false, "Rename failed")
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    onResult(false, e.localizedMessage)
+                }
+            }
+        }
+    }
+
     fun printPdf(context: Context, displayName: String) {
         try {
             val printManager = context.getSystemService(Context.PRINT_SERVICE) as? android.print.PrintManager ?: return

@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
@@ -71,7 +73,15 @@ fun ScannerScreen(
             }
             
             // Empty background while waiting for Google Scanner to launch
-            Box(modifier = Modifier.fillMaxSize().background(NexusTheme.colors.background))
+            Box(
+                modifier = Modifier.fillMaxSize().background(NexusTheme.colors.background),
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    color = NexusTheme.colors.primary,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
         }
         ScannerState.REVIEW -> {
             ScannerReviewScreen(
@@ -103,11 +113,20 @@ fun ScannerScreen(
                 modifier = Modifier.fillMaxSize().background(NexusTheme.colors.background),
                 contentAlignment = Alignment.Center
             ) {
-                NexusText(
-                    text = "Saving PDF...",
-                    style = NexusTheme.typography.title,
-                    color = NexusTheme.colors.textPrimary
-                )
+                androidx.compose.foundation.layout.Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        color = NexusTheme.colors.primary,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    NexusText(
+                        text = "Saving PDF...",
+                        style = NexusTheme.typography.title,
+                        color = NexusTheme.colors.textPrimary
+                    )
+                }
                 
                 LaunchedEffect(Unit) {
                     coroutineScope.launch {

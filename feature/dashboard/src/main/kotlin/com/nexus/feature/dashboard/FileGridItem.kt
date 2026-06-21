@@ -71,11 +71,11 @@ fun FileGridItem(
 
     val accentColor = remember(docType) {
         when (docType) {
-            DocumentType.PDF  -> Color(0xFFC4362A)
-            DocumentType.DOCX -> Color(0xFF3B7DD8)
-            DocumentType.XLSX -> Color(0xFF2E9E5B)
-            DocumentType.TXT  -> Color(0xFF7C5CBF)
-            else              -> Color(0xFF3B7DD8)
+            DocumentType.PDF  -> com.nexus.core.theme.DocumentAccentColors.PDF
+            DocumentType.DOCX -> com.nexus.core.theme.DocumentAccentColors.DOCX
+            DocumentType.XLSX -> com.nexus.core.theme.DocumentAccentColors.XLSX
+            DocumentType.TXT  -> com.nexus.core.theme.DocumentAccentColors.TXT
+            else              -> com.nexus.core.theme.DocumentAccentColors.UNKNOWN
         }
     }
 
@@ -99,7 +99,7 @@ fun FileGridItem(
         onClick = onClick,
         enabled = isAccessible,
         modifier = modifier
-            .padding(6.dp)
+            .padding(0.dp)
     ) {
         var thumbnail by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
         LaunchedEffect(doc.uri) {
@@ -114,7 +114,7 @@ fun FileGridItem(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1.2f)
+                    .aspectRatio(0.75f)
                     .background(if (thumbnail != null) NexusTheme.colors.surfaceVariant else accentColor.copy(alpha = 0.15f))
                     .then(if (thumbnail == null && docType == DocumentType.PDF) Modifier.shimmerEffect() else Modifier),
                 contentAlignment = Alignment.Center
@@ -168,7 +168,12 @@ fun FileGridItem(
                                     enter = scaleIn(animationSpec = pressSpring()) + fadeIn(),
                                     exit = scaleOut(animationSpec = pressSpring()) + fadeOut()
                                 ) {
-                                    NexusText("⭐")
+                                    androidx.compose.foundation.Image(
+                                        painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_star),
+                                        contentDescription = "Starred",
+                                        modifier = Modifier.size(16.dp),
+                                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(NexusTheme.colors.primary)
+                                    )
                                 }
                             }
                         }
@@ -186,12 +191,17 @@ fun FileGridItem(
                         } else {
                             Box(
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(48.dp)
                                     .clip(androidx.compose.foundation.shape.CircleShape)
                                     .clickable { menuExpanded = true },
                                 contentAlignment = Alignment.Center
                             ) {
-                                NexusText("⋮", style = NexusTheme.typography.h2, color = NexusTheme.colors.textSecondary)
+                                androidx.compose.foundation.Image(
+                                    painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_more_vert),
+                                    contentDescription = "More Options",
+                                    modifier = Modifier.size(24.dp),
+                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(NexusTheme.colors.textSecondary)
+                                )
                             }
                         }
                         if (menuExpanded) {

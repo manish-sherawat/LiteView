@@ -14,8 +14,8 @@ android {
         applicationId = "com.nexus.nexusdocs"
         minSdk = 26
         targetSdk = 35
-        versionCode = 212
-        versionName = "2.1.2"
+        versionCode = 215
+        versionName = "2.1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

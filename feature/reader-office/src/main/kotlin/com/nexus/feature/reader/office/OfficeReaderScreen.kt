@@ -13,7 +13,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
+import com.nexus.core.util.toUserFriendlyMessage
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -39,13 +41,14 @@ import androidx.compose.material3.Icon
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nexus.core.theme.NexusTheme
-import com.nexus.core.ui.NexusButton
+import com.nexus.core.ui.components.NexusButton
 import com.nexus.core.ui.NexusSurface
 import com.nexus.core.ui.NexusText
-import com.nexus.core.ui.NexusTopBar
+import com.nexus.core.ui.components.NexusPillTopBar
 import java.net.URLDecoder
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.isSystemInDarkTheme
+import com.nexus.core.ui.animations.shimmerEffect
 import androidx.compose.ui.platform.LocalContext
 import android.content.Intent
 import android.print.PrintAttributes
@@ -67,8 +70,12 @@ fun OfficeReaderScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val displayName = try { URLDecoder.decode(URLDecoder.decode(fileName, "UTF-8"), "UTF-8") } catch (_: Exception) { fileName }
 
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
     var isImmersiveMode by remember { mutableStateOf(false) }
-    val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 0.dp else 100.dp)
+    val bottomInset = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 16.dp else 90.dp)
+    val bottomPadding by animateDpAsState(targetValue = if (isImmersiveMode) bottomInset else bottomInset + 100.dp)
 
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -102,8 +109,28 @@ fun OfficeReaderScreen(
             ) { state ->
                 when (state) {
                     is OfficeReaderUiState.Loading -> {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            NexusText("Loading document...", color = NexusTheme.colors.textSecondary)
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 24.dp, vertical = 100.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                items(20) { index ->
+                                    val widthFraction = when {
+                                        index % 5 == 0 -> 0.4f
+                                        index % 3 == 0 -> 0.7f
+                                        else -> 0.9f
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(widthFraction)
+                                            .height(16.dp)
+                                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+                                            .shimmerEffect()
+                                    )
+                                }
+                            }
                         }
                     }
                     is OfficeReaderUiState.DocxReady -> {
@@ -170,6 +197,9 @@ fun OfficeReaderScreen(
                             }
                         },
                         update = { view ->
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                view.settings.forceDark = if (isDark) android.webkit.WebSettings.FORCE_DARK_ON else android.webkit.WebSettings.FORCE_DARK_OFF
+                            }
                             if (view.tag != htmlWithScript) {
                                 view.loadDataWithBaseURL(null, htmlWithScript, "text/html", "UTF-8", null)
                                 view.tag = htmlWithScript
@@ -278,6 +308,9 @@ fun OfficeReaderScreen(
                                     }
                                 },
                                 update = { view ->
+                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                        view.settings.forceDark = if (isDark) android.webkit.WebSettings.FORCE_DARK_ON else android.webkit.WebSettings.FORCE_DARK_OFF
+                                    }
                                     if (view.tag != htmlContent) {
                                         view.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
                                         view.tag = htmlContent
@@ -285,6 +318,46 @@ fun OfficeReaderScreen(
                                 },
                                 modifier = Modifier.fillMaxSize()
                             )
+                            
+                            // Horizontal scroll hint
+                            var showScrollHint by remember { mutableStateOf(true) }
+                            LaunchedEffect(state.currentSheet) {
+                                showScrollHint = true
+                                kotlinx.coroutines.delay(3000)
+                                showScrollHint = false
+                            }
+                            
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = showScrollHint && !isImmersiveMode,
+                                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 100.dp),
+                                enter = fadeIn(),
+                                exit = fadeOut()
+                            ) {
+                                NexusSurface(
+                                    shape = NexusTheme.shapes.pill,
+                                    color = NexusTheme.colors.primary.copy(alpha = 0.9f),
+                                    modifier = Modifier.padding(16.dp),
+                                    elevation = 8.dp
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_view_list),
+                                            contentDescription = null,
+                                            tint = NexusTheme.colors.onPrimary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        NexusText(
+                                            "Swipe horizontally to view more",
+                                            style = NexusTheme.typography.caption,
+                                            color = NexusTheme.colors.onPrimary
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -316,7 +389,7 @@ fun OfficeReaderScreen(
                 is OfficeReaderUiState.Error -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            NexusText(state.message, color = NexusTheme.colors.error)
+                            NexusText(state.message.toUserFriendlyMessage(), color = NexusTheme.colors.error)
                             Spacer(modifier = Modifier.height(16.dp))
                             NexusButton(text = "Go Back", onClick = onBack)
                         }
@@ -521,7 +594,7 @@ fun OfficeReaderScreen(
                         }
                     }
                 } else {
-                    NexusTopBar(
+                    NexusPillTopBar(
                         title = displayName,
                         outerVerticalPadding = 4.dp,
                         innerVerticalPadding = 8.dp,

@@ -1,0 +1,95 @@
+================================================================================
+                           LITEVIEW (NexusDocsViewer)
+                              CHANGELOG v2.1.5
+================================================================================
+
+Date: June 21, 2026
+Version Code: 215
+Version Name: 2.1.5
+
+This version introduces our largest design and stability update yet. Based on a 
+comprehensive UX/UI audit, we have overhauled the app's visual hierarchy, 
+animation systems, networking reliability, and typographic identity.
+
+================================================================================
+🐛 CRITICAL BUG FIXES & STABILITY
+================================================================================
+- [UI BUG FIX] Resolved an issue where the Bottom Navigation Bar (the floating 
+  pill on the Dashboard) was completely invisible on certain devices. This was 
+  due to a Jetpack Compose `matchParentSize()` constraint collision that caused 
+  the layout bounding box to collapse to 0dp. The navigation pill now renders 
+  reliably with an intrinsic 64dp height.
+- [UPDATER FIX] Fixed the "Check for Updates" feature in the Settings screen 
+  that previously failed with an HTTP Error 504 (Gateway Timeout). 
+  - Added a strict "User-Agent" header ("LiteView-AppUpdater") to comply with 
+    GitHub API requirements and prevent connections from being actively dropped.
+  - Implemented strict 15-second connect and read timeouts to prevent infinite 
+    hanging when checking for updates on poor or restricted networks.
+  - Added specific error mapping for Gateway Timeouts so users know if their 
+    ISP is blocking access.
+- [LAYOUT] Fixed inconsistent Top Bar padding where the Top App Bar would 
+  incorrectly overlap with the device's physical status bar on devices with 
+  edge-to-edge displays.
+- [BUILD] Fixed `app:debug` compilation failures by resolving missing `Offset` 
+  imports in the `reader-office` module and ensuring correct Material 3 
+  dependency injection.
+
+================================================================================
+🎨 TYPOGRAPHY & BRANDING SYSTEM
+================================================================================
+- [TYPOGRAPHY] Completely deprecated the system default `sans-serif` font. The 
+  app now utilizes a unified, premium Google Font family (Inter/Nunito) across 
+  all screens.
+- [READABILITY] Adjusted global `lineHeight` and `letterSpacing` tracking for 
+  all body text and labels to improve legibility on long documents.
+- [HEADER HIERARCHY] Dashboard headers now accurately respect the Design 
+  System's `h1` sizing (30sp) instead of relying on manual, inconsistent 
+  inline overrides.
+- [SPLASH SCREEN] Synchronized splash screen branding. The app now consistently 
+  identifies itself visually and textually throughout the startup sequence.
+
+================================================================================
+✨ UI/UX ENHANCEMENTS & MODERNIZATION
+================================================================================
+- [SHIMMER LOADERS] Eradicated all plain text "Loading PDF..." indicators. 
+  When opening heavy PDFs, Text files, or Office documents, the app now 
+  displays beautiful, animated Shimmer/Skeleton placeholder layouts that mimic 
+  the document structure while it loads in the background.
+- [COLORS] Centralized all hardcoded color hex codes into a unified 
+  "DocumentAccentColors" design token system. PDF, DOCX, XLSX, and TXT files 
+  now use consistent, visually distinct accent colors across all file list 
+  items and grid items.
+- [SEARCH BAR] Added a leading "magnifying glass" search icon to the main 
+  Dashboard Search Bar to improve discoverability and bring it up to modern 
+  Material 3 standards.
+- [TOUCH TARGETS] Increased the touch target size of the scanner floating 
+  action button (FAB) from 40dp to meet the 48x48dp minimum accessibility 
+  guidelines.
+- [FILE LISTS] File cards now perfectly align in both List and Grid views with 
+  corrected horizontal padding (unified to 24dp).
+- [ICONS] Swapped out the generic emoji "🔙" used on the Unsupported File 
+  Screen for a proper, high-quality Material Vector back icon.
+
+================================================================================
+🎬 MICRO-INTERACTIONS & ANIMATIONS
+================================================================================
+- [HAPTICS & PHYSICS] Replaced generic "clickable" ripples with a global 
+  "Spring Bounce" physics animation. Tapping cards, buttons, or navigation 
+  items now provides a highly satisfying, physically-modeled scaling bounce 
+  effect combined with subtle haptic feedback.
+- [CONSISTENCY] Applied `springBounceClick` globally so that every interactive 
+  element (from Settings rows to File Cards to Nav Icons) responds to user 
+  touch with the exact same weight and velocity.
+- [MATERIAL 3] Upgraded the Dashboard screen's `CircularProgressIndicator` to 
+  utilize the latest Material 3 components for smoother indeterminate rotations.
+
+================================================================================
+📝 UNDER THE HOOD
+================================================================================
+- Optimized `WindowInsets` padding calculations on the Dashboard to prevent 
+  lists from rendering underneath the newly fixed floating navigation pill.
+- Updated `versionCode` to 215.
+- Updated `versionName` to 2.1.5.
+
+Thank you for using LiteView!
+================================================================================

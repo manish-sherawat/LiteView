@@ -106,6 +106,17 @@ sealed class NexusRoute(val route: String) {
 
         fun buildRoute(): String = "reader/text/$encodedUri/$fileName"
     }
+
+    // Unsupported Format
+    data class Unsupported(
+        val fileName: String
+    ) : NexusRoute("reader/unsupported/{fileName}") {
+        companion object {
+            const val ROUTE = "reader/unsupported/{fileName}"
+            const val ARG_FILE_NAME = "fileName"
+        }
+        fun buildRoute(): String = "reader/unsupported/$fileName"
+    }
 }
 
 // ─── DocumentReaderRouter Interface ──────────────────────────────────────────

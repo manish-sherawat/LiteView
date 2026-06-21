@@ -14,7 +14,10 @@ data class NexusColors(
     val textPrimary: Color,
     val textSecondary: Color,
     val divider: Color,
-    val error: Color
+    val error: Color,
+    val success: Color,
+    val warning: Color,
+    val searchHighlight: Color
 )
 
 val LocalNexusColors = compositionLocalOf {
@@ -27,7 +30,10 @@ val LocalNexusColors = compositionLocalOf {
         textPrimary = Color.Unspecified,
         textSecondary = Color.Unspecified,
         divider = Color.Unspecified,
-        error = Color.Unspecified
+        error = Color.Unspecified,
+        success = Color.Unspecified,
+        warning = Color.Unspecified,
+        searchHighlight = Color.Unspecified
     )
 }
 
@@ -40,7 +46,10 @@ val lightNexusColors = NexusColors(
     textPrimary = Color(0xFF212529),
     textSecondary = Color(0xFF868E96),
     divider = Color(0xFFE9ECEF),
-    error = Color(0xFFFA5252)
+    error = Color(0xFFFA5252),
+    success = Color(0xFF4CAF50),
+    warning = Color(0xFFFF9800),
+    searchHighlight = Color(0x66FFEB3B)
 )
 
 val darkNexusColors = NexusColors(
@@ -52,7 +61,10 @@ val darkNexusColors = NexusColors(
     textPrimary = Color(0xFFE0E0E0),
     textSecondary = Color(0xFFA0A0A0),
     divider = Color(0xFF333333),
-    error = Color(0xFFFF6B6B)
+    error = Color(0xFFFF6B6B),
+    success = Color(0xFF81C784),
+    warning = Color(0xFFFFB74D),
+    searchHighlight = Color(0x66FFEB3B)
 )
 
 val sepiaNexusColors = NexusColors(
@@ -64,10 +76,11 @@ val sepiaNexusColors = NexusColors(
     textPrimary = Color(0xFF3E2723), // Espresso text
     textSecondary = Color(0xFF795548),
     divider = Color(0xFFD7CCC8),
-    error = Color(0xFFD32F2F)
+    error = Color(0xFFD32F2F),
+    success = Color(0xFF4CAF50),
+    warning = Color(0xFFFF9800),
+    searchHighlight = Color(0x66FFEB3B)
 )
-
-
 
 val forestNexusColors = NexusColors(
     background = Color(0xFFE8F5E9), // Light sage green
@@ -78,7 +91,10 @@ val forestNexusColors = NexusColors(
     textPrimary = Color(0xFF1B2620), // Dark grey-green
     textSecondary = Color(0xFF455A64),
     divider = Color(0xFFA5D6A7),
-    error = Color(0xFFD32F2F)
+    error = Color(0xFFD32F2F),
+    success = Color(0xFF4CAF50),
+    warning = Color(0xFFFF9800),
+    searchHighlight = Color(0x66FFEB3B)
 )
 
 val sunsetNexusColors = NexusColors(
@@ -90,5 +106,16 @@ val sunsetNexusColors = NexusColors(
     textPrimary = Color(0xFF3E2723), // Dark warm brown
     textSecondary = Color(0xFF5D4037),
     divider = Color(0xFFFFCC80),
-    error = Color(0xFFD32F2F)
+    error = Color(0xFFD32F2F),
+    success = Color(0xFF4CAF50),
+    warning = Color(0xFFFF9800),
+    searchHighlight = Color(0x66FFEB3B)
 )
+
+object DocumentAccentColors {
+    val PDF  = Color(0xFFC4362A)
+    val DOCX = Color(0xFF3B7DD8)
+    val XLSX = Color(0xFF2E9E5B)
+    val TXT  = Color(0xFF7C5CBF)
+    val UNKNOWN = Color(0xFF3B7DD8)
+}

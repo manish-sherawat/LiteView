@@ -37,7 +37,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nexus.core.navigation.DocumentReaderRouter
 import com.nexus.core.theme.NexusTheme
-import com.nexus.core.ui.NexusButton
+import com.nexus.core.ui.components.NexusButton
 import com.nexus.core.ui.NexusSurface
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.NexusTextField
@@ -98,10 +98,13 @@ fun DashboardScreen(
             modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
-            contentPadding = PaddingValues(top = 48.dp, bottom = 180.dp)
+            contentPadding = PaddingValues(
+                top = 0.dp, 
+                bottom = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 100.dp
+            )
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Column(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(top = 16.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -109,7 +112,7 @@ fun DashboardScreen(
                     ) {
                         NexusText(
                             text = "LiteView",
-                            style = NexusTheme.typography.h1.copy(fontSize = 36.sp),
+                            style = NexusTheme.typography.display,
                             color = NexusTheme.colors.textPrimary
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -117,9 +120,9 @@ fun DashboardScreen(
                                 painter = painterResource(id = R.drawable.ic_text_scan),
                                 contentDescription = "Scan",
                                 modifier = Modifier
+                                    .size(48.dp)
                                     .springBounceClick { router.navigateToScanner() }
-                                    .padding(8.dp)
-                                    .size(32.dp),
+                                    .padding(8.dp),
                                 colorFilter = ColorFilter.tint(NexusTheme.colors.primary)
                             )
                         }
@@ -127,30 +130,27 @@ fun DashboardScreen(
                     
                     Spacer(modifier = Modifier.height(24.dp))
                     
-                    NexusTextField(
-                        value = uiState.searchQuery,
-                        onValueChange = { viewModel.setSearchQuery(it) },
-                        placeholder = "Search files...",
-                        leadingIcon = {
-                            Image(
-                                painter = painterResource(id = R.drawable.ic_search),
-                                contentDescription = "Search",
-                                modifier = Modifier.size(24.dp),
-                                colorFilter = ColorFilter.tint(NexusTheme.colors.textSecondary)
-                            )
-                        }
+                    com.nexus.core.ui.components.NexusSearchBar(
+                        query = uiState.searchQuery,
+                        onQueryChange = { viewModel.setSearchQuery(it) },
+                        onClear = { viewModel.setSearchQuery("") },
+                        placeholderText = "Search files..."
                     )
                     
                     Spacer(modifier = Modifier.height(24.dp))
                     
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        TabButton("All", uiState.selectedTab == DashboardTab.ALL) { viewModel.setSelectedTab(DashboardTab.ALL) }
-                        TabButton("Recent", uiState.selectedTab == DashboardTab.RECENT) { viewModel.setSelectedTab(DashboardTab.RECENT) }
-                        TabButton("Starred", uiState.selectedTab == DashboardTab.STARRED) { viewModel.setSelectedTab(DashboardTab.STARRED) }
-                    }
+                    com.nexus.core.ui.components.NexusTabRow(
+                        options = listOf(DashboardTab.ALL, DashboardTab.RECENT, DashboardTab.STARRED),
+                        selectedOption = uiState.selectedTab,
+                        onOptionSelected = { viewModel.setSelectedTab(it) },
+                        optionLabel = { tab ->
+                            when (tab) {
+                                DashboardTab.ALL -> "All"
+                                DashboardTab.RECENT -> "Recent"
+                                DashboardTab.STARRED -> "Starred"
+                            }
+                        }
+                    )
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
@@ -198,7 +198,7 @@ fun DashboardScreen(
                 }
             }
             
-            if (uiState.documents.isEmpty()) {
+            if (uiState.isLoading) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Column(
                         modifier = Modifier
@@ -206,14 +206,45 @@ fun DashboardScreen(
                             .padding(top = 64.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        NexusText(
-                            text = when (uiState.selectedTab) {
-                                DashboardTab.STARRED -> "⭐"
-                                DashboardTab.RECENT -> "🕒"
-                                else -> "📭"
-                            },
-                            style = NexusTheme.typography.h1.copy(fontSize = 64.sp)
+                        androidx.compose.material3.CircularProgressIndicator(
+                            color = NexusTheme.colors.primary,
+                            modifier = Modifier.size(48.dp)
                         )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        NexusText(
+                            text = "Scanning storage...",
+                            style = NexusTheme.typography.title,
+                            color = NexusTheme.colors.textPrimary
+                        )
+                    }
+                }
+            } else if (uiState.documents.isEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 64.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        val emptyIcon = when (uiState.selectedTab) {
+                            DashboardTab.STARRED -> R.drawable.ic_star
+                            DashboardTab.RECENT -> R.drawable.ic_update_progress
+                            else -> R.drawable.ic_folder
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(96.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(NexusTheme.colors.primary.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                painter = painterResource(id = emptyIcon),
+                                contentDescription = "Empty",
+                                modifier = Modifier.size(48.dp),
+                                colorFilter = ColorFilter.tint(NexusTheme.colors.primary)
+                            )
+                        }
                         Spacer(modifier = Modifier.height(16.dp))
                         NexusText(
                             text = when (uiState.selectedTab) {
@@ -229,7 +260,7 @@ fun DashboardScreen(
                             text = when (uiState.selectedTab) {
                                 DashboardTab.STARRED -> "Star a file to quickly access it here."
                                 DashboardTab.RECENT -> "Files you open will automatically appear here."
-                                else -> "Tap + Add in the nav bar to import documents."
+                                else -> "Tap Add in the nav bar to import documents."
                             },
                             style = NexusTheme.typography.body,
                             color = NexusTheme.colors.textSecondary,
@@ -301,10 +332,9 @@ fun DashboardScreen(
                     }
                 },
                 confirmButton = {
-                    NexusText(
-                        "Close",
-                        color = NexusTheme.colors.primary,
-                        modifier = Modifier.clickable { detailsDialogDoc = null }.padding(8.dp)
+                    com.nexus.core.ui.components.NexusButton(
+                        text = "Close",
+                        onClick = { detailsDialogDoc = null }
                     )
                 }
             )
@@ -351,15 +381,10 @@ fun FileCard(
                 .padding(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(NexusTheme.shapes.medium)
-                    .background(NexusTheme.colors.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                NexusText("📄", style = NexusTheme.typography.h2)
-            }
+            com.nexus.core.ui.components.FileTypeIcon(
+                type = runCatching { com.nexus.core.navigation.DocumentType.valueOf(doc.documentType) }.getOrDefault(com.nexus.core.navigation.DocumentType.UNKNOWN),
+                size = 48.dp
+            )
             
             Spacer(modifier = Modifier.width(16.dp))
             
@@ -378,7 +403,12 @@ fun FileCard(
             }
             
             if (isStarred) {
-                NexusText("⭐")
+                Image(
+                    painter = painterResource(id = R.drawable.ic_star),
+                    contentDescription = "Starred",
+                    modifier = Modifier.size(24.dp),
+                    colorFilter = ColorFilter.tint(NexusTheme.colors.primary)
+                )
             }
         }
     }

@@ -19,7 +19,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.nexus.core.theme.NexusTheme
 import com.nexus.core.ui.NexusText
+import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.components.NexusButton
+import com.nexus.core.ui.components.NexusTopBar
 
 @Composable
 fun ScannerSaveScreen(
@@ -50,21 +52,12 @@ fun ScannerSaveScreen(
             .statusBarsPadding()
     ) {
         // Top Bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            NexusButton(text = "Back", onClick = onBack)
-            NexusText(
-                text = "Save Document",
-                style = NexusTheme.typography.title,
-                color = NexusTheme.colors.textPrimary
-            )
-            Spacer(modifier = Modifier.width(64.dp))
-        }
+        NexusTopBar(
+            title = "Save Document",
+            navigationIcon = {
+                NexusButton(text = "Back", onClick = onBack)
+            }
+        )
 
         Column(
             modifier = Modifier

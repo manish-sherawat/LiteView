@@ -40,6 +40,10 @@ fun animateNexusColorsAsState(targetColors: NexusColors): NexusColors {
     val divider by animateColorAsState(targetColors.divider, animationSpec = colorSpring(), label = "divider")
     val error by animateColorAsState(targetColors.error, animationSpec = colorSpring(), label = "error")
 
+    val success by animateColorAsState(targetColors.success, animationSpec = colorSpring(), label = "success")
+    val warning by animateColorAsState(targetColors.warning, animationSpec = colorSpring(), label = "warning")
+    val searchHighlight by animateColorAsState(targetColors.searchHighlight, animationSpec = colorSpring(), label = "searchHighlight")
+
     return NexusColors(
         background = background,
         surface = surface,
@@ -49,7 +53,10 @@ fun animateNexusColorsAsState(targetColors: NexusColors): NexusColors {
         textPrimary = textPrimary,
         textSecondary = textSecondary,
         divider = divider,
-        error = error
+        error = error,
+        success = success,
+        warning = warning,
+        searchHighlight = searchHighlight
     )
 }
 

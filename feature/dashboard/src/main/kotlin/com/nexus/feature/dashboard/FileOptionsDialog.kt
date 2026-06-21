@@ -36,123 +36,64 @@ fun FileOptionsDialog(
     onRemove: () -> Unit,
     onShowDetails: () -> Unit
 ) {
-    val isVisible = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    androidx.compose.runtime.LaunchedEffect(Unit) { isVisible.value = true }
-
-    Dialog(
+    com.nexus.core.ui.components.NexusDialog(
         onDismissRequest = onDismissRequest,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 24.dp)
-                .clickable(
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismissRequest
-                ),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            androidx.compose.animation.AnimatedVisibility(
-                visible = isVisible.value,
-                enter = androidx.compose.animation.slideInVertically(
-                    initialOffsetY = { it },
-                    animationSpec = com.nexus.core.ui.animations.dialogSpring()
-                ) + androidx.compose.animation.fadeIn(),
-                exit = androidx.compose.animation.slideOutVertically(
-                    targetOffsetY = { it }
-                ) + androidx.compose.animation.fadeOut(),
-                modifier = Modifier.align(Alignment.BottomCenter)
+        title = {
+            NexusText(
+                text = fileName,
+                style = NexusTheme.typography.title,
+                maxLines = 1,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        },
+        confirmButton = {
+            com.nexus.core.ui.components.NexusButton(
+                text = "Close",
+                onClick = onDismissRequest,
+                isOutlined = true
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth()
             ) {
-                NexusSurface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .pointerInput(Unit) {
-                            var accumulatedDrag = 0f
-                            detectVerticalDragGestures(
-                                onDragEnd = { accumulatedDrag = 0f },
-                                onDragCancel = { accumulatedDrag = 0f },
-                                onVerticalDrag = { _, dragAmount ->
-                                    accumulatedDrag += dragAmount
-                                    if (accumulatedDrag > 100f) {
-                                        onDismissRequest()
-                                        accumulatedDrag = 0f
-                                    }
-                                }
-                            )
-                        }
-                        .clickable(
-                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                            indication = null,
-                            onClick = {} // Prevent clicks on the dialog from dismissing it
-                        ),
-                    shape = NexusTheme.shapes.large,
-                    elevation = 24.dp,
-                    color = NexusTheme.colors.surface
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .width(32.dp)
-                                .height(4.dp)
-                                .clip(NexusTheme.shapes.pill)
-                                .background(NexusTheme.colors.textSecondary.copy(alpha = 0.2f))
-                                .align(Alignment.CenterHorizontally)
-                        )
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        NexusText(
-                            text = fileName,
-                            style = NexusTheme.typography.title,
-                            maxLines = 1,
-                            modifier = Modifier.padding(bottom = 16.dp, start = 8.dp, end = 8.dp)
-                        )
-
-                        FileOptionItem(icon = "📤", iconRes = R.drawable.ic_share, label = "Share file", onClick = {
-                            onDismissRequest()
-                            onShare()
-                        })
-                        FileOptionItem(icon = "✏️", iconRes = R.drawable.ic_rename, label = "Rename file", onClick = {
-                            onDismissRequest()
-                            onRename()
-                        })
-                        FileOptionItem(
-                            icon = "",
-                            iconRes = R.drawable.ic_star,
-                            label = if (isStarred) "Unstar file" else "Star file", 
-                            onClick = {
-                                onDismissRequest()
-                                onToggleStarred()
-                            }
-                        )
-                        FileOptionItem(icon = "ℹ️", iconRes = R.drawable.ic_info, label = "File details", onClick = {
-                            onDismissRequest()
-                            onShowDetails()
-                        })
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        FileOptionItem(
-                            icon = "🗑️", 
-                            iconRes = R.drawable.ic_delete,
-                            label = "Remove from recents", 
-                            onClick = {
-                                onDismissRequest()
-                                onRemove()
-                            }, 
-                            isDestructive = true
-                        )
+                FileOptionItem(icon = "📤", iconRes = R.drawable.ic_share, label = "Share file", onClick = {
+                    onDismissRequest()
+                    onShare()
+                })
+                FileOptionItem(icon = "✏️", iconRes = R.drawable.ic_rename, label = "Rename file", onClick = {
+                    onDismissRequest()
+                    onRename()
+                })
+                FileOptionItem(
+                    icon = "",
+                    iconRes = R.drawable.ic_star,
+                    label = if (isStarred) "Unstar file" else "Star file", 
+                    onClick = {
+                        onDismissRequest()
+                        onToggleStarred()
                     }
-                }
+                )
+                FileOptionItem(icon = "ℹ️", iconRes = R.drawable.ic_info, label = "File details", onClick = {
+                    onDismissRequest()
+                    onShowDetails()
+                })
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                FileOptionItem(
+                    icon = "🗑️", 
+                    iconRes = R.drawable.ic_delete,
+                    label = "Remove from recents", 
+                    onClick = {
+                        onDismissRequest()
+                        onRemove()
+                    }, 
+                    isDestructive = true
+                )
             }
         }
-    }
+    )
 }
 
 @Composable

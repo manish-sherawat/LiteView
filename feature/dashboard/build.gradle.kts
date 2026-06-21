@@ -29,6 +29,7 @@ dependencies {
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
     implementation(libs.compose.ui)
+    implementation(libs.compose.material3)
 
 
     implementation(libs.compose.animation)

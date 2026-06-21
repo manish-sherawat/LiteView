@@ -55,6 +55,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.nexus.core.ui.NexusSurface
@@ -159,7 +160,7 @@ fun SettingsScreen(
                         contentDescription = "Back",
                         modifier = Modifier
                             .clip(androidx.compose.foundation.shape.CircleShape)
-                            .clickable { onBack() }
+                            .springBounceClick { onBack() }
                             .padding(16.dp)
                             .size(24.dp),
                         colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
@@ -230,7 +231,7 @@ fun SettingsScreen(
                         SettingsSwitchRow(
                             iconRes = R.drawable.ic_startup,
                             title = "Startup to Picker",
-                            subtitle = "Bypass the Home screen and open file picker",
+                            subtitle = "Bypass the Home screen and open file picker\n(Long-press the app icon to access Settings)",
                             checked = uiState.startupToPicker,
                             onCheckedChange = { viewModel.setStartupToPicker(it) }
                         )
@@ -307,23 +308,21 @@ fun SettingsScreen(
             title = { NexusText("Clear Cache?", style = NexusTheme.typography.h2) },
             text = { NexusText("This will remove temporary files like document thumbnails and extracted text. Your recent documents history will remain intact.") },
             confirmButton = {
-                NexusText(
+                com.nexus.core.ui.components.NexusButton(
                     text = "Clear Cache",
-                    color = NexusTheme.colors.error,
-                    modifier = Modifier
-                        .clickable {
-                            viewModel.clearCache()
-                            showClearCacheDialog = false
-                        }
-                        .padding(8.dp)
+                    containerColor = NexusTheme.colors.error,
+                    contentColor = NexusTheme.colors.background,
+                    onClick = {
+                        viewModel.clearCache()
+                        showClearCacheDialog = false
+                    }
                 )
             },
             dismissButton = {
-                NexusText(
+                com.nexus.core.ui.components.NexusButton(
                     text = "Cancel",
-                    modifier = Modifier
-                        .clickable { showClearCacheDialog = false }
-                        .padding(8.dp)
+                    isOutlined = true,
+                    onClick = { showClearCacheDialog = false }
                 )
             }
         )
@@ -332,7 +331,8 @@ fun SettingsScreen(
     if (showChangelogDialog) {
         ChangelogDialog(
             state = changelogState,
-            onDismiss = { showChangelogDialog = false }
+            onDismiss = { showChangelogDialog = false },
+            onRetry = { viewModel.fetchChangelog() }
         )
     }
 
@@ -384,8 +384,16 @@ fun SettingsScreen(
                 text = { NexusText(state.message) },
                 confirmButton = {
                     NexusText(
-                        text = "OK",
+                        text = "Retry",
                         color = NexusTheme.colors.primary,
+                        modifier = Modifier
+                            .clickable { viewModel.checkForUpdates() }
+                            .padding(8.dp)
+                    )
+                },
+                dismissButton = {
+                    NexusText(
+                        text = "Cancel",
                         modifier = Modifier
                             .clickable { viewModel.resetUpdateState() }
                             .padding(8.dp)
@@ -414,7 +422,7 @@ private fun SettingsSectionGroup(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Column(modifier = modifier) {
+    Column(modifier = modifier.padding(top = 16.dp)) {
         NexusText(
             text = label,
             style = NexusTheme.typography.label,
@@ -463,7 +471,12 @@ private fun SettingsNavRow(
             color = NexusTheme.colors.textSecondary
         )
         Spacer(modifier = Modifier.width(8.dp))
-        NexusText(">", color = NexusTheme.colors.textSecondary)
+        Image(
+            painter = painterResource(id = com.nexus.core.R.drawable.ic_arrow_right),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(NexusTheme.colors.textSecondary),
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
@@ -572,9 +585,9 @@ private fun SettingsPermissionRow(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(8.dp)
+                    .size(12.dp)
                     .clip(CircleShape)
-                    .background(if (isGranted) Color.Green else NexusTheme.colors.error)
+                    .background(if (isGranted) NexusTheme.colors.success else NexusTheme.colors.error)
             )
             Spacer(modifier = Modifier.width(8.dp))
             NexusText(
@@ -623,7 +636,7 @@ private fun SettingsDivider() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 68.dp)
+            .padding(start = 56.dp)
             .height(1.dp)
             .background(NexusTheme.colors.divider)
     )
@@ -644,8 +657,23 @@ private fun ThemeSelectionDialog(
         Triple(ThemeMode.SUNSET, "Sunset", R.drawable.ic_theme_sunset)
     )
 
+    var dragOffset by remember { mutableStateOf(0f) }
+    var isVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { isVisible = true }
+    
+    val animatedOffset by animateFloatAsState(
+        targetValue = if (isVisible) dragOffset else 1000f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+        ),
+        finishedListener = { if (!isVisible) onDismiss() }
+    )
+    
+    val handleDismiss = { isVisible = false }
+
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = handleDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Box(
@@ -655,24 +683,22 @@ private fun ThemeSelectionDialog(
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                    onClick = onDismiss
+                    onClick = handleDismiss
                 ),
             contentAlignment = Alignment.BottomCenter
         ) {
             NexusSurface(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .offset { androidx.compose.ui.unit.IntOffset(0, animatedOffset.toInt()) }
                     .pointerInput(Unit) {
-                        var accumulatedDrag = 0f
                         detectVerticalDragGestures(
-                            onDragEnd = { accumulatedDrag = 0f },
-                            onDragCancel = { accumulatedDrag = 0f },
+                            onDragEnd = { 
+                                if (dragOffset > 150f) handleDismiss() else dragOffset = 0f 
+                            },
+                            onDragCancel = { dragOffset = 0f },
                             onVerticalDrag = { _, dragAmount ->
-                                accumulatedDrag += dragAmount
-                                if (accumulatedDrag > 100f) {
-                                    onDismiss()
-                                    accumulatedDrag = 0f
-                                }
+                                dragOffset = (dragOffset + dragAmount).coerceAtLeast(0f)
                             }
                         )
                     }
@@ -720,7 +746,7 @@ private fun ThemeSelectionDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(NexusTheme.shapes.medium)
-                                .clickable { onThemeSelected(mode) }
+                                .springBounceClick { onThemeSelected(mode) }
                                 .padding(vertical = 12.dp, horizontal = 16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -760,7 +786,7 @@ private fun ThemeSelectionDialog(
 private data class ChangelogEntry(val version: String, val date: String, val notes: List<String>)
 
 @Composable
-private fun ChangelogDialog(state: ChangelogState, onDismiss: () -> Unit) {
+private fun ChangelogDialog(state: ChangelogState, onDismiss: () -> Unit, onRetry: () -> Unit) {
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -779,7 +805,7 @@ private fun ChangelogDialog(state: ChangelogState, onDismiss: () -> Unit) {
             NexusSurface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.85f)
+                    .heightIn(max = 600.dp)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -791,7 +817,7 @@ private fun ChangelogDialog(state: ChangelogState, onDismiss: () -> Unit) {
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
                         .padding(24.dp)
                 ) {
                     NexusText(
@@ -800,18 +826,25 @@ private fun ChangelogDialog(state: ChangelogState, onDismiss: () -> Unit) {
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
                     
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.weight(1f, fill = false), contentAlignment = Alignment.Center) {
                         when (state) {
                             is ChangelogState.Idle, is ChangelogState.Loading -> {
                                 NexusText("Loading...", color = NexusTheme.colors.primary, style = NexusTheme.typography.body)
                             }
                             is ChangelogState.Error -> {
-                                NexusText(
-                                    text = state.message,
-                                    color = NexusTheme.colors.error,
-                                    style = NexusTheme.typography.body,
-                                    textAlign = TextAlign.Center
-                                )
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    NexusText(
+                                        text = state.message,
+                                        color = NexusTheme.colors.error,
+                                        style = NexusTheme.typography.body,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    com.nexus.core.ui.components.NexusButton(
+                                        text = "Retry",
+                                        onClick = onRetry
+                                    )
+                                }
                             }
                             is ChangelogState.Success -> {
                                 LazyColumn(
