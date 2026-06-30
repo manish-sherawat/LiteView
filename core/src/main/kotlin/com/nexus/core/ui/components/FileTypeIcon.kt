@@ -62,60 +62,22 @@ fun FileTypeIcon(
     val style = fileTypeStyleFor(type)
     val content = @Composable {
         val iconSize = if (drawContainer) size * 0.6f else size
-        val textLabel = when (type) {
-            DocumentType.PDF -> "PDF"
-            DocumentType.DOCX -> "DOC"
-            DocumentType.XLSX -> "XLS"
-            DocumentType.TXT -> "TXT"
-            else -> "FILE"
+        val imageRes = when (type) {
+            DocumentType.PDF -> com.nexus.core.R.drawable.ic_file_pdf_new
+            DocumentType.DOCX -> com.nexus.core.R.drawable.ic_file_word_new
+            DocumentType.XLSX -> com.nexus.core.R.drawable.ic_file_sheet_new
+            DocumentType.TXT -> com.nexus.core.R.drawable.ic_file_txt_new
+            else -> com.nexus.core.R.drawable.ic_file_gen_new
         }
         
         Box(
             modifier = Modifier.size(iconSize),
             contentAlignment = Alignment.Center
         ) {
-            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
-                val scaleX = size.value / 24f
-                val scaleY = size.value / 24f
-                val strokeWidth = 1.5f * scaleX
-
-                // Rounded file
-                drawRoundRect(
-                    color = style.accentColor,
-                    topLeft = androidx.compose.ui.geometry.Offset(4f * scaleX, 2f * scaleY),
-                    size = androidx.compose.ui.geometry.Size(16f * scaleX, 20f * scaleY),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(3f * scaleX, 3f * scaleY),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
-                )
-
-                // Fold corner
-                val path = androidx.compose.ui.graphics.Path().apply {
-                    moveTo(14f * scaleX, 2f * scaleY)
-                    lineTo(14f * scaleX, 7f * scaleY)
-                    quadraticBezierTo(
-                        14f * scaleX, 7.55f * scaleY,
-                        14.45f * scaleX, 8f * scaleY
-                    )
-                    lineTo(15f * scaleX, 8f * scaleY)
-                    lineTo(20f * scaleX, 8f * scaleY)
-                }
-                drawPath(
-                    path = path,
-                    color = style.accentColor,
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
-                )
-            }
-            
-            NexusText(
-                text = textLabel,
-                color = style.accentColor,
-                style = NexusTheme.typography.caption.copy(
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                    fontSize = androidx.compose.ui.unit.TextUnit(iconSize.value * (5.5f/24f), androidx.compose.ui.unit.TextUnitType.Sp)
-                ),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = iconSize * (12.5f/24f))
+            Image(
+                painter = painterResource(id = imageRes),
+                contentDescription = "${type.name} File",
+                modifier = Modifier.fillMaxSize()
             )
         }
     }

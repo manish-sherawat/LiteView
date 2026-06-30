@@ -120,19 +120,16 @@ fun Modifier.springBounceClick(
     val hapticFeedbackEnabled = LocalHapticFeedbackEnabled.current
     val haptic = LocalHapticFeedback.current
 
-    androidx.compose.runtime.LaunchedEffect(isPressed) {
-        if (isPressed && enabled && hapticFeedbackEnabled) {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-        }
-    }
-
     this
         .scale(scale)
         .clickable(
             interactionSource = interactionSource,
             indication        = null,
             enabled           = enabled,
-            onClick           = onClick
+            onClick           = {
+                if (hapticFeedbackEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
         )
 }
 
@@ -154,19 +151,16 @@ fun Modifier.springBounceCombinedClick(
     val hapticFeedbackEnabled = LocalHapticFeedbackEnabled.current
     val haptic = LocalHapticFeedback.current
 
-    androidx.compose.runtime.LaunchedEffect(isPressed) {
-        if (isPressed && enabled && hapticFeedbackEnabled) {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-        }
-    }
-
     this
         .scale(scale)
         .combinedClickable(
             interactionSource = interactionSource,
             indication        = null,
             enabled           = enabled,
-            onClick           = onClick,
+            onClick           = {
+                if (hapticFeedbackEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            },
             onLongClick       = onLongClick?.let {
                 {
                     if (hapticFeedbackEnabled) haptic.performHapticFeedback(HapticFeedbackType.LongPress)

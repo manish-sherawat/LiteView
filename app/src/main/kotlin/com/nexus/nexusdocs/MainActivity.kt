@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.zIndex
@@ -69,13 +69,13 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val themeMode by preferencesRepository.themeMode
-                .collectAsState(initial = ThemeMode.SYSTEM)
+                .collectAsStateWithLifecycle(initialValue = ThemeMode.SYSTEM)
             
             val homeStyle by preferencesRepository.homeStyle
-                .collectAsState(initial = HomeStyle.APPLE_GLASSMORPHIC)
+                .collectAsStateWithLifecycle(initialValue = HomeStyle.APPLE_GLASSMORPHIC)
 
             val hapticFeedbackEnabled by preferencesRepository.hapticFeedbackEnabled
-                .collectAsState(initial = true)
+                .collectAsStateWithLifecycle(initialValue = true)
 
             com.nexus.core.theme.NexusDocsViewerTheme(
                 themeMode = themeMode,

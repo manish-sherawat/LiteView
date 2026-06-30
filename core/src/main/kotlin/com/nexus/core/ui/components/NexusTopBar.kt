@@ -202,8 +202,10 @@ fun NexusPillTopBar(
             NexusSurface(
                 modifier = Modifier.size(iconSize),
                 shape = androidx.compose.foundation.shape.CircleShape,
-                color = NexusTheme.colors.surfaceVariant,
-                elevation = 8.dp
+                color = NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f),
+                elevation = 16.dp,
+                borderWidth = 1.dp,
+                borderColor = NexusTheme.colors.textPrimary.copy(alpha = 0.1f)
             ) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -212,14 +214,16 @@ fun NexusPillTopBar(
                     navigationIcon()
                 }
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(2.dp))
         }
 
         NexusSurface(
             modifier = Modifier.weight(1f),
             shape = NexusTheme.shapes.pill,
-            color = NexusTheme.colors.surfaceVariant,
-            elevation = 8.dp
+            color = NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f),
+            elevation = 16.dp,
+            borderWidth = 1.dp,
+            borderColor = NexusTheme.colors.textPrimary.copy(alpha = 0.1f)
         ) {
             Row(
                 modifier = Modifier

@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,8 +34,8 @@ fun ScannerSaveScreen(
     if (scannedPages.isEmpty()) return
     
     val context = LocalContext.current
-    val fileName by viewModel.pdfFileName.collectAsState()
-    val saveDirectoryUri by viewModel.saveDirectoryUri.collectAsState()
+    val fileName by viewModel.pdfFileName.collectAsStateWithLifecycle()
+    val saveDirectoryUri by viewModel.saveDirectoryUri.collectAsStateWithLifecycle()
     
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         uri?.let {

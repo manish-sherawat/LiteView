@@ -54,17 +54,17 @@ val lightNexusColors = NexusColors(
 
 val darkNexusColors = NexusColors(
     background = Color(0xFF000000), // True AMOLED black
-    surface = Color(0xFF121212),    // Very dark grey for surface depth
-    surfaceVariant = Color(0xFF1E1E1E), // Slightly lighter for elevated surfaces
-    primary = Color(0xFFFFFFFF), // Minimal white accent
+    surface = Color(0xFF0F0F0F),    // Deeper grey for better contrast
+    surfaceVariant = Color(0xFF181818), 
+    primary = Color(0xFFFFFFFF), 
     onPrimary = Color(0xFF000000),
-    textPrimary = Color(0xFFE0E0E0),
-    textSecondary = Color(0xFFA0A0A0),
-    divider = Color(0xFF333333),
-    error = Color(0xFFFF6B6B),
-    success = Color(0xFF81C784),
-    warning = Color(0xFFFFB74D),
-    searchHighlight = Color(0x66FFEB3B)
+    textPrimary = Color(0xFFE8E8E8),
+    textSecondary = Color(0xFFAAAAAA),
+    divider = Color(0xFF2C2C2C),
+    error = Color(0xFFFF453A), // Vibrant Apple Red
+    success = Color(0xFF32D74B), // Vibrant Green
+    warning = Color(0xFFFF9F0A), // Vibrant Orange
+    searchHighlight = Color(0x88FFD60A) // Glowing Yellow
 )
 
 val sepiaNexusColors = NexusColors(
@@ -113,9 +113,9 @@ val sunsetNexusColors = NexusColors(
 )
 
 object DocumentAccentColors {
-    val PDF  = Color(0xFFC4362A)
-    val DOCX = Color(0xFF3B7DD8)
-    val XLSX = Color(0xFF2E9E5B)
-    val TXT  = Color(0xFF7C5CBF)
-    val UNKNOWN = Color(0xFF3B7DD8)
+    val PDF  = Color(0xFFFF3B30) // Vibrant Red
+    val DOCX = Color(0xFF0A84FF) // Vibrant Blue
+    val XLSX = Color(0xFF32D74B) // Vibrant Green
+    val TXT  = Color(0xFFBF5AF2) // Vibrant Purple
+    val UNKNOWN = Color(0xFF0A84FF)
 }

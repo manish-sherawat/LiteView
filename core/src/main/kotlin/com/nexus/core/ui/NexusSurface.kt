@@ -36,7 +36,7 @@ fun NexusSurface(
             .background(color)
             .then(
                 if (borderWidth > 0.dp) Modifier.border(borderWidth, borderColor, shape)
-                else Modifier
+                else Modifier.border(1.dp, NexusTheme.colors.textPrimary.copy(alpha = 0.2f), shape)
             ),
         content = content
     )

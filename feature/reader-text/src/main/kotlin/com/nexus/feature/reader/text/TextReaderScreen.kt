@@ -14,6 +14,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
+import com.nexus.core.ui.components.NexusVerticalScrollbar
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlin.math.roundToInt
 import androidx.compose.foundation.gestures.detectTapGestures
 import com.nexus.core.util.toUserFriendlyMessage
 import androidx.compose.ui.input.pointer.pointerInput
@@ -62,6 +66,12 @@ fun TextReaderScreen(
     val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 16.dp else 140.dp)
     val bottomPadding by animateDpAsState(targetValue = if (isImmersiveMode) bottomInset else bottomInset + 100.dp)
 
+    val percent = remember(listState.firstVisibleItemIndex, uiState) {
+        val lastIndex = if (uiState is TextReaderUiState.Success) (uiState as TextReaderUiState.Success).lines.size - 1 else 0
+        if (lastIndex > 0) (listState.firstVisibleItemIndex.toFloat() / lastIndex * 100).toInt().coerceIn(0, 100) else 0
+    }
+    val displayTitle = displayName
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -71,7 +81,7 @@ fun TextReaderScreen(
             targetState = uiState,
             modifier = Modifier.fillMaxSize(),
             transitionSpec = {
-                fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                fadeIn(animationSpec = tween(220, delayMillis = 90)) togetherWith fadeOut(animationSpec = tween(90))
             },
             label = "textReaderState"
         ) { state ->
@@ -97,6 +107,20 @@ fun TextReaderScreen(
                         val scaledFontSize = 14.sp * fontSizeMultiplier
                         val scaledLineHeight = scaledFontSize * 1.5f
                         val horizontalScrollState = androidx.compose.foundation.rememberScrollState()
+                        val coroutineScope = rememberCoroutineScope()
+                        
+                        val layoutInfo = listState.layoutInfo
+                        val visibleItemsInfo = layoutInfo.visibleItemsInfo
+                        val firstVisibleIndex = if (visibleItemsInfo.isEmpty()) 0 else visibleItemsInfo.first().index
+
+                        var isDraggingSlider by remember { mutableStateOf(false) }
+                        var sliderValue by remember { mutableFloatStateOf(1f) }
+                        
+                        LaunchedEffect(firstVisibleIndex, isDraggingSlider) {
+                            if (!isDraggingSlider) {
+                                sliderValue = (firstVisibleIndex + 1).toFloat()
+                            }
+                        }
                         
                         Box(
                             modifier = Modifier
@@ -146,40 +170,22 @@ fun TextReaderScreen(
                                     visible = !isImmersiveMode,
                                     modifier = Modifier
                                         .align(Alignment.CenterEnd)
-                                        .padding(end = 8.dp, top = 64.dp, bottom = 64.dp),
+                                        .padding(top = 64.dp, bottom = 64.dp),
                                     enter = fadeIn(),
                                     exit = fadeOut()
                                 ) {
-                                    val layoutInfo = listState.layoutInfo
-                                    val visibleItemsInfo = layoutInfo.visibleItemsInfo
-                                    val firstVisibleIndex = if (visibleItemsInfo.isEmpty()) 0 else visibleItemsInfo.first().index
-                                    val fraction = if (state.lines.size > 1) firstVisibleIndex.toFloat() / (state.lines.size - 1) else 0f
-                                    
-                                    BoxWithConstraints(
-                                        modifier = Modifier
-                                            .fillMaxHeight(0.6f)
-                                            .width(32.dp)
-                                    ) {
-                                        val trackHeight = constraints.maxHeight.toFloat()
-                                        val thumbHeightPx = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() }
-                                        val maxScroll = (trackHeight - thumbHeightPx).coerceAtLeast(0f)
-                                        val thumbOffsetPx = fraction * maxScroll
-                                        
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.Center)
-                                                .fillMaxHeight()
-                                                .width(4.dp)
-                                                .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.3f), androidx.compose.foundation.shape.CircleShape)
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.TopCenter)
-                                                .offset { androidx.compose.ui.unit.IntOffset(0, thumbOffsetPx.toInt()) }
-                                                .size(width = 24.dp, height = 48.dp)
-                                                .background(NexusTheme.colors.primary, androidx.compose.foundation.shape.CircleShape)
-                                        )
-                                    }
+                                    NexusVerticalScrollbar(
+                                        pageCount = state.lines.size,
+                                        sliderValue = sliderValue,
+                                        onSliderValueChange = { newValue ->
+                                            sliderValue = newValue
+                                            coroutineScope.launch {
+                                                listState.scrollToItem((sliderValue.roundToInt() - 1).coerceIn(0, state.lines.size - 1))
+                                            }
+                                        },
+                                        onDragStarted = { isDraggingSlider = true },
+                                        onDragStopped = { isDraggingSlider = false }
+                                    )
                                 }
                             }
                         }
@@ -203,7 +209,7 @@ fun TextReaderScreen(
                     exit = shrinkVertically() + fadeOut()
                 ) {
                     NexusPillTopBar(
-                        title = displayName,
+                        title = displayTitle,
                         outerVerticalPadding = 4.dp,
                         innerVerticalPadding = 8.dp,
                         iconSize = 40.dp,
@@ -220,6 +226,18 @@ fun TextReaderScreen(
                                     contentDescription = "Back",
                                     modifier = Modifier.size(20.dp),
                                     colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
+                                )
+                            }
+                        },
+                        actions = {
+                            if (uiState is TextReaderUiState.Success && percent > 0) {
+                                NexusText(
+                                    text = "$percent%",
+                                    color = NexusTheme.colors.primary,
+                                    style = NexusTheme.typography.label.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                                    modifier = Modifier
+                                        .background(NexusTheme.colors.primary.copy(alpha = 0.15f), androidx.compose.foundation.shape.CircleShape)
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
                         }
@@ -248,7 +266,9 @@ fun TextReaderScreen(
                                 modifier = Modifier
                                     .size(48.dp)
                                     .clip(androidx.compose.foundation.shape.CircleShape)
-                                    .springBounceClick { fontSizeMultiplier += 0.1f }
+                                    .springBounceClick { 
+                                        fontSizeMultiplier = kotlin.math.round((fontSizeMultiplier + 0.1f) * 10) / 10f
+                                    }
                                     .padding(12.dp),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -258,7 +278,11 @@ fun TextReaderScreen(
                                 modifier = Modifier
                                     .size(48.dp)
                                     .clip(androidx.compose.foundation.shape.CircleShape)
-                                    .springBounceClick { if(fontSizeMultiplier > 0.5f) fontSizeMultiplier -= 0.1f }
+                                    .springBounceClick { 
+                                        if (fontSizeMultiplier > 0.5f) {
+                                            fontSizeMultiplier = kotlin.math.round((fontSizeMultiplier - 0.1f) * 10) / 10f
+                                        }
+                                    }
                                     .padding(12.dp),
                                 contentAlignment = Alignment.Center
                             ) {

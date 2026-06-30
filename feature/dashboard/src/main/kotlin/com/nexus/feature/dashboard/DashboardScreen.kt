@@ -18,6 +18,14 @@ import androidx.compose.animation.core.spring
 import com.nexus.core.ui.animations.springBounceClick
 import com.nexus.core.ui.animations.fadeSlideIn
 import androidx.compose.runtime.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarDuration
+import com.nexus.core.updater.UpdateState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +51,7 @@ import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.NexusTextField
 import com.nexus.core.R
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     router: DocumentReaderRouter,
@@ -50,8 +59,50 @@ fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(updateState) {
+        if (updateState is UpdateState.Error) {
+            val error = updateState as UpdateState.Error
+            snackbarHostState.showSnackbar(
+                message = "Update check failed: ${error.message}",
+                actionLabel = "Dismiss",
+                duration = SnackbarDuration.Short
+            )
+            viewModel.resetUpdateState()
+        }
+    }
+    
+    if (updateState is UpdateState.Available) {
+        val available = updateState as UpdateState.Available
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissUpdate() },
+            title = { NexusText(text = "Update Available", style = NexusTheme.typography.title, color = NexusTheme.colors.textPrimary) },
+            text = { 
+                Column {
+                    NexusText(text = "Version ${available.version} is available.", style = NexusTheme.typography.body, color = NexusTheme.colors.textPrimary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    NexusText(text = available.releaseNotes, style = NexusTheme.typography.body, color = NexusTheme.colors.textSecondary)
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.Button(
+                    onClick = { viewModel.downloadUpdate(available.downloadUrl, available.version) }
+                ) {
+                    NexusText(text = "Update Now", style = NexusTheme.typography.label, color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissUpdate() }) {
+                    NexusText(text = "Later", style = NexusTheme.typography.label, color = NexusTheme.colors.primary)
+                }
+            },
+            containerColor = NexusTheme.colors.surface
+        )
+    }
+
     var isPermissionGranted by remember { mutableStateOf(viewModel.hasStoragePermission(context)) }
     var detailsDialogDoc by remember { mutableStateOf<com.nexus.feature.dashboard.data.RecentDocument?>(null) }
 
@@ -93,16 +144,21 @@ fun DashboardScreen(
             .fillMaxSize()
             .background(NexusTheme.colors.background)
     ) {
-        LazyVerticalGrid(
-            columns = if (uiState.isGridView) GridCells.Fixed(2) else GridCells.Fixed(1),
-            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            contentPadding = PaddingValues(
-                top = 0.dp, 
-                bottom = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 100.dp
-            )
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = { viewModel.refreshDocuments() },
+            modifier = Modifier.fillMaxSize()
         ) {
+            LazyVerticalGrid(
+                columns = if (uiState.isGridView) GridCells.Fixed(2) else GridCells.Fixed(1),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                contentPadding = PaddingValues(
+                    top = 0.dp, 
+                    bottom = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 100.dp
+                )
+            ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Column(modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(top = 16.dp)) {
                     Row(
@@ -115,15 +171,25 @@ fun DashboardScreen(
                             style = NexusTheme.typography.display,
                             color = NexusTheme.colors.textPrimary
                         )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(NexusTheme.shapes.pill)
+                                .background(NexusTheme.colors.primary.copy(alpha = 0.1f))
+                                .springBounceClick { router.navigateToScanner() }
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
                             Image(
                                 painter = painterResource(id = R.drawable.ic_text_scan),
                                 contentDescription = "Scan",
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .springBounceClick { router.navigateToScanner() }
-                                    .padding(8.dp),
+                                modifier = Modifier.size(20.dp),
                                 colorFilter = ColorFilter.tint(NexusTheme.colors.primary)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            NexusText(
+                                text = "Scan",
+                                style = NexusTheme.typography.label,
+                                color = NexusTheme.colors.primary
                             )
                         }
                     }
@@ -159,10 +225,16 @@ fun DashboardScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.springBounceClick { 
-                            val nextSort = SortOrder.entries[(uiState.sortOrder.ordinal + 1) % SortOrder.entries.size]
-                            viewModel.setSortOrder(nextSort)
-                        }) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(NexusTheme.shapes.pill)
+                                .springBounceClick { 
+                                    val nextSort = SortOrder.entries[(uiState.sortOrder.ordinal + 1) % SortOrder.entries.size]
+                                    viewModel.setSortOrder(nextSort)
+                                }
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
                             NexusText(
                                 text = "Sort: ${uiState.sortOrder.name.replace("BY_", "")}",
                                 style = NexusTheme.typography.label,
@@ -173,15 +245,20 @@ fun DashboardScreen(
                                 painter = painterResource(id = if (uiState.sortAscending) R.drawable.ic_sort_asc else R.drawable.ic_sort_desc),
                                 contentDescription = "Sort direction",
                                 modifier = Modifier
-                                    .size(20.dp)
-                                    .springBounceClick { viewModel.toggleSortDirection() },
+                                    .size(24.dp)
+                                    .clip(androidx.compose.foundation.shape.CircleShape)
+                                    .springBounceClick { viewModel.toggleSortDirection() }
+                                    .padding(2.dp),
                                 colorFilter = ColorFilter.tint(NexusTheme.colors.textSecondary)
                             )
                         }
                         
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.springBounceClick { viewModel.toggleGridView() }.padding(4.dp)
+                            modifier = Modifier
+                                .clip(NexusTheme.shapes.pill)
+                                .springBounceClick { viewModel.toggleGridView() }
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             Image(
                                 painter = painterResource(id = if (uiState.isGridView) R.drawable.ic_view_list else R.drawable.ic_view_grid),
@@ -235,7 +312,7 @@ fun DashboardScreen(
                             modifier = Modifier
                                 .size(96.dp)
                                 .clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(NexusTheme.colors.primary.copy(alpha = 0.2f)),
+                                .background(NexusTheme.colors.surfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
                             Image(
@@ -272,7 +349,7 @@ fun DashboardScreen(
                 itemsIndexed(uiState.documents, key = { _, it -> it.doc.uri }) { index, uiModel ->
                     if (uiState.isGridView) {
                         FileGridItem(
-                            modifier = Modifier.animateItem().fadeSlideIn(delay = index * 15),
+                            modifier = Modifier.animateItem(),
                             doc = uiModel.doc,
                             isAccessible = uiModel.isAccessible,
                             isStarred = uiState.starredUris.contains(uiModel.doc.uri),
@@ -293,7 +370,7 @@ fun DashboardScreen(
                         )
                     } else {
                         FileListItem(
-                            modifier = Modifier.animateItem().fadeSlideIn(delay = index * 15),
+                            modifier = Modifier.animateItem(),
                             doc = uiModel.doc,
                             isAccessible = uiModel.isAccessible,
                             isStarred = uiState.starredUris.contains(uiModel.doc.uri),
@@ -313,9 +390,9 @@ fun DashboardScreen(
                             onRename = { newName -> viewModel.renameDocument(uiModel.doc.uri, newName) }
                         )
                     }
-                }
-            }
-        }
+                } // End of itemsIndexed block
+            } // End of LazyVerticalGrid block
+        } // End of PullToRefreshBox block
 
         detailsDialogDoc?.let { doc ->
             com.nexus.core.ui.components.NexusDialog(
@@ -339,7 +416,15 @@ fun DashboardScreen(
                 }
             )
         }
+        
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 80.dp) // above nav bar
+        )
     }
+}
 }
 
 @Composable

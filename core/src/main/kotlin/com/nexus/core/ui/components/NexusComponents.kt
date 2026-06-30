@@ -67,9 +67,10 @@ fun NexusCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(6.dp, NexusTheme.shapes.large, spotColor = Color.Black.copy(alpha = 0.08f))
+            .shadow(12.dp, NexusTheme.shapes.large, spotColor = Color.Black.copy(alpha = 0.12f), ambientColor = Color.Black.copy(alpha = 0.05f))
             .clip(NexusTheme.shapes.large)
             .background(NexusTheme.colors.surfaceVariant)
+            .border(1.dp, NexusTheme.colors.textPrimary.copy(alpha = 0.2f), NexusTheme.shapes.large)
             .then(
                 if (onClick != null || onLongClick != null) 
                     Modifier.springBounceCombinedClick(
@@ -102,7 +103,7 @@ fun NexusSearchBar(
             .heightIn(min = 48.dp)
             .wrapContentHeight()
             .clip(NexusTheme.shapes.pill)
-            .background(NexusTheme.colors.surfaceVariant)
+            .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f))
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.CenterStart
     ) {
@@ -239,7 +240,7 @@ fun NexusSwitch(
             modifier = Modifier
                 .offset { androidx.compose.ui.unit.IntOffset(offset.roundToPx(), 0) }
                 .size(22.dp)
-                .shadow(2.dp, CircleShape)
+                .shadow(if (checked) 8.dp else 2.dp, CircleShape, spotColor = if (checked) trackColor else Color.Black)
                 .clip(CircleShape)
                 .background(thumbColor)
         )

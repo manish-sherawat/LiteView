@@ -103,8 +103,8 @@ fun OfficeReaderScreen(
             targetState = uiState,
             modifier = Modifier.fillMaxSize(),
             transitionSpec = {
-                    fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
-                },
+                fadeIn(animationSpec = tween(220, delayMillis = 90)) togetherWith fadeOut(animationSpec = tween(90))
+            },
                 label = "officeReaderState"
             ) { state ->
                 when (state) {
@@ -372,9 +372,15 @@ fun OfficeReaderScreen(
                                 onValueChange = { password = it },
                                 label = { NexusText("Password", color = NexusTheme.colors.textSecondary) },
                                 visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                                singleLine = true
+                                singleLine = true,
+                                isError = state.isError,
+                                modifier = Modifier.fillMaxWidth()
                             )
-                            Spacer(modifier = Modifier.height(16.dp))
+                            if (state.isError) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                NexusText("Incorrect password", color = NexusTheme.colors.error, style = NexusTheme.typography.caption)
+                            }
+                            Spacer(modifier = Modifier.height(24.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 NexusButton(text = "Cancel", onClick = onBack)
                                 NexusButton(text = "Open", onClick = {

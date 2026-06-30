@@ -32,11 +32,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.foundation.border
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nexus.core.navigation.DocumentType
@@ -60,7 +63,9 @@ fun FileGridItem(
     onShare: () -> Unit,
     onRename: (String) -> Unit,
     modifier: Modifier = Modifier,
-    isOpening: Boolean = false
+    isOpening: Boolean = false,
+    isSelected: Boolean = false,
+    onLongClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     var menuExpanded by remember { mutableStateOf(false) }
@@ -97,6 +102,7 @@ fun FileGridItem(
     NexusCard(
         accentColor = accentColor,
         onClick = onClick,
+        onLongClick = onLongClick,
         enabled = isAccessible,
         modifier = modifier
             .padding(0.dp)
@@ -135,8 +141,30 @@ fun FileGridItem(
                         FileTypeIcon(type = docType, size = 64.dp, drawContainer = false)
                     }
                 }
-
-
+                
+                if (isSelected) {
+                    val pulseAlpha by androidx.compose.animation.core.rememberInfiniteTransition(label = "pulse").animateFloat(
+                        initialValue = 0.4f,
+                        targetValue = 0.8f,
+                        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                            animation = androidx.compose.animation.core.tween(1000),
+                            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                        ),
+                        label = "pulseAlpha"
+                    )
+                    Box(modifier = Modifier.fillMaxSize().border(3.dp, NexusTheme.colors.primary.copy(alpha = pulseAlpha)))
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_check),
+                        contentDescription = "Selected",
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(8.dp)
+                            .size(24.dp)
+                            .background(NexusTheme.colors.primary, androidx.compose.foundation.shape.CircleShape)
+                            .padding(4.dp),
+                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(NexusTheme.colors.onPrimary)
+                    )
+                }
             }
 
             Column(
@@ -265,38 +293,10 @@ fun FileGridItem(
                         color = NexusTheme.colors.textSecondary
                     )
                     
-                    if (showProgress) {
-                        NexusText(
-                            text = "$progressPct%",
-                            style = NexusTheme.typography.caption.copy(fontWeight = FontWeight.Bold),
-                            color = accentColor
-                        )
-                    }
+
                 }
 
-                if (showProgress) {
-                    val animatedProgress by animateFloatAsState(
-                        targetValue = progressPct / 100f,
-                        animationSpec = pressSpring(),
-                        label = "gridProgressFill"
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .clip(NexusTheme.shapes.pill)
-                            .background(NexusTheme.colors.surfaceVariant)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(animatedProgress)
-                                .height(4.dp)
-                                .clip(NexusTheme.shapes.pill)
-                                .background(accentColor)
-                        )
-                    }
-                }
+
             }
         }
     }

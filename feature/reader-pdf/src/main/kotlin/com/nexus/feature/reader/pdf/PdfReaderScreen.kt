@@ -23,7 +23,9 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import com.nexus.core.ui.components.NexusVerticalScrollbar
 import androidx.compose.ui.input.pointer.pointerInput
 
 import androidx.compose.ui.draw.drawWithContent
@@ -35,6 +37,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -136,8 +139,8 @@ fun PdfReaderScreen(
             targetState = uiState,
             modifier = Modifier.fillMaxSize(),
             transitionSpec = {
-                    fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
-                },
+                fadeIn(animationSpec = tween(220, delayMillis = 90)) togetherWith fadeOut(animationSpec = tween(90))
+            },
                 label = "pdfReaderState"
             ) { state ->
                 when (state) {
@@ -164,7 +167,7 @@ fun PdfReaderScreen(
                     is PdfReaderUiState.Success -> {
                         Box(modifier = Modifier.fillMaxSize()) {
                             val bottomInset = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                            val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 16.dp else 90.dp)
+                            val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 16.dp else if (isSearchMode) 160.dp else 90.dp)
                             val bottomPadding by animateDpAsState(targetValue = if (isImmersiveMode) bottomInset else bottomInset + 80.dp)
                             
                             val coroutineScope = rememberCoroutineScope()
@@ -356,9 +359,15 @@ fun PdfReaderScreen(
                                                                     val width = (rect.right - rect.left) * this.size.width
                                                                     val height = (rect.bottom - rect.top) * this.size.height
                                                                     drawRect(
-                                                                        color = searchHighlightColor,
+                                                                        color = searchHighlightColor.copy(alpha = 0.4f),
                                                                         topLeft = Offset(left, top),
                                                                         size = Size(width, height)
+                                                                    )
+                                                                    drawRect(
+                                                                        color = searchHighlightColor,
+                                                                        topLeft = Offset(left, top),
+                                                                        size = Size(width, height),
+                                                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
                                                                     )
                                                                 }
                                                             }
@@ -436,68 +445,22 @@ fun PdfReaderScreen(
                                     visible = !isImmersiveMode,
                                     modifier = Modifier
                                         .align(Alignment.CenterEnd)
-                                        .padding(end = 8.dp, top = 64.dp, bottom = 64.dp),
+                                        .padding(top = 64.dp, bottom = 64.dp),
                                     enter = fadeIn(),
                                     exit = fadeOut()
                                 ) {
-                                    BoxWithConstraints(
-                                        modifier = Modifier
-                                            .fillMaxHeight(0.6f)
-                                            .width(32.dp)
-                                            .pointerInput(state.pageCount) {
-                                                awaitEachGesture {
-                                                    val down = awaitFirstDown()
-                                                    isDraggingSlider = true
-                                                    
-                                                    do {
-                                                        val event = awaitPointerEvent()
-                                                        val y = event.changes.first().position.y
-                                                        
-                                                        val trackHeight = size.height.toFloat()
-                                                        val thumbHeightPx = 48.dp.toPx()
-                                                        val maxScroll = (trackHeight - thumbHeightPx).coerceAtLeast(0f)
-                                                        
-                                                        val desiredThumbTop = y - thumbHeightPx / 2
-                                                        val newOffsetPx = desiredThumbTop.coerceIn(0f, maxScroll)
-                                                        
-                                                        val fraction = if (maxScroll > 0) newOffsetPx / maxScroll else 0f
-                                                        sliderValue = 1f + fraction * (state.pageCount - 1)
-                                                        
-                                                        coroutineScope.launch {
-                                                            listState.scrollToItem((sliderValue.roundToInt() - 1).coerceIn(0, state.pageCount - 1))
-                                                        }
-                                                        
-                                                        event.changes.forEach { it.consume() }
-                                                    } while (event.changes.any { it.pressed })
-                                                    
-                                                    isDraggingSlider = false
-                                                }
+                                    NexusVerticalScrollbar(
+                                        pageCount = state.pageCount,
+                                        sliderValue = sliderValue,
+                                        onSliderValueChange = { newValue ->
+                                            sliderValue = newValue
+                                            coroutineScope.launch {
+                                                listState.scrollToItem((sliderValue.roundToInt() - 1).coerceIn(0, state.pageCount - 1))
                                             }
-                                    ) {
-                                        val trackHeight = constraints.maxHeight.toFloat()
-                                        val thumbHeightPx = with(density) { 48.dp.toPx() }
-                                        val maxScroll = (trackHeight - thumbHeightPx).coerceAtLeast(0f)
-                                        
-                                        val thumbOffsetPx = if (state.pageCount > 1) {
-                                            (sliderValue - 1f) / (state.pageCount - 1f) * maxScroll
-                                        } else 0f
-                                        
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.Center)
-                                                .fillMaxHeight()
-                                                .width(4.dp)
-                                                .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.3f), CircleShape)
-                                        )
-                                        
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.TopCenter)
-                                                .offset { androidx.compose.ui.unit.IntOffset(0, thumbOffsetPx.roundToInt()) }
-                                                .size(width = 24.dp, height = 48.dp)
-                                                .background(NexusTheme.colors.primary, CircleShape)
-                                        )
-                                    }
+                                        },
+                                        onDragStarted = { isDraggingSlider = true },
+                                        onDragStopped = { isDraggingSlider = false }
+                                    )
                                 }
                             }
 
@@ -515,18 +478,6 @@ fun PdfReaderScreen(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(CircleShape)
-                                            .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.9f))
-                                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                                    ) {
-                                        NexusText(
-                                            text = "Page ${sliderValue.roundToInt()} / ${state.pageCount}",
-                                            style = NexusTheme.typography.label,
-                                            color = NexusTheme.colors.textPrimary
-                                        )
-                                    }
 
                                     NexusSurface(
                                         shape = CircleShape,
@@ -592,6 +543,77 @@ fun PdfReaderScreen(
                             }
                         }
                     }
+                is PdfReaderUiState.PasswordRequired -> {
+                    var password by remember { mutableStateOf("") }
+                    var isVisible by remember { mutableStateOf(false) }
+                    
+                    LaunchedEffect(Unit) {
+                        isVisible = true
+                    }
+                    LaunchedEffect(state.isError) {
+                        if (state.isError) {
+                            password = ""
+                            isVisible = true
+                        }
+                    }
+                    
+                    Box(modifier = Modifier.fillMaxSize().background(NexusTheme.colors.background), contentAlignment = Alignment.Center) {
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = isVisible,
+                            enter = androidx.compose.animation.scaleIn(animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 300f)) + androidx.compose.animation.fadeIn(),
+                            exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut()
+                        ) {
+                            NexusSurface(
+                                shape = NexusTheme.shapes.large,
+                                elevation = 8.dp,
+                                modifier = Modifier.padding(32.dp).fillMaxWidth()
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = "Lock",
+                                        modifier = Modifier.size(48.dp),
+                                        tint = NexusTheme.colors.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    NexusText("Protected PDF", color = NexusTheme.colors.textPrimary, style = NexusTheme.typography.title)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    NexusText("Enter password to open", color = NexusTheme.colors.textSecondary, style = NexusTheme.typography.body)
+                                    Spacer(modifier = Modifier.height(24.dp))
+                                    androidx.compose.material3.OutlinedTextField(
+                                        value = password,
+                                        onValueChange = { password = it },
+                                        label = { NexusText("Password", color = NexusTheme.colors.textSecondary) },
+                                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                        singleLine = true,
+                                        isError = state.isError,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    if (state.isError) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        NexusText("Incorrect password", color = NexusTheme.colors.error, style = NexusTheme.typography.caption)
+                                    }
+                                    Spacer(modifier = Modifier.height(24.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+                                        Box(modifier = Modifier.weight(1f)) {
+                                            NexusButton(text = "Cancel", onClick = onBack, modifier = Modifier.fillMaxWidth())
+                                        }
+                                        Box(modifier = Modifier.weight(1f)) {
+                                            NexusButton(text = "Open", onClick = {
+                                                if (password.isNotEmpty()) {
+                                                    viewModel.loadPdf(state.encodedUri, state.encodedFileName, password)
+                                                }
+                                            }, modifier = Modifier.fillMaxWidth())
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 is PdfReaderUiState.Error -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {

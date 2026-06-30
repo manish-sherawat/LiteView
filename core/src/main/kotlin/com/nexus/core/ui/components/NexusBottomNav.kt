@@ -319,7 +319,7 @@ private fun NexusBottomNavIcon(
     Box(
         modifier = Modifier
             .size(52.dp)
-            .springBounceClick(enabled = true, scaleDown = 0.88f, onClick = onClick),
+            .springBounceClick(enabled = true, scaleDown = 1.0f, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         if (item.badge > 0) {
@@ -368,15 +368,15 @@ private fun BoxScope.BadgeDot(count: Int) {
     Box(
         modifier = Modifier
             .offset(x = 10.dp, y = (-10).dp)
-            .size(if (count > 9) 16.dp else 8.dp)
+            .size(16.dp)
             .clip(CircleShape)
             .background(NexusTheme.colors.error)
             .align(Alignment.TopEnd),
         contentAlignment = Alignment.Center
     ) {
-        if (count > 9) {
+        if (count > 0) {
             NexusText(
-                text     = "9+",
+                text     = if (count > 9) "9+" else count.toString(),
                 color    = Color.White,
                 style    = NexusTheme.typography.caption.copy(
                     fontSize   = 8.sp,

@@ -52,6 +52,7 @@ sealed class PdfReaderUiState {
         val fileSize: Long = 0L,
         val lastModified: Long = 0L
     ) : PdfReaderUiState()
+    data class PasswordRequired(val encodedUri: String, val encodedFileName: String, val isError: Boolean = false) : PdfReaderUiState()
     data class Error(val message: String) : PdfReaderUiState()
 }
 
@@ -137,7 +138,7 @@ class PdfReaderViewModel @Inject constructor(
 
 
 
-    fun loadPdf(encodedUri: String, encodedFileName: String) {
+    fun loadPdf(encodedUri: String, encodedFileName: String, password: String? = null) {
         viewModelScope.launch {
             _uiState.value = PdfReaderUiState.Loading
             
@@ -162,25 +163,25 @@ class PdfReaderViewModel @Inject constructor(
                 }
             }
             
-            withContext(Dispatchers.Main) {
-                renderedPagesCache.values.forEach { it.recycle() }
-                val uriStr = URLDecoder.decode(URLDecoder.decode(encodedUri, StandardCharsets.UTF_8.toString()), StandardCharsets.UTF_8.toString())
-                currentUri = uriStr
+            val uriStrDecoded = withContext(Dispatchers.IO) {
+                URLDecoder.decode(URLDecoder.decode(encodedUri, StandardCharsets.UTF_8.toString()), StandardCharsets.UTF_8.toString())
+            }
+            
+            renderedPagesCache.values.forEach { it.recycle() }
+            currentUri = uriStrDecoded
 
-                viewModelScope.launch {
-                    documentBookmarkDao.getBookmarksForDocument(uriStr).collect {
-                        _bookmarks.value = it
-                    }
+            viewModelScope.launch {
+                documentBookmarkDao.getBookmarksForDocument(uriStrDecoded).collect {
+                    _bookmarks.value = it
                 }
-
-                renderedPagesCache.clear()
-                _renderedPages.value = emptyMap()
-                _outline.value = emptyList()
             }
 
+            renderedPagesCache.clear()
+            _renderedPages.value = emptyMap()
+            _outline.value = emptyList()
             withContext(Dispatchers.IO) {
                 try {
-                    val uriStr = URLDecoder.decode(URLDecoder.decode(encodedUri, StandardCharsets.UTF_8.toString()), StandardCharsets.UTF_8.toString())
+                    val uriStr = uriStrDecoded
                     val uri = Uri.parse(uriStr)
                     
                     var fileSize = 0L
@@ -231,6 +232,15 @@ class PdfReaderViewModel @Inject constructor(
                     if (filePathToOpen == null) throw IllegalStateException("Cannot access file")
 
                     val doc = Document.openDocument(filePathToOpen)
+                    if (doc.needsPassword()) {
+                        if (password == null || !doc.authenticatePassword(password)) {
+                            withContext(Dispatchers.Main) {
+                                _uiState.value = PdfReaderUiState.PasswordRequired(encodedUri, encodedFileName, password != null)
+                            }
+                            return@withContext
+                        }
+                    }
+
                     mupdfDocument = doc
                     val count = doc.countPages()
                     context.getSharedPreferences("nexus_page_counts", Context.MODE_PRIVATE)

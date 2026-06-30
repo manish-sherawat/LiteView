@@ -32,6 +32,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.border
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nexus.core.navigation.DocumentType
@@ -62,7 +64,9 @@ fun FileListItem(
     onShare: () -> Unit,
     onRename: (String) -> Unit,
     modifier: Modifier = Modifier,
-    isOpening: Boolean = false
+    isOpening: Boolean = false,
+    isSelected: Boolean = false,
+    onLongClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     var menuExpanded by remember { mutableStateOf(false) }
@@ -103,6 +107,7 @@ fun FileListItem(
     NexusCard(
         accentColor = accentColor,
         onClick = onClick,
+        onLongClick = onLongClick,
         enabled = isAccessible,
         modifier = modifier
             .fillMaxWidth()
@@ -148,8 +153,30 @@ fun FileListItem(
                             FileTypeIcon(type = docType, size = 48.dp, drawContainer = false)
                         }
                     }
-
-
+                    
+                    if (isSelected) {
+                        val pulseAlpha by androidx.compose.animation.core.rememberInfiniteTransition(label = "pulse").animateFloat(
+                            initialValue = 0.4f,
+                            targetValue = 0.8f,
+                            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                                animation = androidx.compose.animation.core.tween(1000),
+                                repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                            ),
+                            label = "pulseAlpha"
+                        )
+                        Box(modifier = Modifier.fillMaxSize().border(3.dp, NexusTheme.colors.primary.copy(alpha = pulseAlpha), NexusTheme.shapes.medium))
+                        androidx.compose.foundation.Image(
+                            painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_check),
+                            contentDescription = "Selected",
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(4.dp)
+                                .size(20.dp)
+                                .background(NexusTheme.colors.primary, androidx.compose.foundation.shape.CircleShape)
+                                .padding(4.dp),
+                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(NexusTheme.colors.onPrimary)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
@@ -266,40 +293,7 @@ fun FileListItem(
                 }
             }
 
-            if (showProgress) {
-                val animatedProgress by animateFloatAsState(
-                    targetValue = progressPct / 100f,
-                    animationSpec = pressSpring(),
-                    label = "progressFill"
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(6.dp)
-                            .clip(NexusTheme.shapes.pill)
-                            .background(NexusTheme.colors.surfaceVariant)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(animatedProgress)
-                                .height(6.dp)
-                                .clip(NexusTheme.shapes.pill)
-                                .background(accentColor)
-                        )
-                    }
-                    NexusText(
-                        text = "$progressPct%",
-                        style = NexusTheme.typography.caption.copy(fontWeight = FontWeight.Bold),
-                        color = accentColor
-                    )
-                }
-            }
+
         }
     }
 }

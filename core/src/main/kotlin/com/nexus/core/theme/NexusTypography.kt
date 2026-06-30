@@ -56,44 +56,56 @@ val defaultNexusTypography = NexusTypography(
         fontFamily = NexusFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 36.sp,
-        letterSpacing = (-1).sp
+        letterSpacing = (-1).sp,
+        lineHeight = 44.sp
     ),
     h1 = TextStyle(
         fontFamily = NexusFontFamily,
         fontWeight = FontWeight.Bold,
-        fontSize = 30.sp
+        fontSize = 30.sp,
+        letterSpacing = (-0.5).sp,
+        lineHeight = 38.sp
     ),
     h2 = TextStyle(
         fontFamily = NexusFontFamily,
         fontWeight = FontWeight.Bold,
-        fontSize = 22.sp
+        fontSize = 22.sp,
+        letterSpacing = 0.sp,
+        lineHeight = 28.sp
     ),
     title = TextStyle(
         fontFamily = NexusFontFamily,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 16.sp
+        fontSize = 16.sp,
+        letterSpacing = 0.15.sp,
+        lineHeight = 24.sp
     ),
     body = TextStyle(
         fontFamily = NexusFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
+        letterSpacing = 0.25.sp,
         lineHeight = 22.sp
     ),
     label = TextStyle(
         fontFamily = NexusFontFamily,
         fontWeight = FontWeight.Medium,
-        fontSize = 12.sp
+        fontSize = 12.sp,
+        letterSpacing = 0.5.sp,
+        lineHeight = 16.sp
     ),
     caption = TextStyle(
         fontFamily = NexusFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
+        letterSpacing = 0.4.sp,
         lineHeight = 18.sp
     ),
     buttonLabel = TextStyle(
         fontFamily = NexusFontFamily,
         fontWeight = FontWeight.SemiBold,
         fontSize = 14.sp,
-        letterSpacing = 0.5.sp
+        letterSpacing = 0.5.sp,
+        lineHeight = 20.sp
     )
 )

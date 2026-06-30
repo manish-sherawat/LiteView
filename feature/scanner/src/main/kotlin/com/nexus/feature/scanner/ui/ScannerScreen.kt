@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.size
@@ -30,8 +31,8 @@ fun ScannerScreen(
     onBack: () -> Unit,
     viewModel: ScannerViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val scannedPages by viewModel.scannedPages.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val scannedPages by viewModel.scannedPages.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 

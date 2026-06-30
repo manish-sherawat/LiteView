@@ -66,43 +66,21 @@ fun NexusNavHost(
                 navController = navController,
                 startDestination = NexusRoute.Splash.route,
                 modifier = modifier,
-                // ── Forward push: new screen slides in from right ──────────────────
-                // M3 Emphasized Decelerate: fast travel → gentle landing
+                // ── Forward push: new screen fades in ──────────────────
                 enterTransition = {
-                    slideInHorizontally(
-                        initialOffsetX = { fullWidth -> (fullWidth * 0.15f).toInt() },
-                        animationSpec  = tween(DurationMedium3, easing = EmphasizedDecelerateEasing)
-                    ) + fadeIn(
-                        animationSpec = tween(DurationMedium2, easing = EmphasizedDecelerateEasing)
-                    )
+                    fadeIn(animationSpec = tween(DurationMedium2, easing = EmphasizedDecelerateEasing))
                 },
-                // ── Forward push: old screen slides out to left ────────────────────
-                // M3 Emphasized Accelerate: gentle start → fast exit
+                // ── Forward push: old screen fades out ────────────────────
                 exitTransition = {
-                    slideOutHorizontally(
-                        targetOffsetX  = { fullWidth -> -(fullWidth * 0.15f).toInt() },
-                        animationSpec  = tween(DurationMedium2, easing = EmphasizedAccelerateEasing)
-                    ) + fadeOut(
-                        animationSpec = tween(DurationShort4, easing = EmphasizedAccelerateEasing)
-                    )
+                    fadeOut(animationSpec = tween(DurationShort4, easing = EmphasizedAccelerateEasing))
                 },
-                // ── Back pop: previous screen slides back in from left ─────────────
+                // ── Back pop: previous screen fades in ─────────────
                 popEnterTransition = {
-                    slideInHorizontally(
-                        initialOffsetX = { fullWidth -> -(fullWidth * 0.15f).toInt() },
-                        animationSpec  = tween(DurationMedium3, easing = EmphasizedDecelerateEasing)
-                    ) + fadeIn(
-                        animationSpec = tween(DurationMedium2, easing = EmphasizedDecelerateEasing)
-                    )
+                    fadeIn(animationSpec = tween(DurationMedium2, easing = EmphasizedDecelerateEasing))
                 },
-                // ── Back pop: current screen slides out to right ───────────────────
+                // ── Back pop: current screen fades out ───────────────────
                 popExitTransition = {
-                    slideOutHorizontally(
-                        targetOffsetX  = { fullWidth -> (fullWidth * 0.15f).toInt() },
-                        animationSpec  = tween(DurationMedium2, easing = EmphasizedAccelerateEasing)
-                    ) + fadeOut(
-                        animationSpec = tween(DurationShort4, easing = EmphasizedAccelerateEasing)
-                    )
+                    fadeOut(animationSpec = tween(DurationShort4, easing = EmphasizedAccelerateEasing))
                 }
             ) {
                 // ── Splash ────────────────────────────────────────────────────────────

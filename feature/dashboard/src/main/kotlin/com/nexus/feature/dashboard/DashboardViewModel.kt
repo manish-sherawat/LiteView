@@ -10,6 +10,8 @@ import com.nexus.feature.dashboard.data.RecentDocument
 import com.nexus.feature.dashboard.data.RecentDocumentRepository
 import com.nexus.core.preferences.UserPreferencesRepository
 import com.nexus.core.preferences.HomeStyle
+import com.nexus.core.updater.AppUpdater
+import com.nexus.core.updater.UpdateState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,6 +36,7 @@ enum class DashboardTab { ALL, RECENT, STARRED }
 data class DashboardUiState(
     val documents: List<RecentDocumentUiModel> = emptyList(),
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val searchQuery: String = "",
     val sortOrder: SortOrder = SortOrder.BY_DATE,
     val isGridView: Boolean = false,
@@ -53,6 +56,7 @@ data class DashboardUiState(
 class DashboardViewModel @Inject constructor(
     private val repository: RecentDocumentRepository,
     private val prefsRepository: UserPreferencesRepository,
+    private val appUpdater: AppUpdater,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -60,6 +64,7 @@ class DashboardViewModel @Inject constructor(
     private val _sortOrder = MutableStateFlow(SortOrder.BY_DATE)
     private val _isGridView = MutableStateFlow(false)
     private val _isLoading = MutableStateFlow(true)
+    private val _isRefreshing = MutableStateFlow(false)
     private val _inaccessibleUris = MutableStateFlow<Set<String>>(emptySet())
     private val _scannedDocuments = MutableStateFlow<List<RecentDocument>>(emptyList())
     private val _selectedUris = MutableStateFlow<Set<String>>(emptySet())
@@ -86,6 +91,8 @@ class DashboardViewModel @Inject constructor(
             started = SharingStarted.Eagerly,
             initialValue = null
         )
+
+    val updateState: StateFlow<UpdateState> = appUpdater.updateState
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<DashboardUiState> = combine(
@@ -116,13 +123,14 @@ class DashboardViewModel @Inject constructor(
         combine(
             prefsRepository.permissionRationaleShown,
             _sortAscending,
-            ::Pair
+            _isRefreshing,
+            ::Triple
         )
     ) { (docs, scanned, inaccessible): Triple<List<RecentDocument>, List<RecentDocument>, Set<String>>,
         (loading, query, sort): Triple<Boolean, String, SortOrder>,
         (grid, tab, starred): Triple<Boolean, DashboardTab, Set<String>>,
         (selectionMode, selected, bannerDismissed): Triple<Boolean, Set<String>, Boolean>,
-        (rationale, ascending): Pair<Boolean?, Boolean> ->
+        (rationale, ascending, refreshing): Triple<Boolean?, Boolean, Boolean> ->
 
         val baseDocs = when (tab) {
             DashboardTab.RECENT -> docs.distinctBy { "${it.fileName}_${it.fileSizeBytes}" }
@@ -158,6 +166,7 @@ class DashboardViewModel @Inject constructor(
         DashboardUiState(
             documents = mapped,
             isLoading = loading,
+            isRefreshing = refreshing,
             searchQuery = query,
             sortOrder = sort,
             isGridView = grid,
@@ -205,6 +214,16 @@ class DashboardViewModel @Inject constructor(
             if (hasStoragePermission(context)) {
                 scanStorage()
             }
+
+            launch {
+                try {
+                    val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                    val versionName = packageInfo.versionName ?: "1.0.0"
+                    appUpdater.checkForUpdates(versionName)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
         }
     }
 
@@ -227,6 +246,8 @@ class DashboardViewModel @Inject constructor(
         scanJob?.cancel()
         scanJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
+
+                // Rescan external storage
                 val uri = android.provider.MediaStore.Files.getContentUri("external")
                 val projection = arrayOf(
                     android.provider.MediaStore.Files.FileColumns.DATA,
@@ -309,8 +330,18 @@ class DashboardViewModel @Inject constructor(
                 e.printStackTrace()
             } finally {
                 _isLoading.value = false
+                _isRefreshing.value = false
             }
         }
+    }
+
+    fun refreshDocuments() {
+        if (!hasStoragePermission(context)) {
+            _isRefreshing.value = false
+            return
+        }
+        _isRefreshing.value = true
+        scanStorage()
     }
 
     fun setSearchQuery(query: String) { _searchQuery.value = query }
@@ -492,6 +523,20 @@ class DashboardViewModel @Inject constructor(
     /** Clear the full history (called from Settings). */
     fun clearHistory() {
         viewModelScope.launch { repository.clearAll() }
+    }
+
+    // ─── Updater ─────────────────────────────────────────────────────────────
+
+    fun downloadUpdate(url: String, version: String) {
+        appUpdater.downloadAndInstallUpdate(url, version)
+    }
+
+    fun dismissUpdate() {
+        appUpdater.resetState()
+    }
+    
+    fun resetUpdateState() {
+        appUpdater.resetState()
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

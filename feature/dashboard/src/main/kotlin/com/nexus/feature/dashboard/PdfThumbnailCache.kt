@@ -9,8 +9,12 @@ import kotlinx.coroutines.withContext
 import android.util.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 object PdfThumbnailCache {
+    private val renderSemaphore = Semaphore(1)
+    
     // Cache up to 20 thumbnails
     private val memoryCache = object : LruCache<String, ImageBitmap>(20) {
         override fun sizeOf(key: String, value: ImageBitmap): Int {
@@ -23,36 +27,38 @@ object PdfThumbnailCache {
         if (cached != null) return cached
 
         return withContext(Dispatchers.IO) {
-            try {
-                val uri = Uri.parse(uriString)
-                val fd = context.contentResolver.openFileDescriptor(uri, "r") ?: return@withContext null
-                val renderer = PdfRenderer(fd)
-                if (renderer.pageCount > 0) {
-                    val page = renderer.openPage(0)
-                    // Calculate thumbnail size (e.g. max 400px width/height)
-                    val scale = Math.min(400f / page.width, 400f / page.height)
-                    val width = (page.width * scale).toInt()
-                    val height = (page.height * scale).toInt()
+            renderSemaphore.withPermit {
+                try {
+                    val uri = Uri.parse(uriString)
+                    val fd = context.contentResolver.openFileDescriptor(uri, "r") ?: return@withPermit null
+                    val renderer = PdfRenderer(fd)
+                    if (renderer.pageCount > 0) {
+                        val page = renderer.openPage(0)
+                        // Calculate thumbnail size (e.g. max 400px width/height)
+                        val scale = Math.min(400f / page.width, 400f / page.height)
+                        val width = (page.width * scale).toInt()
+                        val height = (page.height * scale).toInt()
 
-                    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                    // Fill white background before rendering
-                    bitmap.eraseColor(android.graphics.Color.WHITE)
-                    
-                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                    page.close()
+                        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                        // Fill white background before rendering
+                        bitmap.eraseColor(android.graphics.Color.WHITE)
+                        
+                        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                        page.close()
+                        renderer.close()
+                        fd.close()
+
+                        val imageBitmap = bitmap.asImageBitmap()
+                        memoryCache.put(uriString, imageBitmap)
+                        return@withPermit imageBitmap
+                    }
                     renderer.close()
                     fd.close()
-
-                    val imageBitmap = bitmap.asImageBitmap()
-                    memoryCache.put(uriString, imageBitmap)
-                    return@withContext imageBitmap
+                    null
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    null
                 }
-                renderer.close()
-                fd.close()
-                null
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
             }
         }
     }

@@ -87,7 +87,7 @@ sealed class OfficeReaderUiState {
         val currentMatchIndex: Int = 0
     ) : OfficeReaderUiState()
 
-    data class PasswordRequired(val encodedUri: String, val docType: String) : OfficeReaderUiState()
+    data class PasswordRequired(val encodedUri: String, val docType: String, val isError: Boolean = false) : OfficeReaderUiState()
 
     data class Error(val message: String) : OfficeReaderUiState()
 }
@@ -138,9 +138,7 @@ class OfficeReaderViewModel @Inject constructor(
 
     fun loadDocument(encodedUri: String, docType: String, password: String? = null) {
         viewModelScope.launch {
-            if (password == null) {
-                _uiState.value = OfficeReaderUiState.Loading()
-            }
+            _uiState.value = OfficeReaderUiState.Loading()
             withContext(Dispatchers.IO) {
                 try {
                     val uriStr = URLDecoder.decode(
@@ -192,10 +190,17 @@ class OfficeReaderViewModel @Inject constructor(
                             .edit().putInt(uriStr, count).apply()
                     }
 
-                    withContext(Dispatchers.Main) { _uiState.value = result }
+                    withContext(Dispatchers.Main) { 
+                        if (result is OfficeReaderUiState.PasswordRequired) {
+                            // This logic is specifically for if the parse helper returned this status
+                            _uiState.value = result
+                        } else {
+                            _uiState.value = result 
+                        }
+                    }
                 } catch (e: org.apache.poi.EncryptedDocumentException) {
                     withContext(Dispatchers.Main) {
-                        _uiState.value = OfficeReaderUiState.PasswordRequired(encodedUri, docType)
+                        _uiState.value = OfficeReaderUiState.PasswordRequired(encodedUri, docType, password != null)
                     }
                 } catch (e: Throwable) {
                     withContext(Dispatchers.Main) {

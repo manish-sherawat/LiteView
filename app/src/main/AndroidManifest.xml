@@ -14,6 +14,7 @@
     
     <!-- Camera for scanning documents -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <!-- Haptic feedback -->
     <uses-permission android:name="android.permission.VIBRATE" />
