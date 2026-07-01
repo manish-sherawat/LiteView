@@ -378,9 +378,12 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    /** Remove one document from the recent list. */
+    /** Remove one document from the recent list and delete physically. */
     fun removeDocument(uri: String) {
-        viewModelScope.launch { repository.removeDocument(uri) }
+        viewModelScope.launch {
+            deletePhysicalFile(uri)
+            repository.removeDocument(uri)
+        }
     }
 
     /** Restore a removed document to the recent list. */
@@ -426,9 +429,26 @@ class DashboardViewModel @Inject constructor(
         val selected = _selectedUris.value
         viewModelScope.launch {
             selected.forEach { uri ->
+                deletePhysicalFile(uri)
                 repository.removeDocument(uri)
             }
             clearSelection()
+        }
+    }
+
+    private fun deletePhysicalFile(uriStr: String) {
+        try {
+            val uri = Uri.parse(uriStr)
+            if (uri.scheme == "file") {
+                val file = java.io.File(uri.path ?: "")
+                if (file.exists()) {
+                    file.delete()
+                }
+            } else if (uri.scheme == "content") {
+                context.contentResolver.delete(uri, null, null)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

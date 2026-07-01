@@ -53,6 +53,21 @@ val lightNexusColors = NexusColors(
 )
 
 val darkNexusColors = NexusColors(
+    background = Color(0xFF121212), // Material Dark Surface
+    surface = Color(0xFF1E1E1E),
+    surfaceVariant = Color(0xFF2C2C2C), 
+    primary = Color(0xFFFFFFFF), 
+    onPrimary = Color(0xFF000000),
+    textPrimary = Color(0xFFE8E8E8),
+    textSecondary = Color(0xFFAAAAAA),
+    divider = Color(0xFF333333),
+    error = Color(0xFFFF453A),
+    success = Color(0xFF32D74B),
+    warning = Color(0xFFFF9F0A),
+    searchHighlight = Color(0x88FFD60A)
+)
+
+val amoledNexusColors = NexusColors(
     background = Color(0xFF000000), // True AMOLED black
     surface = Color(0xFF0F0F0F),    // Deeper grey for better contrast
     surfaceVariant = Color(0xFF181818), 

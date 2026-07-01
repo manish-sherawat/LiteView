@@ -17,6 +17,10 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.animation.core.spring
 import com.nexus.core.ui.animations.springBounceClick
 import com.nexus.core.ui.animations.fadeSlideIn
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.graphics.graphicsLayer
+import com.nexus.core.ui.utils.glassBackground
+import androidx.compose.foundation.border
 import androidx.compose.runtime.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -144,7 +148,9 @@ fun DashboardScreen(
             .fillMaxSize()
             .background(NexusTheme.colors.background)
     ) {
+        val pullToRefreshState = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
         PullToRefreshBox(
+            state = pullToRefreshState,
             isRefreshing = uiState.isRefreshing,
             onRefresh = { viewModel.refreshDocuments() },
             modifier = Modifier.fillMaxSize()
@@ -308,21 +314,22 @@ fun DashboardScreen(
                             DashboardTab.RECENT -> R.drawable.ic_update_progress
                             else -> R.drawable.ic_folder
                         }
+                        
                         Box(
                             modifier = Modifier
-                                .size(96.dp)
+                                .size(120.dp)
                                 .clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(NexusTheme.colors.surfaceVariant),
+                                .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Image(
                                 painter = painterResource(id = emptyIcon),
                                 contentDescription = "Empty",
-                                modifier = Modifier.size(48.dp),
-                                colorFilter = ColorFilter.tint(NexusTheme.colors.primary)
+                                modifier = Modifier.size(56.dp),
+                                colorFilter = ColorFilter.tint(NexusTheme.colors.primary.copy(alpha = 0.8f))
                             )
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
                         NexusText(
                             text = when (uiState.selectedTab) {
                                 DashboardTab.STARRED -> "No starred files"
@@ -335,9 +342,9 @@ fun DashboardScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         NexusText(
                             text = when (uiState.selectedTab) {
-                                DashboardTab.STARRED -> "Star a file to quickly access it here."
-                                DashboardTab.RECENT -> "Files you open will automatically appear here."
-                                else -> "Tap Add in the nav bar to import documents."
+                                DashboardTab.STARRED -> "Files you star will appear here for quick access."
+                                DashboardTab.RECENT -> "Recently opened files will appear here."
+                                else -> "Tap the Scan button or open a document to get started."
                             },
                             style = NexusTheme.typography.body,
                             color = NexusTheme.colors.textSecondary,
@@ -347,21 +354,40 @@ fun DashboardScreen(
                 }
             } else {
                 itemsIndexed(uiState.documents, key = { _, it -> it.doc.uri }) { index, uiModel ->
+                    var isVisible by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) {
+                        kotlinx.coroutines.delay(index.toLong().coerceAtMost(15L) * 30L)
+                        isVisible = true
+                    }
+                    val alpha by androidx.compose.animation.core.animateFloatAsState(targetValue = if (isVisible) 1f else 0f, label = "alpha")
+                    val translationY by androidx.compose.animation.core.animateFloatAsState(targetValue = if (isVisible) 0f else 30f, label = "translateY")
+
+                    val itemModifier = Modifier.animateItem().graphicsLayer {
+                        this.alpha = alpha
+                        this.translationY = translationY
+                    }
+
                     if (uiState.isGridView) {
                         FileGridItem(
-                            modifier = Modifier.animateItem(),
+                            modifier = itemModifier,
                             doc = uiModel.doc,
                             isAccessible = uiModel.isAccessible,
                             isStarred = uiState.starredUris.contains(uiModel.doc.uri),
+                            isSelected = uiState.selectedUris.contains(uiModel.doc.uri),
                             onToggleStarred = { viewModel.toggleStarred(uiModel.doc.uri) },
                             onClick = {
-                                if (uiModel.isAccessible) {
+                                if (uiState.isSelectionMode) {
+                                    viewModel.toggleSelection(uiModel.doc.uri)
+                                } else if (uiModel.isAccessible) {
                                     router.openDocument(
                                         uri = Uri.parse(uiModel.doc.uri),
                                         mimeType = uiModel.doc.mimeType,
                                         fileName = uiModel.doc.fileName
                                     )
                                 }
+                            },
+                            onLongClick = {
+                                viewModel.toggleSelection(uiModel.doc.uri)
                             },
                             onRemove = { viewModel.removeDocument(uiModel.doc.uri) },
                             onShowDetails = { detailsDialogDoc = uiModel.doc },
@@ -370,19 +396,25 @@ fun DashboardScreen(
                         )
                     } else {
                         FileListItem(
-                            modifier = Modifier.animateItem(),
+                            modifier = itemModifier,
                             doc = uiModel.doc,
                             isAccessible = uiModel.isAccessible,
                             isStarred = uiState.starredUris.contains(uiModel.doc.uri),
+                            isSelected = uiState.selectedUris.contains(uiModel.doc.uri),
                             onToggleStarred = { viewModel.toggleStarred(uiModel.doc.uri) },
                             onClick = {
-                                if (uiModel.isAccessible) {
+                                if (uiState.isSelectionMode) {
+                                    viewModel.toggleSelection(uiModel.doc.uri)
+                                } else if (uiModel.isAccessible) {
                                     router.openDocument(
                                         uri = Uri.parse(uiModel.doc.uri),
                                         mimeType = uiModel.doc.mimeType,
                                         fileName = uiModel.doc.fileName
                                     )
                                 }
+                            },
+                            onLongClick = {
+                                viewModel.toggleSelection(uiModel.doc.uri)
                             },
                             onRemove = { viewModel.removeDocument(uiModel.doc.uri) },
                             onShowDetails = { detailsDialogDoc = uiModel.doc },
@@ -423,6 +455,74 @@ fun DashboardScreen(
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 80.dp) // above nav bar
         )
+
+        // Multi-Select Action Bar with Glassmorphism
+        androidx.compose.animation.AnimatedVisibility(
+            visible = uiState.isSelectionMode,
+            enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }) + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) + androidx.compose.animation.fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 24.dp)
+                    .clip(NexusTheme.shapes.large)
+                    .glassBackground(blurRadius = 40f, alpha = 0.85f, fallbackColor = NexusTheme.colors.surface)
+                    .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.3f), NexusTheme.shapes.large)
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        NexusText("${uiState.selectedUris.size} selected", style = NexusTheme.typography.title, color = NexusTheme.colors.textPrimary)
+                        NexusText("Select all", style = NexusTheme.typography.label, color = NexusTheme.colors.primary, modifier = Modifier.clickable { viewModel.selectAll() })
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_share),
+                            contentDescription = "Share",
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f))
+                                .clickable {
+                                    uiState.selectedUris.forEach { viewModel.shareDocument(it) }
+                                    viewModel.clearSelection()
+                                }
+                                .padding(8.dp),
+                            colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
+                        )
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_delete),
+                            contentDescription = "Delete",
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(NexusTheme.colors.error.copy(alpha = 0.15f))
+                                .clickable { viewModel.deleteSelected() }
+                                .padding(8.dp),
+                            colorFilter = ColorFilter.tint(NexusTheme.colors.error)
+                        )
+                        Image(
+                            painter = painterResource(id = com.nexus.core.R.drawable.ic_close),
+                            contentDescription = "Close",
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f))
+                                .clickable { viewModel.clearSelection() }
+                                .padding(8.dp),
+                            colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 }

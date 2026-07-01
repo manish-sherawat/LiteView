@@ -113,8 +113,11 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
 
+                val dashboardUiState by dashboardViewModel.uiState.collectAsStateWithLifecycle()
+                val isSelectionMode = dashboardUiState.isSelectionMode
+
                 // Bottom nav is only shown on the home screen (Dashboard or Settings)
-                val showBottomNav = currentRoute == NexusRoute.Dashboard.route || currentRoute == NexusRoute.Settings.route
+                val showBottomNav = (currentRoute == NexusRoute.Dashboard.route || currentRoute == NexusRoute.Settings.route) && !isSelectionMode
 
 
 

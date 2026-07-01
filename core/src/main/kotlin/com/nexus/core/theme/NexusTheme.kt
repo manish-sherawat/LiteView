@@ -70,6 +70,7 @@ fun NexusDocsViewerTheme(
     val targetColors = when (themeMode) {
         ThemeMode.LIGHT -> lightNexusColors
         ThemeMode.DARK -> darkNexusColors
+        ThemeMode.AMOLED -> amoledNexusColors
         ThemeMode.SEPIA -> sepiaNexusColors
         ThemeMode.FOREST -> forestNexusColors
         ThemeMode.SUNSET -> sunsetNexusColors

@@ -13,6 +13,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.*
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -22,6 +23,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
+import com.nexus.core.ui.utils.glassBackground
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -87,6 +89,7 @@ import kotlin.math.roundToInt
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.Animatable
 
+@androidx.compose.animation.ExperimentalSharedTransitionApi
 @Composable
 fun PdfReaderScreen(
     encodedUri: String,
@@ -130,10 +133,28 @@ fun PdfReaderScreen(
     val currentSearchMatchIndex by viewModel.currentSearchMatchIndex.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
 
+    val decodedUri = try { URLDecoder.decode(encodedUri, "UTF-8") } catch (_: Exception) { encodedUri }
+    val sharedScope = com.nexus.core.navigation.LocalSharedTransitionScope.current
+    val animatedScope = com.nexus.core.navigation.LocalAnimatedVisibilityScope.current
+
+    var mainModifier = modifier
+        .fillMaxSize()
+        .background(NexusTheme.colors.background)
+        
+    var sharedElementModifier: Modifier = Modifier
+    if (sharedScope != null && animatedScope != null) {
+        with(sharedScope) {
+            @OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+            sharedElementModifier = Modifier.sharedElement(
+                state = rememberSharedContentState(key = "thumb_$decodedUri"),
+                animatedVisibilityScope = animatedScope,
+                boundsTransform = { _, _ -> tween(300) }
+            )
+        }
+    }
+
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(NexusTheme.colors.background)
+        modifier = mainModifier
     ) {
         AnimatedContent(
             targetState = uiState,
@@ -150,7 +171,7 @@ fun PdfReaderScreen(
                         val placeholderHeight = screenWidthDp * 1.414f
                         
                         LazyColumn(
-                            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 90.dp),
+                            modifier = Modifier.fillMaxSize().then(sharedElementModifier).padding(horizontal = 16.dp, vertical = 90.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             items(3) {
@@ -182,6 +203,7 @@ fun PdfReaderScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
+                                    .then(sharedElementModifier)
                                     .pointerInput(Unit) {
                                         detectTapGestures(
                                             onDoubleTap = { tapOffset ->
@@ -479,11 +501,11 @@ fun PdfReaderScreen(
                                     verticalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
 
-                                    NexusSurface(
-                                        shape = CircleShape,
-                                        elevation = 8.dp,
-                                        color = NexusTheme.colors.surfaceVariant.copy(alpha = 0.95f),
-                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(horizontal = 16.dp)
+                                            .clip(CircleShape)
+                                            .glassBackground(blurRadius = 40f, alpha = 0.85f, fallbackColor = NexusTheme.colors.surfaceVariant)
                                     ) {
                                         Row(
                                             modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
@@ -1289,3 +1311,42 @@ fun rememberArrowsHorizontalIcon(): ImageVector {
         }.build()
     }
 }
+
+@Composable
+fun ConfettiEffect(modifier: Modifier = Modifier) {
+    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition()
+    val progress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = tween(2000, easing = androidx.compose.animation.core.LinearEasing)
+        )
+    )
+    
+    val particles = remember {
+        List(50) {
+            ConfettiParticle(
+                x = kotlin.random.Random.nextFloat(),
+                y = kotlin.random.Random.nextFloat() * 1.5f - 0.5f,
+                speed = kotlin.random.Random.nextFloat() * 0.5f + 0.5f,
+                color = listOf(Color.Red, Color.Blue, Color.Green, Color.Yellow, Color.Magenta).random(),
+                size = kotlin.random.Random.nextFloat() * 20f + 10f
+            )
+        }
+    }
+    
+    androidx.compose.foundation.Canvas(modifier = modifier) {
+        particles.forEach { p ->
+            val currentY = (p.y + progress * p.speed) % 1.5f
+            if (currentY > -0.2f && currentY < 1.2f) {
+                drawRect(
+                    color = p.color,
+                    topLeft = Offset(p.x * size.width, currentY * size.height),
+                    size = Size(p.size, p.size)
+                )
+            }
+        }
+    }
+}
+
+data class ConfettiParticle(val x: Float, val y: Float, val speed: Float, val color: Color, val size: Float)

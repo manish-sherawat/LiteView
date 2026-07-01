@@ -84,7 +84,7 @@ fun FileOptionsDialog(
                 FileOptionItem(
                     icon = "🗑️", 
                     iconRes = R.drawable.ic_delete,
-                    label = "Remove from recents", 
+                    label = "Delete file", 
                     onClick = {
                         onDismissRequest()
                         onRemove()

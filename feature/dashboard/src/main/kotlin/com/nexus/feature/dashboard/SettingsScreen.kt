@@ -180,6 +180,7 @@ fun SettingsScreen(
                         val themeText = when (uiState.themeMode) {
                             ThemeMode.LIGHT -> "Light"
                             ThemeMode.DARK -> "Dark"
+                            ThemeMode.AMOLED -> "Pitch Black (AMOLED)"
                             ThemeMode.SEPIA -> "Sepia"
                             ThemeMode.FOREST -> "Forest"
                             ThemeMode.SUNSET -> "Sunset"
@@ -613,6 +614,7 @@ private fun ThemeSelectionDialog(
         Triple(ThemeMode.SYSTEM, "System Default", R.drawable.ic_theme_system),
         Triple(ThemeMode.LIGHT, "Light", R.drawable.ic_theme_light),
         Triple(ThemeMode.DARK, "Dark", R.drawable.ic_theme_dark),
+        Triple(ThemeMode.AMOLED, "Pitch Black (AMOLED)", R.drawable.ic_theme_dark),
         Triple(ThemeMode.SEPIA, "Sepia", R.drawable.ic_theme_sepia),
         Triple(ThemeMode.FOREST, "Forest", R.drawable.ic_theme_forest),
         Triple(ThemeMode.SUNSET, "Sunset", R.drawable.ic_theme_sunset)

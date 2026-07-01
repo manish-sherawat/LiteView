@@ -98,8 +98,10 @@ fun NexusNavHost(
 
                 // ── Dashboard ─────────────────────────────────────────────────────────
                 composable(route = NexusRoute.Dashboard.route) {
+                    val activity = androidx.compose.ui.platform.LocalContext.current as androidx.activity.ComponentActivity
+                    val dashboardViewModel: com.nexus.feature.dashboard.DashboardViewModel = androidx.hilt.navigation.compose.hiltViewModel(activity)
                     CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
-                        DashboardScreen(router = router)
+                        DashboardScreen(router = router, viewModel = dashboardViewModel)
                     }
                 }
 

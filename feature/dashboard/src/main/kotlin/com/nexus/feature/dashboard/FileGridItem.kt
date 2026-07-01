@@ -50,7 +50,11 @@ import com.nexus.core.ui.components.NexusCard
 import com.nexus.core.ui.components.NexusDialog
 import com.nexus.feature.dashboard.data.RecentDocument
 import com.nexus.core.ui.animations.*
+import com.nexus.core.navigation.LocalSharedTransitionScope
+import com.nexus.core.navigation.LocalAnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun FileGridItem(
     doc: RecentDocument,
@@ -71,6 +75,7 @@ fun FileGridItem(
     var menuExpanded by remember { mutableStateOf(false) }
     var renameDialogExpanded by remember { mutableStateOf(false) }
     var newFileName by remember { mutableStateOf(doc.fileName) }
+
     val docType = runCatching { DocumentType.valueOf(doc.documentType) }
         .getOrDefault(DocumentType.UNKNOWN)
 
@@ -99,6 +104,12 @@ fun FileGridItem(
         }
     }
 
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 0.95f else 1f,
+        animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 300f),
+        label = "scale"
+    )
+
     NexusCard(
         accentColor = accentColor,
         onClick = onClick,
@@ -106,6 +117,10 @@ fun FileGridItem(
         enabled = isAccessible,
         modifier = modifier
             .padding(0.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
     ) {
         var thumbnail by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
         LaunchedEffect(doc.uri) {
@@ -117,12 +132,26 @@ fun FileGridItem(
         Column(
             modifier = Modifier.fillMaxWidth()
         ) {
+            var thumbnailModifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(0.75f)
+                .background(if (thumbnail != null) NexusTheme.colors.surfaceVariant else accentColor.copy(alpha = 0.15f))
+                .then(if (thumbnail == null && docType == DocumentType.PDF) Modifier.shimmerEffect() else Modifier)
+
+            val sharedScope = LocalSharedTransitionScope.current
+            val animatedScope = LocalAnimatedVisibilityScope.current
+            if (sharedScope != null && animatedScope != null) {
+                with(sharedScope) {
+                    thumbnailModifier = thumbnailModifier.sharedElement(
+                        state = rememberSharedContentState(key = "thumb_${doc.uri}"),
+                        animatedVisibilityScope = animatedScope,
+                        boundsTransform = { _, _ -> androidx.compose.animation.core.tween(300) }
+                    )
+                }
+            }
+
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(0.75f)
-                    .background(if (thumbnail != null) NexusTheme.colors.surfaceVariant else accentColor.copy(alpha = 0.15f))
-                    .then(if (thumbnail == null && docType == DocumentType.PDF) Modifier.shimmerEffect() else Modifier),
+                modifier = thumbnailModifier,
                 contentAlignment = Alignment.Center
             ) {
                 Crossfade(
@@ -240,7 +269,10 @@ fun FileGridItem(
                                 onShare = onShare,
                                 onRename = { renameDialogExpanded = true },
                                 onToggleStarred = onToggleStarred,
-                                onRemove = onRemove,
+                                onRemove = { 
+                                    onRemove()
+                                    menuExpanded = false
+                                },
                                 onShowDetails = onShowDetails
                             )
                         }

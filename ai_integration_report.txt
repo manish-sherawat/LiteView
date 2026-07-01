@@ -1,0 +1,54 @@
+============================================================
+AI INTEGRATION REPORT & RECOMMENDATIONS FOR LITEVIEW
+============================================================
+
+1. WHICH AI MODEL SHOULD WE USE? (Focusing on FREE options)
+------------------------------------------------------------
+For a mobile app like LiteView, you have two main paths: Cloud APIs (requires internet) or On-Device models (works offline but takes up storage).
+
+RECOMMENDATION 1: Google Gemini API (Cloud - Best Overall)
+- Why: Google AI Studio offers a very generous FREE tier for the Gemini API (up to 15 requests per minute, 1,500 per day). It is currently the most powerful free LLM available for developers.
+- Use Case: Perfect for "Chat with Document" and Auto-Summarization.
+- Pros: Extremely smart, handles massive documents (huge context window), easy to integrate via the official Android SDK.
+- Cons: Requires an internet connection.
+
+RECOMMENDATION 2: Google MediaPipe / Gemma (On-Device - Best for Privacy)
+- Why: Google recently released tools to run LLMs directly on Android devices completely offline and for free.
+- Use Case: If you want to market the app as "100% Privacy Focused - Documents never leave your device".
+- Pros: No internet required, no API costs ever, maximum privacy.
+- Cons: Users will need to download a heavy model file (~1.5GB to 3GB) on first use. Older phones might struggle to run it fast.
+
+RECOMMENDATION 3: Google ML Kit (On-Device - Best for Utilities)
+- Why: It's the industry standard for Android. 
+- Use Case: Use this for Text Recognition (OCR) on scanned images, extracting entities (like phone numbers/dates), and offline translation. Completely free.
+
+------------------------------------------------------------
+2. HOW TO INTEGRATE IT (Rough Idea / Implementation Plan)
+------------------------------------------------------------
+
+STEP A: Extracting the Text
+Before the AI can do anything, it needs to read the file. 
+- For PDFs: Use a library like PdfBox-Android or standard Android graphics APIs to extract the raw text string from the current page or document.
+- For Scans: Use ML Kit Text Recognition to convert the image to a raw text string.
+
+STEP B: Connecting to Gemini API (Example Flow)
+1. Add the dependency in your build.gradle: 
+   `implementation 'com.google.ai.client.generativeai:generativeai:0.5.0'`
+2. Get a free API Key from Google AI Studio.
+3. In your ViewModel, create the model instance:
+   `val generativeModel = GenerativeModel(modelName = "gemini-1.5-flash", apiKey = "YOUR_KEY")`
+4. When the user asks a question, combine the document text and their question:
+   `val prompt = "Document Text: $extractedText \n\n User Question: What is this about?"`
+5. Call the API asynchronously in a Coroutine:
+   `val response = generativeModel.generateContent(prompt)`
+
+STEP C: Building the UI (Jetpack Compose)
+1. Create a `DraggableBottomSheet` that can slide up over the `PdfReaderScreen`.
+2. Add a chat interface inside the bottom sheet using a `LazyColumn`.
+3. Add a floating "✨ Summarize" FAB (Floating Action Button) that instantly triggers the AI when tapped.
+4. Add a "typing" shimmer animation while waiting for the API response.
+
+------------------------------------------------------------
+FINAL VERDICT
+------------------------------------------------------------
+Start by integrating the **Gemini 1.5 Flash API**. It is free, lightning-fast, and very easy to add to a Kotlin/Compose Android app. It will allow you to build out the "Chat with Document" and "Summarize" features in just a few days of development work without worrying about heavy on-device processing.
