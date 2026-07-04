@@ -61,6 +61,9 @@ class TextReaderViewModel @Inject constructor(
 
     private val _readerTheme = MutableStateFlow("LIGHT") // LIGHT, DARK, SEPIA
     val readerTheme: StateFlow<String> = _readerTheme.asStateFlow()
+    
+    private val _matchCase = MutableStateFlow(false)
+    val matchCase: StateFlow<Boolean> = _matchCase.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -92,7 +95,7 @@ class TextReaderViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             _keepScreenAwake.value = prefsRepository.keepScreenAwake.first()
-            _fontSize.value = prefsRepository.defaultFontSize.first()
+            _fontSize.value = 16f // Increased default font size
             _readerTheme.value = prefsRepository.readerTheme.first()
             _isWordWrapEnabled.value = prefsRepository.wordWrapEnabled.first()
         }
@@ -116,9 +119,10 @@ class TextReaderViewModel @Inject constructor(
         } else {
             searchJob = viewModelScope.launch(Dispatchers.Default) {
                 val matches = mutableListOf<Int>()
+                val ignoreCase = !_matchCase.value
                 allLines.forEachIndexed { index, text ->
-                    kotlinx.coroutines.yield() // Allow cooperative cancellation
-                    if (text.contains(query, ignoreCase = true)) {
+                    if (index % 1000 == 0) kotlinx.coroutines.yield() // Allow cooperative cancellation
+                    if (text.contains(query, ignoreCase = ignoreCase)) {
                         matches.add(index)
                     }
                 }
@@ -128,6 +132,11 @@ class TextReaderViewModel @Inject constructor(
                 }
             }
         }
+    }
+    
+    fun toggleMatchCase() {
+        _matchCase.value = !_matchCase.value
+        setSearchQuery(_searchQuery.value)
     }
 
     fun nextSearchMatch() {
@@ -168,8 +177,11 @@ class TextReaderViewModel @Inject constructor(
         _readerTheme.value = theme
         viewModelScope.launch { prefsRepository.setReaderTheme(theme) }
     }
+    
+    private var currentEncodedUri: String? = null
 
-    fun loadFile(encodedUri: String) {
+    fun loadFile(encodedUri: String, overrideCharset: Charset? = null) {
+        currentEncodedUri = encodedUri
         viewModelScope.launch {
             _uiState.value = TextReaderUiState.Loading
             withContext(Dispatchers.IO) {
@@ -183,7 +195,7 @@ class TextReaderViewModel @Inject constructor(
                     } ?: throw IllegalStateException("Cannot open file")
 
                     // Detect charset — try UTF-8, fall back to ISO-8859-1
-                    val charset = detectCharset(inputStream)
+                    val charset = overrideCharset ?: detectCharset(inputStream)
 
                     // Re-open the stream (InputStreams cannot be reset after reading)
                     val freshStream = if (uri.scheme == "file") {
@@ -198,9 +210,16 @@ class TextReaderViewModel @Inject constructor(
                     var line: String?
                     var truncated = false
                     while (reader.readLine().also { line = it } != null) {
+                        if (totalLines % 1000 == 0) kotlinx.coroutines.yield() // Prevent blocking IO thread completely
                         totalLines++
                         if (totalLines <= MAX_LINES) {
-                            lines.add(line ?: "")
+                            // Truncate excessively long lines to prevent Compose layout engine from hanging
+                            val safeLine = if ((line?.length ?: 0) > 5000) {
+                                line?.substring(0, 5000) + "… [Line Truncated]"
+                            } else {
+                                line ?: ""
+                            }
+                            lines.add(safeLine)
                         } else {
                             truncated = true
                             break
@@ -240,6 +259,17 @@ class TextReaderViewModel @Inject constructor(
                         )
                     }
                 }
+            }
+        }
+    }
+    
+    fun reloadWithCharset(charsetName: String) {
+        currentEncodedUri?.let { uri ->
+            try {
+                val charset = Charset.forName(charsetName)
+                loadFile(uri, charset)
+            } catch (e: Exception) {
+                // Invalid charset name
             }
         }
     }

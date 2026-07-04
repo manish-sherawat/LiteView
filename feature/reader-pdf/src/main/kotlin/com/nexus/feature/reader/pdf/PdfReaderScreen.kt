@@ -1,6 +1,7 @@
 package com.nexus.feature.reader.pdf
 
 import android.graphics.Bitmap
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -82,7 +83,7 @@ import com.nexus.core.theme.NexusTheme
 import com.nexus.core.ui.components.NexusButton
 import com.nexus.core.ui.NexusSurface
 import com.nexus.core.ui.NexusText
-import com.nexus.core.ui.components.NexusPillTopBar
+import com.nexus.core.ui.components.NexusTopBar
 import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import kotlin.math.roundToInt
@@ -90,6 +91,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.Animatable
 
 @androidx.compose.animation.ExperimentalSharedTransitionApi
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun PdfReaderScreen(
     encodedUri: String,
@@ -131,11 +133,19 @@ fun PdfReaderScreen(
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
     val searchHighlights by viewModel.searchHighlights.collectAsStateWithLifecycle()
     val currentSearchMatchIndex by viewModel.currentSearchMatchIndex.collectAsStateWithLifecycle()
+    
+    var isDrawMode by remember { mutableStateOf(false) }
+    var currentDrawPage by remember { mutableIntStateOf(-1) }
+    val drawnStrokes = remember { androidx.compose.runtime.mutableStateMapOf<Int, List<List<Offset>>>() }
+    var showOutlineSheet by remember { mutableStateOf(false) }
+    var isSavingAnnotations by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
 
     val decodedUri = try { URLDecoder.decode(encodedUri, "UTF-8") } catch (_: Exception) { encodedUri }
     val sharedScope = com.nexus.core.navigation.LocalSharedTransitionScope.current
     val animatedScope = com.nexus.core.navigation.LocalAnimatedVisibilityScope.current
+    val outline by viewModel.outline.collectAsStateWithLifecycle()
+    val bookmarks by viewModel.bookmarks.collectAsStateWithLifecycle()
 
     var mainModifier = modifier
         .fillMaxSize()
@@ -339,6 +349,7 @@ fun PdfReaderScreen(
                                 val pdfContent: LazyListScope.() -> Unit = {
                                     items(state.pageCount) { pageIndex ->
                                         LaunchedEffect(pageIndex) {
+                                            kotlinx.coroutines.delay(100) // Render debouncer
                                             viewModel.renderPage(pageIndex, screenWidthPx - with(density) { 32.dp.roundToPx() })
                                         }
                                     
@@ -355,56 +366,117 @@ fun PdfReaderScreen(
                                             color = pageContainerColor,
                                             modifier = Modifier.width(screenWidthDp - 32.dp)
                                         ) {
-                                            if (bitmap != null) {
-                                                val isLandscape = pageRotation % 180 != 0
-                                                Image(
-                                                    bitmap = bitmap.asImageBitmap(),
-                                                    contentDescription = null,
-                                                    contentScale = ContentScale.Fit,
-                                                    colorFilter = colorFilter,
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .aspectRatio(
-                                                            if (isLandscape) bitmap.height.toFloat() / bitmap.width.toFloat()
-                                                            else bitmap.width.toFloat() / bitmap.height.toFloat()
-                                                        )
-                                                        .graphicsLayer {
-                                                            rotationZ = pageRotation.toFloat()
-                                                        }
-                                                        .drawWithContent {
-                                                            drawContent()
-                                                            val highlights = searchHighlights[pageIndex]
-                                                            if (highlights != null && highlights.isNotEmpty()) {
-                                                                for (rect in highlights) {
-                                                                    val left = rect.left * this.size.width
-                                                                    val top = rect.top * this.size.height
-                                                                    val width = (rect.right - rect.left) * this.size.width
-                                                                    val height = (rect.bottom - rect.top) * this.size.height
-                                                                    drawRect(
-                                                                        color = searchHighlightColor.copy(alpha = 0.4f),
-                                                                        topLeft = Offset(left, top),
-                                                                        size = Size(width, height)
-                                                                    )
-                                                                    drawRect(
-                                                                        color = searchHighlightColor,
-                                                                        topLeft = Offset(left, top),
-                                                                        size = Size(width, height),
-                                                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
-                                                                    )
+                                            Box {
+                                                if (bitmap != null) {
+                                                    val isLandscape = pageRotation % 180 != 0
+                                                    Image(
+                                                        bitmap = bitmap.asImageBitmap(),
+                                                        contentDescription = null,
+                                                        contentScale = ContentScale.Fit,
+                                                        colorFilter = colorFilter,
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .aspectRatio(
+                                                                if (isLandscape) bitmap.height.toFloat() / bitmap.width.toFloat()
+                                                                else bitmap.width.toFloat() / bitmap.height.toFloat()
+                                                            )
+                                                            .graphicsLayer {
+                                                                rotationZ = pageRotation.toFloat()
+                                                            }
+                                                            .drawWithContent {
+                                                                drawContent()
+                                                                val highlights = searchHighlights[pageIndex]
+                                                                if (highlights != null && highlights.isNotEmpty()) {
+                                                                    for (rect in highlights) {
+                                                                        val left = rect.left * this.size.width
+                                                                        val top = rect.top * this.size.height
+                                                                        val width = (rect.right - rect.left) * this.size.width
+                                                                        val height = (rect.bottom - rect.top) * this.size.height
+                                                                        drawRect(
+                                                                            color = searchHighlightColor.copy(alpha = 0.4f),
+                                                                            topLeft = Offset(left, top),
+                                                                            size = Size(width, height)
+                                                                        )
+                                                                        drawRect(
+                                                                            color = searchHighlightColor,
+                                                                            topLeft = Offset(left, top),
+                                                                            size = Size(width, height),
+                                                                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                                                                        )
+                                                                    }
                                                                 }
                                                             }
+                                                    )
+                                                } else {
+                                                    val placeholderHeight = (screenWidthDp - 32.dp) * 1.414f
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .height(placeholderHeight)
+                                                            .background(NexusTheme.colors.surfaceVariant),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        NexusText("Loading page...", color = NexusTheme.colors.textSecondary)
+                                                    }
+                                                }
+                                                
+                                                // Canvas Overlay for Drawing
+                                                if (isDrawMode && (currentDrawPage == -1 || currentDrawPage == pageIndex) && bitmap != null) {
+                                                    var currentPath by remember { mutableStateOf<List<Offset>>(emptyList()) }
+                                                    androidx.compose.foundation.Canvas(
+                                                        modifier = Modifier
+                                                            .matchParentSize()
+                                                            .pointerInput(isDrawMode) {
+                                                                if (!isDrawMode) return@pointerInput
+                                                                detectDragGestures(
+                                                                    onDragStart = { offset ->
+                                                                        currentDrawPage = pageIndex
+                                                                        currentPath = listOf(offset)
+                                                                    },
+                                                                    onDrag = { change, _ ->
+                                                                        currentPath = currentPath + change.position
+                                                                    },
+                                                                    onDragEnd = {
+                                                                        val strokes = drawnStrokes[pageIndex]?.toMutableList() ?: mutableListOf()
+                                                                        val normalized = currentPath.map { Offset(it.x / size.width, it.y / size.height) }
+                                                                        strokes.add(normalized)
+                                                                        drawnStrokes[pageIndex] = strokes
+                                                                        currentPath = emptyList()
+                                                                        currentDrawPage = -1
+                                                                    },
+                                                                    onDragCancel = {
+                                                                        currentPath = emptyList()
+                                                                        currentDrawPage = -1
+                                                                    }
+                                                                )
+                                                            }
+                                                    ) {
+                                                        drawnStrokes[pageIndex]?.forEach { stroke ->
+                                                            val denormalized = stroke.map { Offset(it.x * size.width, it.y * size.height) }
+                                                            drawPath(
+                                                                path = androidx.compose.ui.graphics.Path().apply {
+                                                                    if (denormalized.isNotEmpty()) {
+                                                                        moveTo(denormalized.first().x, denormalized.first().y)
+                                                                        for (i in 1 until denormalized.size) {
+                                                                            lineTo(denormalized[i].x, denormalized[i].y)
+                                                                        }
+                                                                    }
+                                                                },
+                                                                color = Color.Red,
+                                                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                                                            )
                                                         }
-                                                )
-                                            } else {
-                                                val placeholderHeight = (screenWidthDp - 32.dp) * 1.414f
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .height(placeholderHeight)
-                                                        .background(NexusTheme.colors.surfaceVariant),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    NexusText("Loading page...", color = NexusTheme.colors.textSecondary)
+                                                        if (currentPath.isNotEmpty()) {
+                                                            drawPath(
+                                                                path = androidx.compose.ui.graphics.Path().apply {
+                                                                    moveTo(currentPath.first().x, currentPath.first().y)
+                                                                    for (i in 1 until currentPath.size) lineTo(currentPath[i].x, currentPath[i].y)
+                                                                },
+                                                                color = Color.Red,
+                                                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -415,7 +487,7 @@ fun PdfReaderScreen(
                                     LazyRow(
                                         state = listState,
                                         modifier = Modifier.fillMaxSize(),
-                                        userScrollEnabled = scale <= 1f,
+                                        userScrollEnabled = scale <= 1f && !isDrawMode,
                                         contentPadding = PaddingValues(top = topPadding, start = 8.dp, end = 8.dp, bottom = bottomPadding),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         verticalAlignment = Alignment.CenterVertically
@@ -426,7 +498,7 @@ fun PdfReaderScreen(
                                     LazyColumn(
                                         state = listState,
                                         modifier = Modifier.fillMaxSize(),
-                                        userScrollEnabled = scale <= 1f,
+                                        userScrollEnabled = scale <= 1f && !isDrawMode,
                                         contentPadding = PaddingValues(top = topPadding, start = 8.dp, end = 8.dp, bottom = bottomPadding),
                                         verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
@@ -512,6 +584,36 @@ fun PdfReaderScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                                         ) {
+                                            Image(
+                                                painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_view_list),
+                                                contentDescription = "Outline",
+                                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(if (outline.isNotEmpty()) NexusTheme.colors.textPrimary else NexusTheme.colors.textSecondary.copy(alpha = 0.5f)),
+                                                modifier = Modifier
+                                                    .size(48.dp)
+                                                    .clip(CircleShape)
+                                                    .springBounceClick { if (outline.isNotEmpty()) showOutlineSheet = true }
+                                                    .padding(12.dp)
+                                            )
+                                            Image(
+                                                painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_rename),
+                                                contentDescription = "Draw",
+                                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(if (isDrawMode) NexusTheme.colors.primary else NexusTheme.colors.textPrimary),
+                                                modifier = Modifier
+                                                    .size(48.dp)
+                                                    .clip(CircleShape)
+                                                    .springBounceClick { isDrawMode = !isDrawMode }
+                                                    .padding(12.dp)
+                                            )
+                                            Image(
+                                                painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_star),
+                                                contentDescription = "Bookmark",
+                                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(if (bookmarks.any { it.pageIndex == (currentPage - 1) }) NexusTheme.colors.primary else NexusTheme.colors.textPrimary),
+                                                modifier = Modifier
+                                                    .size(48.dp)
+                                                    .clip(CircleShape)
+                                                    .springBounceClick { viewModel.toggleBookmark(currentPage - 1) }
+                                                    .padding(12.dp)
+                                            )
                                             val context = androidx.compose.ui.platform.LocalContext.current
                                             Image(
                                                 imageVector = rememberLayoutDashboardIcon(),
@@ -560,6 +662,40 @@ fun PdfReaderScreen(
                                                     .padding(12.dp)
                                             )
                                         }
+                                    }
+                                    
+                                    if (isDrawMode) {
+                                        NexusButton(
+                                            text = if (isSavingAnnotations) "Saving..." else "Save Annotations",
+                                            enabled = !isSavingAnnotations,
+                                            onClick = {
+                                                isSavingAnnotations = true
+                                                val strokes = drawnStrokes[currentPage - 1] ?: emptyList()
+                                                if (strokes.isEmpty()) {
+                                                    isDrawMode = false
+                                                    isSavingAnnotations = false
+                                                } else {
+                                                    viewModel.saveAnnotations(currentPage - 1, strokes.map { path -> path.map { android.graphics.PointF(it.x, it.y) } }) {
+                                                        isDrawMode = false
+                                                        isSavingAnnotations = false
+                                                        drawnStrokes.remove(currentPage - 1)
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .glassBackground(blurRadius = 40f, alpha = 0.85f, fallbackColor = NexusTheme.colors.surfaceVariant)
+                                    ) {
+                                        NexusText(
+                                            text = "$currentPage / ${state.pageCount}",
+                                            style = NexusTheme.typography.title, // Increased from body to title
+                                            color = NexusTheme.colors.textPrimary,
+                                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp) // Increased padding
+                                        )
                                     }
                                 }
                             }
@@ -656,16 +792,13 @@ fun PdfReaderScreen(
                     enter = expandVertically() + fadeIn(),
                     exit = shrinkVertically() + fadeOut()
                 ) {
-                    NexusPillTopBar(
+                    NexusTopBar(
                         title = displayName,
                         titleStyle = com.nexus.core.theme.NexusTheme.typography.body,
-                        outerVerticalPadding = 4.dp,
-                        innerVerticalPadding = 8.dp,
-                        iconSize = 40.dp,
                         navigationIcon = {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxSize()
+                                    .size(40.dp)
                                     .clip(CircleShape)
                                     .clickable { onBack() },
                                 contentAlignment = Alignment.Center
@@ -890,6 +1023,31 @@ fun PdfReaderScreen(
                     }
                 )
 
+            }
+            
+            if (showOutlineSheet) {
+                androidx.compose.material3.ModalBottomSheet(
+                    onDismissRequest = { showOutlineSheet = false },
+                    containerColor = NexusTheme.colors.surface
+                ) {
+                    if (outline.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                            NexusText("No Outline Available", color = NexusTheme.colors.textSecondary)
+                        }
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                            items(outline) { item ->
+                                NexusText(
+                                    text = item.title,
+                                    modifier = Modifier.fillMaxWidth().clickable {
+                                        showOutlineSheet = false
+                                        coroutineScope.launch { listState.scrollToItem(item.pageIndex.coerceAtLeast(0)) }
+                                    }.padding(vertical = 12.dp)
+                                )
+                            }
+                        }
+                    }
+                }
             }
             
             if (showMenu) {

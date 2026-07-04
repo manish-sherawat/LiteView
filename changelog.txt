@@ -1,0 +1,112 @@
+# 📜 Changelog
+
+## 🚀 Version 2.4.1 (Latest Release)
+
+---
+
+### 🌐 Global Updates
+**🐛 Bug Fixes**
+- 🛠️ Fixed the "Collapsing Top Bar" bug where content was being compressed by incorrect status bar padding across viewers.
+
+**✨ UI & UX Improvements**
+- 🎨 Completely redesigned the Top Navigation Bar across all document viewers to use a standard edge-to-edge layout, fixing icon/text overlapping and back button alignment.
+
+---
+
+### ⚙️ Dashboard & Settings
+**🐛 Bug Fixes**
+- 🗂️ Fixed a bug causing starred files to disappear from the Dashboard when a duplicate-named file exists.
+- 🖱️ Corrected a touch delegation issue in `SettingsScreen` where the settings toggles failed to register clicks directly on the switch.
+- 🔄 Fixed the manual "Check for Updates" button to properly display an explicit "Up to Date" dialogue instead of failing silently.
+- 🛡️ Extended security accessibility checking to correctly parse the Scanned Documents list.
+
+**✨ UI & UX Improvements**
+- 📱 Redesigned the Settings Update dialog into an immersive, edge-to-edge full-screen experience with scrollable changelogs.
+- 🛑 Added explicit padding protections on all dialogs to prevent overlap with hardware or virtual navigation buttons on modern Android devices.
+
+---
+
+### 📊 Excel Viewer
+**🆕 New Features**
+- 🔍 Expanded the "Jump" feature to support cell (e.g. C150), row, and column destinations, complete with a 3-second yellow highlight animation.
+- ❄️ Implemented a "Freeze Panes" toggle button on the bottom navigation bar.
+- 🧊 Added support for freezing panes (rows and columns).
+- 📂 Implemented a 'Sheet Navigator' side panel for quick switching between sheets.
+- 📈 Introduced basic chart editing capabilities.
+- ⏳ Added a loading screen when opening documents to provide immediate visual feedback and improve overall user experience.
+
+**🐛 Bug Fixes**
+- 📤 Fixed a bug where the "Share Document" functionality crashed due to missing FileProvider permissions on modern Android versions.
+- 🔎 Fixed an issue where the 'Find and Replace' button was unresponsive on large spreadsheets.
+- 📄 Fixed a bug causing the 'Export to PDF' button to occasionally fail without an error message.
+- 🧮 Corrected formula calculation issues in specific cell ranges.
+- 🔒 Resolved a crash that occurred when attempting to open password-protected Excel files.
+
+**✨ UI & UX Improvements**
+- 🧭 Added a dynamic Bottom Navigation Bar containing quick actions for Theme toggling and Focus Mode.
+- 🖱️ Increased the thickness of the horizontal scrollbar for easier interaction on touch devices.
+- 🌗 Improved cell highlight color contrast against the background in Dark Mode.
+- 📐 Optimized the toolbar layout to save screen real estate on smaller devices.
+
+**⚡ Performance Optimizations**
+- 🚀 Eliminated noticeable lag when scrolling through spreadsheets containing more than 10,000 rows.
+- 📉 Significantly reduced memory consumption when rendering multiple charts in a single sheet.
+- 🏎️ Sped up the initial load rendering of complex cell formatting.
+
+---
+
+### 📄 Word Viewer
+**🆕 New Features**
+- 🧘 Enhanced 'Distraction-Free' reading mode to natively hide the System Status and Navigation bars using Compose WindowInsets.
+
+**🐛 Bug Fixes**
+- 🔖 Fixed Table of Contents navigation links to correctly jump to internal bookmarks.
+- 🖨️ Improved 'Print' reliability by wrapping PrintManager in error handling.
+- 🖼️ Fixed image distortion in .docx files by enforcing strict CSS aspect ratios.
+
+**✨ UI & UX Improvements**
+- ✂️ Enhanced page break visibility in continuous scrolling mode using clear dashed lines.
+
+---
+
+### 📕 PDF Viewer
+**🆕 New Features**
+- 🖊️ Implemented an overlay Ink Annotation mode allowing users to draw directly on pages and save paths natively back to the PDF.
+
+**🐛 Bug Fixes**
+- 🔗 Fixed a crash that occurred when pressing the "Share" button due to invalid Intent flags.
+- 📌 Resolved an issue where PDF Bookmarks were not persisting across sessions.
+
+**✨ UI & UX Improvements**
+- 💊 Increased the size of the Page Indicator pill for better readability.
+- 🤏 Adjusted pinch-to-zoom thresholds to eliminate jitter when beginning a zoom gesture.
+- 📋 Added a new Document Outline (TOC) BottomSheet accessible via the toolbar.
+- ⌛ Refined the loading screen with descriptive text instead of a plain spinner.
+
+**⚡ Performance Optimizations**
+- 🔋 Eliminated choppy scrolling and high battery drain on >500 page documents by lowering the rasterization scale and implementing a Render Debouncer.
+
+---
+
+### 📝 Text Viewer
+**🆕 New Features**
+- 🌈 Implemented a basic Syntax Highlighter that automatically colorizes strings and keys in JSON/XML files.
+- 🔢 Added a 'Go to Line' dialog, accessible by tapping the progress indicator.
+- ⏳ Included a descriptive Loading Screen when opening large text files.
+- 🔤 Added dynamic font-family switching (automatically using Monospace for recognized code extensions).
+
+**🐛 Bug Fixes**
+- 💾 Fixed the 'Word Wrap' button state not persisting by syncing it with the internal User Preferences.
+- 🔠 Corrected the 'Change Encoding' function so selecting a new charset completely reloads the file stream and re-renders the text correctly.
+- 🔍 Implemented the 'Match Case' parameter for the Search/Find functionality.
+
+**✨ UI & UX Improvements**
+- 🔎 Added a full Find UI and Change Encoding BottomSheet directly inside the Text Viewer.
+- 📏 Increased the default font size to 16sp for improved readability.
+- 🌓 Added a quick Light/Dark Theme toggle button to the bottom action bar.
+- 📐 Converted the fixed-width Line Numbers margin to a dynamic layout, saving significant horizontal space on mobile screens.
+
+**⚡ Performance Optimizations**
+- 🧵 Restructured file parsing with coroutine `yield()` to stream large log files without causing the main UI thread to lock up and hang.
+- 📏 Enforced line-length bounds on massive 1-line log files to prevent Compose from freezing during layout passes.
+- 🧠 Optimized the Search indexing loop to prevent Out-Of-Memory exceptions on large files.

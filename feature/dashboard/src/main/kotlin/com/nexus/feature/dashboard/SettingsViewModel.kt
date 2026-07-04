@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.nexus.core.updater.AppUpdater
@@ -25,12 +26,13 @@ data class SettingsUiState(
     val defaultFontSize: Float = 14f,
     val appVersion: String = "1.0.0",
     val cacheSizeText: String = "0 B",
-    val cacheClearSuccess: Boolean? = null,   // null = idle, true/false = result
+    val cacheClearMessage: String? = null,
     val keepScreenAwake: Boolean = false,
     val rememberReadingPosition: Boolean = true,
     val startupToPicker: Boolean = false,
     val defaultIsGridView: Boolean = false,
-    val hapticFeedbackEnabled: Boolean = true
+    val hapticFeedbackEnabled: Boolean = true,
+    val isManualUpdateCheck: Boolean = false
 )
 
 // ─── Settings ViewModel ───────────────────────────────────────────────────────
@@ -43,35 +45,53 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    private val _cacheClearResult = MutableStateFlow<Boolean?>(null)
+    private val _cacheClearResult = MutableStateFlow<String?>(null)
     private val _cacheSizeText = MutableStateFlow("Calculating...")
+    private val _isManualUpdateCheck = MutableStateFlow(false)
+    
+    private val _uiEvents = kotlinx.coroutines.flow.MutableSharedFlow<String>()
+    val uiEvents = _uiEvents.asSharedFlow()
 
     init {
         updateCacheSize()
     }
 
     val uiState: StateFlow<SettingsUiState> = combine(
-        prefsRepository.themeMode,
-        prefsRepository.defaultFontSize,
-        prefsRepository.keepScreenAwake,
-        prefsRepository.rememberReadingPosition,
-        prefsRepository.startupToPicker,
-        prefsRepository.defaultIsGridView,
-        prefsRepository.hapticFeedbackEnabled,
-        _cacheSizeText,
-        _cacheClearResult
-    ) { args: Array<Any?> ->
+        combine(
+            prefsRepository.themeMode,
+            prefsRepository.defaultFontSize,
+            prefsRepository.keepScreenAwake,
+            ::Triple
+        ),
+        combine(
+            prefsRepository.rememberReadingPosition,
+            prefsRepository.startupToPicker,
+            prefsRepository.defaultIsGridView,
+            ::Triple
+        ),
+        combine(
+            prefsRepository.hapticFeedbackEnabled,
+            _cacheSizeText,
+            _cacheClearResult,
+            ::Triple
+        ),
+        _isManualUpdateCheck
+    ) { (themeMode, defaultFontSize, keepScreenAwake),
+        (rememberReadingPosition, startupToPicker, defaultIsGridView),
+        (hapticFeedbackEnabled, cacheSizeText, cacheClearResult),
+        isManualUpdateCheck ->
         SettingsUiState(
-            themeMode = args[0] as ThemeMode,
-            defaultFontSize = args[1] as Float,
-            keepScreenAwake = args[2] as Boolean,
-            rememberReadingPosition = args[3] as Boolean,
-            startupToPicker = args[4] as Boolean,
-            defaultIsGridView = args[5] as Boolean,
-            hapticFeedbackEnabled = args[6] as Boolean,
+            themeMode = themeMode,
+            defaultFontSize = defaultFontSize,
+            keepScreenAwake = keepScreenAwake,
+            rememberReadingPosition = rememberReadingPosition,
+            startupToPicker = startupToPicker,
+            defaultIsGridView = defaultIsGridView,
+            hapticFeedbackEnabled = hapticFeedbackEnabled,
             appVersion = getAppVersion(),
-            cacheSizeText = args[7] as String,
-            cacheClearSuccess = args[8] as Boolean?
+            cacheSizeText = cacheSizeText,
+            cacheClearMessage = cacheClearResult,
+            isManualUpdateCheck = isManualUpdateCheck
         )
     }.stateIn(
         scope = viewModelScope,
@@ -122,9 +142,9 @@ class SettingsViewModel @Inject constructor(
                 context.contentResolver.openOutputStream(uri)?.use { outputStream ->
                     outputStream.write(jsonArray.toString(2).toByteArray())
                 }
-                // Optional: Show success
+                _uiEvents.emit("Reading history exported successfully")
             } catch (e: Exception) {
-                e.printStackTrace()
+                _uiEvents.emit("Export failed: ${e.message ?: "Unknown error"}")
             }
         }
     }
@@ -154,14 +174,27 @@ class SettingsViewModel @Inject constructor(
     fun clearCache() {
         viewModelScope.launch {
             try {
-                // Clear app cache directory contents safely
+                val sizeBefore = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    getFolderSize(context.cacheDir)
+                }
+                
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     context.cacheDir.listFiles()?.forEach { it.deleteRecursively() }
                 }
-                _cacheClearResult.value = true
+                
+                val sizeAfter = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    getFolderSize(context.cacheDir)
+                }
+                
+                val freed = sizeBefore - sizeAfter
+                if (freed > 0) {
+                    _cacheClearResult.value = "Cleared ${formatFileSize(freed)}"
+                } else {
+                    _cacheClearResult.value = "No cache to clear"
+                }
                 updateCacheSize()
-            } catch (_: Exception) {
-                _cacheClearResult.value = false
+            } catch (e: Exception) {
+                _cacheClearResult.value = "Failed to clear cache: ${e.message}"
             }
         }
     }
@@ -181,8 +214,9 @@ class SettingsViewModel @Inject constructor(
 
     val updateState: StateFlow<UpdateState> = appUpdater.updateState
 
-    fun checkForUpdates() {
+    fun checkForUpdates(isManual: Boolean = true) {
         viewModelScope.launch {
+            _isManualUpdateCheck.value = isManual
             appUpdater.checkForUpdates(getAppVersion())
         }
     }
@@ -192,6 +226,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun resetUpdateState() {
+        _isManualUpdateCheck.value = false
         appUpdater.resetState()
     }
 

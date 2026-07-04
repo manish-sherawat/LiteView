@@ -228,10 +228,16 @@ fun NexusSwitch(
             .clip(NexusTheme.shapes.pill)
             .background(trackColor)
             .border(1.5.dp, borderColor, NexusTheme.shapes.pill)
-            .toggleable(
-                value = checked,
-                role = Role.Switch,
-                onValueChange = { newValue -> onCheckedChange?.invoke(newValue) }
+            .then(
+                if (onCheckedChange != null) {
+                    Modifier.toggleable(
+                        value = checked,
+                        role = Role.Switch,
+                        onValueChange = onCheckedChange
+                    )
+                } else {
+                    Modifier
+                }
             )
             .padding(4.dp),
         contentAlignment = Alignment.CenterStart

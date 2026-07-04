@@ -120,6 +120,7 @@ fun FileGridItem(
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
+                alpha = if (isAccessible) 1f else 0.5f
             }
     ) {
         var thumbnail by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
@@ -192,6 +193,20 @@ fun FileGridItem(
                             .background(NexusTheme.colors.primary, androidx.compose.foundation.shape.CircleShape)
                             .padding(4.dp),
                         colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(NexusTheme.colors.onPrimary)
+                    )
+                }
+                
+                if (!isAccessible) {
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_lock),
+                        contentDescription = "Inaccessible",
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(8.dp)
+                            .size(24.dp)
+                            .background(NexusTheme.colors.error, androidx.compose.foundation.shape.CircleShape)
+                            .padding(4.dp),
+                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White)
                     )
                 }
             }

@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -62,6 +63,13 @@ import com.nexus.core.ui.NexusSurface
 import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.launch
 import androidx.compose.ui.draw.shadow
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.systemBarsPadding
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
@@ -77,26 +85,21 @@ fun SettingsScreen(
     var showChangelogDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
 
-    var isPermissionGranted by remember {
-        mutableStateOf(
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
-                Environment.isExternalStorageManager()
-            else
-                ContextCompat.checkSelfPermission(
-                    context, Manifest.permission.READ_EXTERNAL_STORAGE
-                ) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-
-    val manageStorageLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) {
-        isPermissionGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+    val checkStoragePermission = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
             Environment.isExternalStorageManager()
         else
             ContextCompat.checkSelfPermission(
                 context, Manifest.permission.READ_EXTERNAL_STORAGE
             ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    var isPermissionGranted by remember { mutableStateOf(checkStoragePermission()) }
+
+    val manageStorageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        isPermissionGranted = checkStoragePermission()
     }
 
     val requestPermissionLauncher = rememberLauncherForActivityResult(
@@ -126,23 +129,23 @@ fun SettingsScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                isPermissionGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
-                    Environment.isExternalStorageManager()
-                else
-                    ContextCompat.checkSelfPermission(
-                        context, Manifest.permission.READ_EXTERNAL_STORAGE
-                    ) == PackageManager.PERMISSION_GRANTED
+                isPermissionGranted = checkStoragePermission()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(uiState.cacheClearSuccess) {
-        uiState.cacheClearSuccess?.let { success ->
-            val message = if (success) "Cache cleared successfully" else "Failed to clear cache"
+    LaunchedEffect(uiState.cacheClearMessage) {
+        uiState.cacheClearMessage?.let { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             viewModel.dismissCacheClearResult()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.uiEvents.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -344,8 +347,11 @@ fun SettingsScreen(
         )
     }
 
-    var showUpdateDialog by remember(updateState) {
-        mutableStateOf(updateState is UpdateState.Available)
+    var showUpdateDialog by remember(updateState, uiState.isManualUpdateCheck) {
+        mutableStateOf(
+            updateState is UpdateState.Available || 
+            (uiState.isManualUpdateCheck && (updateState is UpdateState.UpToDate || updateState is UpdateState.Error))
+        )
     }
 
     if (showUpdateDialog) {
@@ -450,10 +456,15 @@ private fun SettingsSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     iconRes: Int
 ) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (checked) NexusTheme.colors.primary.copy(alpha = 0.05f) else Color.Transparent,
+        label = "switchRowBackground"
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .springBounceClick { onCheckedChange(!checked) }
+            .background(backgroundColor)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -477,7 +488,7 @@ private fun SettingsSwitchRow(
             )
         }
         Spacer(modifier = Modifier.width(16.dp))
-        NexusSwitch(checked = checked, onCheckedChange = onCheckedChange)
+        NexusSwitch(checked = checked, onCheckedChange = null)
     }
 }
 
@@ -539,11 +550,20 @@ private fun SettingsPermissionRow(
             colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
         )
         Spacer(modifier = Modifier.width(16.dp))
-        NexusText(
-            text = title,
-            style = NexusTheme.typography.body,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            NexusText(
+                text = title,
+                style = NexusTheme.typography.body
+            )
+            if (!isGranted) {
+                NexusText(
+                    text = "Required to browse and open documents",
+                    style = NexusTheme.typography.caption,
+                    color = NexusTheme.colors.textSecondary,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
@@ -728,6 +748,25 @@ private fun ThemeSelectionDialog(
                                 )
                             }
                             Spacer(modifier = Modifier.width(16.dp))
+                            
+                            val swatchColor = when (mode) {
+                                ThemeMode.LIGHT -> Color(0xFFF8F9FA)
+                                ThemeMode.DARK -> Color(0xFF1E1E1E)
+                                ThemeMode.AMOLED -> Color.Black
+                                ThemeMode.SEPIA -> Color(0xFFF4ECD8)
+                                ThemeMode.FOREST -> Color(0xFF2C3E2D)
+                                ThemeMode.SUNSET -> Color(0xFF3B2A38)
+                                ThemeMode.SYSTEM -> Color.Gray
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(swatchColor)
+                                    .border(1.dp, NexusTheme.colors.textSecondary.copy(alpha = 0.3f), CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
                             NexusText(
                                 text = label,
                                 style = NexusTheme.typography.body,
@@ -750,6 +789,7 @@ private data class ChangelogEntry(val version: String, val date: String, val not
 
 @Composable
 private fun ChangelogFullScreen(state: ChangelogState, onDismiss: () -> Unit, onRetry: () -> Unit) {
+    BackHandler { onDismiss() }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -777,35 +817,44 @@ private fun ChangelogFullScreen(state: ChangelogState, onDismiss: () -> Unit, on
         )
         
         Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            when (state) {
-                is ChangelogState.Idle, is ChangelogState.Loading -> {
-                    NexusText("Loading...", color = NexusTheme.colors.primary, style = NexusTheme.typography.body)
-                }
-                is ChangelogState.Error -> {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        NexusText(
-                            text = state.message,
-                            color = NexusTheme.colors.error,
-                            style = NexusTheme.typography.body,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        com.nexus.core.ui.components.NexusButton(
-                            text = "Retry",
-                            onClick = onRetry
-                        )
+            AnimatedContent(
+                targetState = state,
+                transitionSpec = {
+                    androidx.compose.animation.fadeIn(animationSpec = tween(300)) togetherWith
+                    androidx.compose.animation.fadeOut(animationSpec = tween(300))
+                },
+                label = "ChangelogState"
+            ) { targetState ->
+                when (targetState) {
+                    is ChangelogState.Idle, is ChangelogState.Loading -> {
+                        NexusText("Loading...", color = NexusTheme.colors.primary, style = NexusTheme.typography.body)
                     }
-                }
-                is ChangelogState.Success -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp)
-                    ) {
-                        items(state.releases.size) { index ->
-                            TimelineItem(
-                                release = state.releases[index],
-                                isLast = index == state.releases.size - 1
+                    is ChangelogState.Error -> {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            NexusText(
+                                text = targetState.message,
+                                color = NexusTheme.colors.error,
+                                style = NexusTheme.typography.body,
+                                textAlign = TextAlign.Center
                             )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            com.nexus.core.ui.components.NexusButton(
+                                text = "Retry",
+                                onClick = onRetry
+                            )
+                        }
+                    }
+                    is ChangelogState.Success -> {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp)
+                        ) {
+                            items(targetState.releases.size) { index ->
+                                TimelineItem(
+                                    release = targetState.releases[index],
+                                    isLast = index == targetState.releases.size - 1
+                                )
+                            }
                         }
                     }
                 }
@@ -967,21 +1016,22 @@ private fun UpdateDialog(
         ) {
             androidx.compose.animation.AnimatedVisibility(
                 visible = isVisible,
-                enter = androidx.compose.animation.scaleIn(
-                    animationSpec = androidx.compose.animation.core.spring(
-                        dampingRatio = 0.75f,
-                        stiffness = 300f
-                    )
+                enter = androidx.compose.animation.slideInVertically(
+                    initialOffsetY = { it },
+                    animationSpec = androidx.compose.animation.core.tween(300)
                 ) + androidx.compose.animation.fadeIn(),
-                exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut(),
-                modifier = Modifier.padding(24.dp)
+                exit = androidx.compose.animation.slideOutVertically(
+                    targetOffsetY = { it },
+                    animationSpec = androidx.compose.animation.core.tween(300)
+                ) + androidx.compose.animation.fadeOut(),
+                modifier = Modifier.fillMaxSize()
             ) {
                 NexusSurface(
-                    shape = NexusTheme.shapes.large,
-                    elevation = 24.dp,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp),
+                    elevation = 0.dp,
                     color = NexusTheme.colors.surface,
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .fillMaxSize()
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -990,138 +1040,179 @@ private fun UpdateDialog(
                 ) {
                     Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .fillMaxSize()
+                            .systemBarsPadding()
                     ) {
-                        val iconRes = when (updateState) {
-                            is UpdateState.Available -> R.drawable.ic_update_progress
-                            is UpdateState.UpToDate -> R.drawable.ic_check
-                            is UpdateState.Error -> R.drawable.ic_info
-                            else -> R.drawable.ic_update_progress
-                        }
-                        
-                        val iconTint = when (updateState) {
-                            is UpdateState.Available -> NexusTheme.colors.primary
-                            is UpdateState.UpToDate -> NexusTheme.colors.success
-                            is UpdateState.Error -> NexusTheme.colors.error
-                            else -> NexusTheme.colors.primary
-                        }
-
                         Box(
                             modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .background(iconTint.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
+                                .fillMaxWidth()
+                                .padding(top = 12.dp, end = 12.dp),
+                            contentAlignment = Alignment.CenterEnd
                         ) {
-                            Image(
-                                painter = painterResource(id = iconRes),
-                                contentDescription = null,
-                                modifier = Modifier.size(32.dp),
-                                colorFilter = ColorFilter.tint(iconTint)
-                            )
+                            com.nexus.core.ui.components.NexusIconButton(
+                                onClick = handleDismiss,
+                                elevation = 0.dp,
+                                containerColor = Color.Transparent
+                            ) {
+                                Image(
+                                    painter = painterResource(id = com.nexus.core.R.drawable.ic_close),
+                                    contentDescription = "Close",
+                                    colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            val iconRes = when (updateState) {
+                                is UpdateState.Available -> R.drawable.ic_update_progress
+                                is UpdateState.UpToDate -> R.drawable.ic_check
+                                is UpdateState.Error -> R.drawable.ic_info
+                                else -> R.drawable.ic_update_progress
+                            }
+                            
+                            val iconTint = when (updateState) {
+                                is UpdateState.Available -> NexusTheme.colors.primary
+                                is UpdateState.UpToDate -> NexusTheme.colors.success
+                                is UpdateState.Error -> NexusTheme.colors.error
+                                else -> NexusTheme.colors.primary
+                            }
 
-                        when (val state = updateState) {
-                            is UpdateState.Available -> {
-                                NexusText(
-                                    text = "Update Available",
-                                    style = NexusTheme.typography.h2,
-                                    color = NexusTheme.colors.textPrimary
+                            Box(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clip(CircleShape)
+                                    .background(iconTint.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = iconRes),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(32.dp),
+                                    colorFilter = ColorFilter.tint(iconTint)
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                NexusText(
-                                    text = "Version ${state.version} is now available.",
-                                    style = NexusTheme.typography.body,
-                                    color = NexusTheme.colors.textSecondary,
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(NexusTheme.colors.surfaceVariant, NexusTheme.shapes.medium)
-                                        .padding(16.dp)
-                                ) {
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            when (val state = updateState) {
+                                is UpdateState.Available -> {
                                     NexusText(
-                                        text = state.releaseNotes,
-                                        style = NexusTheme.typography.caption,
+                                        text = "Update Available",
+                                        style = NexusTheme.typography.h2,
                                         color = NexusTheme.colors.textPrimary
                                     )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    NexusText(
+                                        text = "Version ${state.version} is now available.",
+                                        style = NexusTheme.typography.body,
+                                        color = NexusTheme.colors.textSecondary,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(NexusTheme.colors.surfaceVariant, NexusTheme.shapes.medium)
+                                            .padding(16.dp)
+                                    ) {
+                                        NexusText(
+                                            text = state.releaseNotes,
+                                            style = NexusTheme.typography.caption,
+                                            color = NexusTheme.colors.textPrimary
+                                        )
+                                    }
                                 }
-                                Spacer(modifier = Modifier.height(24.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                                ) {
+                                is UpdateState.UpToDate -> {
+                                    NexusText(
+                                        text = "Up to Date",
+                                        style = NexusTheme.typography.h2,
+                                        color = NexusTheme.colors.textPrimary
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    NexusText(
+                                        text = "You are using the latest version of LiteView.",
+                                        style = NexusTheme.typography.body,
+                                        color = NexusTheme.colors.textSecondary,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                                is UpdateState.Error -> {
+                                    NexusText(
+                                        text = "Update Error",
+                                        style = NexusTheme.typography.h2,
+                                        color = NexusTheme.colors.textPrimary
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    NexusText(
+                                        text = state.message,
+                                        style = NexusTheme.typography.body,
+                                        color = NexusTheme.colors.textSecondary,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                                else -> {}
+                            }
+                        }
+                        
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 64.dp)
+                        ) {
+                            when (val state = updateState) {
+                                is UpdateState.Available -> {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                    ) {
+                                        com.nexus.core.ui.components.NexusButton(
+                                            text = "Later",
+                                            isOutlined = true,
+                                            onClick = handleDismiss,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        com.nexus.core.ui.components.NexusButton(
+                                            text = "Install",
+                                            onClick = { onDownload(state.downloadUrl, state.version) },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+                                is UpdateState.UpToDate -> {
                                     com.nexus.core.ui.components.NexusButton(
-                                        text = "Later",
-                                        isOutlined = true,
+                                        text = "Awesome",
                                         onClick = handleDismiss,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    com.nexus.core.ui.components.NexusButton(
-                                        text = "Install",
-                                        onClick = { onDownload(state.downloadUrl, state.version) },
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier.fillMaxWidth()
                                     )
                                 }
-                            }
-                            is UpdateState.UpToDate -> {
-                                NexusText(
-                                    text = "Up to Date",
-                                    style = NexusTheme.typography.h2,
-                                    color = NexusTheme.colors.textPrimary
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                NexusText(
-                                    text = "You are using the latest version of LiteView.",
-                                    style = NexusTheme.typography.body,
-                                    color = NexusTheme.colors.textSecondary,
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(24.dp))
-                                com.nexus.core.ui.components.NexusButton(
-                                    text = "Awesome",
-                                    onClick = handleDismiss,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                            is UpdateState.Error -> {
-                                NexusText(
-                                    text = "Update Error",
-                                    style = NexusTheme.typography.h2,
-                                    color = NexusTheme.colors.textPrimary
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                NexusText(
-                                    text = state.message,
-                                    style = NexusTheme.typography.body,
-                                    color = NexusTheme.colors.textSecondary,
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(24.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                                ) {
-                                    com.nexus.core.ui.components.NexusButton(
-                                        text = "Cancel",
-                                        isOutlined = true,
-                                        onClick = handleDismiss,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    com.nexus.core.ui.components.NexusButton(
-                                        text = "Retry",
-                                        onClick = onRetry,
-                                        modifier = Modifier.weight(1f)
-                                    )
+                                is UpdateState.Error -> {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                    ) {
+                                        com.nexus.core.ui.components.NexusButton(
+                                            text = "Cancel",
+                                            isOutlined = true,
+                                            onClick = handleDismiss,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        com.nexus.core.ui.components.NexusButton(
+                                            text = "Retry",
+                                            onClick = onRetry,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
                                 }
+                                else -> {}
                             }
-                            else -> {}
                         }
                     }
                 }

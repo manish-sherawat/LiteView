@@ -175,7 +175,7 @@ class OfficeReaderViewModel @Inject constructor(
                     val result = when (docType.uppercase()) {
                         "DOCX" -> parseDocx(inputStream, password)
                         "DOC"  -> parseDoc(inputStream)
-                        "XLSX" -> parseXlsx(inputStream)
+                        "XLSX" -> parseXlsx(inputStream, password)
                         else   -> throw UnsupportedOperationException("Unsupported type: $docType")
                     }
 
@@ -431,7 +431,7 @@ class OfficeReaderViewModel @Inject constructor(
   h4 { font-size: 1.05em; font-weight: 600; margin: 0.8em 0 0.25em; color: #2a4a7f; }
   h5, h6 { font-size: 0.95em; font-weight: 600; margin: 0.7em 0 0.2em; }
   p { margin: 0.4em 0; }
-  img { max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0; display: block; }
+  img { max-width: 100%; height: auto; object-fit: contain; border-radius: 8px; margin: 10px 0; display: block; }
   table {
     width: 100%; border-collapse: collapse; margin: 14px 0;
     overflow-x: auto; display: block; border-radius: 8px;
@@ -451,7 +451,7 @@ class OfficeReaderViewModel @Inject constructor(
   a { color: #3B7DD8; text-decoration: underline; }
   hr { border: none; border-top: 1px solid rgba(128,128,128,0.25); margin: 16px 0; }
   .list-bullet { margin-left: 1.5em; }
-  .page-break { border-top: 2px dashed rgba(128,128,128,0.3); margin: 20px 0; }
+  .page-break { border-top: 2px dashed #888; margin: 40px 0; page-break-after: always; }
   .dark-mode { color: #e8e8e8; }
   .dark-mode h3, .dark-mode h4 { color: #90b8f8; }
   .dark-mode h5, .dark-mode h6 { color: #8ab4f8; }
@@ -851,8 +851,24 @@ class OfficeReaderViewModel @Inject constructor(
 
     // ── XLSX Parser ───────────────────────────────────────────────────────────
 
-    private suspend fun parseXlsx(stream: java.io.InputStream): OfficeReaderUiState {
-        WorkbookFactory.create(stream).use { workbook ->
+    private suspend fun parseXlsx(stream: java.io.InputStream, password: String? = null): OfficeReaderUiState {
+        var finalStream = stream
+        var poifsToClose: POIFSFileSystem? = null
+
+        if (password != null) {
+            val poifs = POIFSFileSystem(stream)
+            poifsToClose = poifs
+            val info = EncryptionInfo(poifs)
+            val decryptor = Decryptor.getInstance(info)
+            if (!decryptor.verifyPassword(password)) {
+                poifs.close()
+                return OfficeReaderUiState.Error("Incorrect password.")
+            }
+            finalStream = decryptor.getDataStream(poifs)
+        }
+
+        try {
+            WorkbookFactory.create(finalStream).use { workbook ->
             val sheetNames = (0 until workbook.numberOfSheets).map { workbook.getSheetName(it) }
             val sheetsRows = mutableListOf<List<XlsxRow>>()
             val sheetsColumnWidths = mutableListOf<List<Int>>()
@@ -929,6 +945,9 @@ class OfficeReaderViewModel @Inject constructor(
                 sheetsRows = sheetsRows,
                 sheetsColumnWidths = sheetsColumnWidths
             )
+        }
+        } finally {
+            poifsToClose?.close()
         }
     }
 }

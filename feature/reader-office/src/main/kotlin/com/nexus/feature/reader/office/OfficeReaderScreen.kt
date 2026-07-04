@@ -44,7 +44,7 @@ import com.nexus.core.theme.NexusTheme
 import com.nexus.core.ui.components.NexusButton
 import com.nexus.core.ui.NexusSurface
 import com.nexus.core.ui.NexusText
-import com.nexus.core.ui.components.NexusPillTopBar
+import com.nexus.core.ui.components.NexusTopBar
 import java.net.URLDecoder
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -73,6 +73,21 @@ fun OfficeReaderScreen(
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var isImmersiveMode by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity
+    
+    androidx.compose.runtime.LaunchedEffect(isImmersiveMode) {
+        activity?.window?.let { window ->
+            val controller = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+            if (isImmersiveMode) {
+                controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            } else {
+                controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            }
+        }
+    }
+
     val bottomInset = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 16.dp else 90.dp)
     val bottomPadding by animateDpAsState(targetValue = if (isImmersiveMode) bottomInset else bottomInset + 100.dp)
@@ -86,13 +101,17 @@ fun OfficeReaderScreen(
     var isPrintLayout by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var showSheetNavigator by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf("") }
-    val context = LocalContext.current
     
     val systemDarkTheme = isSystemInDarkTheme()
     var isDarkThemeOverride by remember { mutableStateOf<Boolean?>(null) }
     val isDark = isDarkThemeOverride ?: systemDarkTheme
+
+    var isFreezePanesEnabled by remember { mutableStateOf(true) }
+    var showJumpColumnDialog by remember { mutableStateOf(false) }
+    var jumpColumnInput by remember { mutableStateOf("") }
 
     Box(
         modifier = modifier
@@ -109,26 +128,49 @@ fun OfficeReaderScreen(
             ) { state ->
                 when (state) {
                     is OfficeReaderUiState.Loading -> {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            LazyColumn(
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(
                                 modifier = Modifier
-                                    .fillMaxSize()
+                                    .fillMaxWidth()
                                     .padding(horizontal = 24.dp, vertical = 100.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                items(20) { index ->
-                                    val widthFraction = when {
-                                        index % 5 == 0 -> 0.4f
-                                        index % 3 == 0 -> 0.7f
-                                        else -> 0.9f
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth(widthFraction)
-                                            .height(16.dp)
-                                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
-                                            .shimmerEffect()
+                                if (state.message != null || docType.equals("XLSX", ignoreCase = true)) {
+                                    androidx.compose.material3.CircularProgressIndicator(color = NexusTheme.colors.primary)
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    NexusText(
+                                        text = state.message ?: "Parsing Excel Document...",
+                                        color = NexusTheme.colors.textPrimary,
+                                        style = NexusTheme.typography.h2
                                     )
+                                    if (state.progress != null) {
+                                        androidx.compose.material3.LinearProgressIndicator(
+                                            progress = { state.progress },
+                                            modifier = Modifier.fillMaxWidth(0.6f).height(8.dp).clip(androidx.compose.foundation.shape.CircleShape),
+                                            color = NexusTheme.colors.primary
+                                        )
+                                    }
+                                } else {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxSize(),
+                                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                                    ) {
+                                        items(20) { index ->
+                                            val widthFraction = when {
+                                                index % 5 == 0 -> 0.4f
+                                                index % 3 == 0 -> 0.7f
+                                                else -> 0.9f
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth(widthFraction)
+                                                    .height(16.dp)
+                                                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+                                                    .shimmerEffect()
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -167,7 +209,7 @@ fun OfficeReaderScreen(
                         val extraStyle = "<style>\n" +
                             (if (isDark) "body.dark-mode, body.dark-mode * { color: #e0e0e0 !important; }\n" else "") +
                             "$printCss\n</style>"
-                        val script = "<script>document.addEventListener('click', function() { AndroidInterface.toggle(); });</script>"
+                        val script = "<script>document.addEventListener('click', function(e) { if (e.target.tagName !== 'A' && !e.target.closest('a')) { AndroidInterface.toggle(); } });</script>"
                         
                         html.replace("</head>", "$extraStyle\n</head>")
                             .replace("</body>", "$script\n</body>")
@@ -214,14 +256,25 @@ fun OfficeReaderScreen(
                     
                     val textColor = if (isDark) "#e0e0e0" else "#1a1a1a"
                     
-                    val htmlContent = remember(rows, columnWidths, state.showGridlines, isDark) {
+                    val htmlContent = remember(rows, columnWidths, state.showGridlines, isDark, isFreezePanesEnabled) {
                         buildString {
                             append("<!DOCTYPE html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes\">")
                             append("<style>")
                             append("body { font-family: sans-serif; font-size: 14px; margin: 0; padding: 16px; background-color: transparent; color: $textColor !important; } ")
                             append("body * { color: $textColor !important; } ")
-                            append("table { border-collapse: collapse; background-color: transparent; border-radius: 4px; overflow: hidden; margin-bottom: 24px; } ")
-                            append("td, th { border: ${if(state.showGridlines) "1px solid #888888" else "none"}; padding: 8px 12px; white-space: nowrap; } ")
+                            append("table { border-collapse: separate; border-spacing: 0; background-color: transparent; margin-bottom: 24px; } ")
+                            append("td, th { border: ${if(state.showGridlines) "1px solid #888888" else "none"}; padding: 8px 12px; white-space: nowrap; background-color: ${if(isDark) "#1e1e1e" else "#ffffff"}; } ")
+                            append("tr:hover td { background-color: ${if(isDark) "#333333" else "#f5f5f5"} !important; } ")
+                            if (isFreezePanesEnabled) {
+                                append("tr:first-child td { position: sticky; top: 0; z-index: 2; font-weight: bold; box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4); } ")
+                                append("td:first-child { position: sticky; left: 0; z-index: 1; font-weight: bold; box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.4); } ")
+                                append("tr:first-child td:first-child { z-index: 3; box-shadow: 2px 2px 2px -1px rgba(0, 0, 0, 0.4); } ")
+                            } else {
+                                append("tr:first-child td, td:first-child, tr:first-child td:first-child { font-weight: bold; } ")
+                            }
+                            append("::-webkit-scrollbar { height: 16px; width: 16px; } ")
+                            append("::-webkit-scrollbar-track { background: ${if(isDark) "#121212" else "#f1f1f1"}; } ")
+                            append("::-webkit-scrollbar-thumb { background: ${if(isDark) "#666" else "#888"}; border-radius: 8px; border: 4px solid ${if(isDark) "#121212" else "#f1f1f1"}; } ")
                             // Add column widths
                             columnWidths.forEachIndexed { i, w ->
                                 append("td:nth-child(${i+1}) { min-width: ${w}px; } ")
@@ -243,7 +296,7 @@ fun OfficeReaderScreen(
                                 append("</tr>")
                             }
                             append("</table>")
-                            append("<script>document.addEventListener('click', function() { AndroidInterface.toggle(); });</script>")
+                            append("<script>document.addEventListener('click', function(e) { if (e.target.tagName !== 'A' && !e.target.closest('a')) { AndroidInterface.toggle(); } });</script>")
                             append("</body></html>")
                         }
                     }
@@ -256,27 +309,30 @@ fun OfficeReaderScreen(
                             exit = shrinkVertically() + fadeOut()
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState())
-                                    .padding(16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.Start
                             ) {
-                                state.sheetNames.forEachIndexed { index, name ->
-                                    val isSelected = index == state.currentSheet
-                                    Box(
-                                        modifier = Modifier
-                                            .background(
-                                                if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.surfaceVariant,
-                                                NexusTheme.shapes.pill
-                                            )
-                                            .clickable { viewModel.switchSheet(index) }
-                                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                                    ) {
-                                        NexusText(
-                                            text = name,
-                                            color = if (isSelected) NexusTheme.colors.onPrimary else NexusTheme.colors.textPrimary
+                                Box(
+                                    modifier = Modifier
+                                        .background(NexusTheme.colors.surfaceVariant, NexusTheme.shapes.pill)
+                                        .clickable { showSheetNavigator = true }
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_view_list),
+                                            contentDescription = "Sheets",
+                                            tint = NexusTheme.colors.textPrimary,
+                                            modifier = Modifier.size(16.dp)
                                         )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        NexusText(
+                                            text = state.sheetNames.getOrNull(state.currentSheet) ?: "Sheet 1",
+                                            color = NexusTheme.colors.textPrimary,
+                                            style = NexusTheme.typography.buttonLabel
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = NexusTheme.colors.textPrimary, modifier = Modifier.size(16.dp))
                                     }
                                 }
                             }
@@ -406,7 +462,7 @@ fun OfficeReaderScreen(
             
             // Bottom Navigation Bar
             AnimatedVisibility(
-                visible = !isImmersiveMode && uiState is OfficeReaderUiState.DocxReady,
+                visible = !isImmersiveMode && (uiState is OfficeReaderUiState.DocxReady || uiState is OfficeReaderUiState.XlsxReady),
                 modifier = Modifier.align(Alignment.BottomCenter),
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut()
@@ -425,11 +481,28 @@ fun OfficeReaderScreen(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Print Layout Mode
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { isPrintLayout = !isPrintLayout }.padding(8.dp)) {
-                            Icon(painter = androidx.compose.ui.res.painterResource(id = if (isPrintLayout) com.nexus.core.R.drawable.ic_printer else com.nexus.core.R.drawable.ic_world), contentDescription = "Layout", tint = if (isPrintLayout) NexusTheme.colors.primary else NexusTheme.colors.textPrimary)
-                            NexusText(if (isPrintLayout) "Print" else "Web", style = NexusTheme.typography.caption, color = if (isPrintLayout) NexusTheme.colors.primary else NexusTheme.colors.textPrimary)
+                        if (uiState is OfficeReaderUiState.DocxReady) {
+                            // Print Layout Mode
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { isPrintLayout = !isPrintLayout }.padding(8.dp)) {
+                                Icon(painter = androidx.compose.ui.res.painterResource(id = if (isPrintLayout) com.nexus.core.R.drawable.ic_printer else com.nexus.core.R.drawable.ic_world), contentDescription = "Layout", tint = if (isPrintLayout) NexusTheme.colors.primary else NexusTheme.colors.textPrimary)
+                                NexusText(if (isPrintLayout) "Print" else "Web", style = NexusTheme.typography.caption, color = if (isPrintLayout) NexusTheme.colors.primary else NexusTheme.colors.textPrimary)
+                            }
                         }
+
+                        if (uiState is OfficeReaderUiState.XlsxReady) {
+                            // Freeze Panes Toggle
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { isFreezePanesEnabled = !isFreezePanesEnabled }.padding(8.dp)) {
+                                Icon(painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_view_grid), contentDescription = "Freeze", tint = if (isFreezePanesEnabled) NexusTheme.colors.primary else NexusTheme.colors.textPrimary)
+                                NexusText(if (isFreezePanesEnabled) "Frozen" else "Unfrozen", style = NexusTheme.typography.caption, color = if (isFreezePanesEnabled) NexusTheme.colors.primary else NexusTheme.colors.textPrimary)
+                            }
+                            
+                            // Jump Column
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showJumpColumnDialog = true }.padding(8.dp)) {
+                                Icon(painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_arrow_right), contentDescription = "Jump", tint = NexusTheme.colors.textPrimary)
+                                NexusText("Jump", style = NexusTheme.typography.caption, color = NexusTheme.colors.textPrimary)
+                            }
+                        }
+
                         // Immersive Mode
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { isImmersiveMode = true }.padding(8.dp)) {
                             Icon(painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_maximize), contentDescription = "Immersive", tint = NexusTheme.colors.textPrimary)
@@ -444,13 +517,27 @@ fun OfficeReaderScreen(
                         }
                         // Share
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable {
-                            val uri = android.net.Uri.parse(URLDecoder.decode(encodedUri, "UTF-8"))
+                            var rawUriStr = URLDecoder.decode(encodedUri, "UTF-8")
+                            if (rawUriStr.contains("%")) rawUriStr = URLDecoder.decode(rawUriStr, "UTF-8")
+                            val rawUri = android.net.Uri.parse(rawUriStr)
+                            val shareUri = if (rawUri.scheme == "file") {
+                                androidx.core.content.FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.fileprovider",
+                                    java.io.File(rawUri.path ?: "")
+                                )
+                            } else {
+                                rawUri
+                            }
                             val intent = Intent(Intent.ACTION_SEND).apply {
                                 type = "*/*"
-                                putExtra(Intent.EXTRA_STREAM, uri)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                putExtra(Intent.EXTRA_STREAM, shareUri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
-                            context.startActivity(Intent.createChooser(intent, "Share Document"))
+                            val chooser = Intent.createChooser(intent, "Share Document").apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(chooser)
                         }.padding(8.dp)) {
                             Icon(painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_share), contentDescription = "Share", tint = NexusTheme.colors.textPrimary)
                             NexusText("Share", style = NexusTheme.typography.caption, color = NexusTheme.colors.textPrimary)
@@ -458,6 +545,81 @@ fun OfficeReaderScreen(
                     }
                 }
             }
+
+        if (showJumpColumnDialog) {
+            AlertDialog(
+                onDismissRequest = { showJumpColumnDialog = false },
+                title = { NexusText("Jump to Cell / Row / Column", color = NexusTheme.colors.textPrimary) },
+                text = {
+                    Column {
+                        NexusText("Examples:\n• C150 (Cell)\n• C (Column)\n• 150 (Row)", color = NexusTheme.colors.textSecondary)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        androidx.compose.material3.OutlinedTextField(
+                            value = jumpColumnInput,
+                            onValueChange = { jumpColumnInput = it.uppercase() },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showJumpColumnDialog = false
+                        val input = jumpColumnInput.trim()
+                        if (input.isNotEmpty()) {
+                            val match = Regex("^([A-Z]*)([0-9]*)$").find(input)
+                            val letters = match?.groupValues?.getOrNull(1) ?: ""
+                            val numbers = match?.groupValues?.getOrNull(2) ?: ""
+                            
+                            var colIndex = 0
+                            if (letters.isNotEmpty()) {
+                                for (char in letters) {
+                                    colIndex = colIndex * 26 + (char - 'A' + 1)
+                                }
+                            }
+                            val rowIndex = numbers.toIntOrNull() ?: 0
+
+                            val js = """
+                                var el = null;
+                                if ($colIndex > 0 && $rowIndex > 0) {
+                                    el = document.querySelector('tr:nth-child(' + $rowIndex + ') td:nth-child(' + $colIndex + ')');
+                                } else if ($rowIndex > 0) {
+                                    el = document.querySelector('tr:nth-child(' + $rowIndex + ')');
+                                } else if ($colIndex > 0) {
+                                    el = document.querySelector('tr td:nth-child(' + $colIndex + ')');
+                                }
+                                if (el) {
+                                    el.scrollIntoView({behavior: 'smooth', block: 'center', inline: 'center'});
+                                    var oldBg = el.style.backgroundColor;
+                                    var oldTrans = el.style.transition;
+                                    el.style.transition = 'background-color 0.5s';
+                                    el.style.backgroundColor = 'rgba(255, 235, 59, 0.7)';
+                                    setTimeout(function() {
+                                        el.style.backgroundColor = oldBg;
+                                        setTimeout(function() { el.style.transition = oldTrans; }, 500);
+                                    }, 3000);
+                                } else {
+                                    AndroidInterface.toggle(); // Reusing interface to trigger something, or just fail silently
+                                }
+                            """.trimIndent()
+                            webViewRef?.evaluateJavascript(js, null)
+                        }
+                        jumpColumnInput = ""
+                    }) {
+                        NexusText("Jump", color = NexusTheme.colors.primary)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { 
+                        showJumpColumnDialog = false 
+                        jumpColumnInput = ""
+                    }) {
+                        NexusText("Cancel", color = NexusTheme.colors.textSecondary)
+                    }
+                },
+                containerColor = NexusTheme.colors.surface
+            )
+        }
         
         if (showInfoDialog && (uiState is OfficeReaderUiState.DocxReady || uiState is OfficeReaderUiState.XlsxReady)) {
             val docxState = uiState as? OfficeReaderUiState.DocxReady
@@ -534,16 +696,35 @@ fun OfficeReaderScreen(
                 onPrint = {
                     showMenu = false
                     webViewRef?.let {
-                        val printManager = context.getSystemService(android.content.Context.PRINT_SERVICE) as android.print.PrintManager
-                        val jobName = "Print - $displayName"
-                        val printAdapter = it.createPrintDocumentAdapter(jobName)
-                        printManager.print(jobName, printAdapter, android.print.PrintAttributes.Builder().build())
+                        try {
+                            val printManager = context.getSystemService(android.content.Context.PRINT_SERVICE) as android.print.PrintManager
+                            val jobName = "Print - $displayName"
+                            val printAdapter = it.createPrintDocumentAdapter(jobName)
+                            printManager.print(jobName, printAdapter, android.print.PrintAttributes.Builder().build())
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(context, "Printing failed or is unsupported on this device.", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    } ?: run {
+                        android.widget.Toast.makeText(context, "Document is not fully loaded.", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 },
                 onInfo = {
                     showMenu = false
                     showInfoDialog = true
                 }
+            )
+        }
+        
+        if (showSheetNavigator && uiState is OfficeReaderUiState.XlsxReady) {
+            val xlsxState = uiState as OfficeReaderUiState.XlsxReady
+            SheetNavigatorBottomSheet(
+                sheetNames = xlsxState.sheetNames,
+                currentSheet = xlsxState.currentSheet,
+                onSheetSelected = { index ->
+                    viewModel.switchSheet(index)
+                    showSheetNavigator = false
+                },
+                onDismiss = { showSheetNavigator = false }
             )
         }
 
@@ -600,15 +781,12 @@ fun OfficeReaderScreen(
                         }
                     }
                 } else {
-                    NexusPillTopBar(
+                    NexusTopBar(
                         title = displayName,
-                        outerVerticalPadding = 4.dp,
-                        innerVerticalPadding = 8.dp,
-                        iconSize = 40.dp,
                         navigationIcon = {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxSize()
+                                    .size(40.dp)
                                     .clip(androidx.compose.foundation.shape.CircleShape)
                                     .clickable { onBack() },
                                 contentAlignment = Alignment.Center
@@ -762,3 +940,86 @@ private data class MenuOption(
     val icon: Int,
     val action: () -> Unit
 )
+
+@Composable
+private fun SheetNavigatorBottomSheet(
+    sheetNames: List<String>,
+    currentSheet: Int,
+    onSheetSelected: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 24.dp)
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss
+                ),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            com.nexus.core.ui.NexusSurface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.6f)
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}
+                    ),
+                shape = com.nexus.core.theme.NexusTheme.shapes.large,
+                elevation = 24.dp,
+                color = com.nexus.core.theme.NexusTheme.colors.surface
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .width(32.dp)
+                            .height(4.dp)
+                            .clip(com.nexus.core.theme.NexusTheme.shapes.pill)
+                            .background(com.nexus.core.theme.NexusTheme.colors.textSecondary.copy(alpha = 0.2f))
+                            .align(Alignment.CenterHorizontally)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    com.nexus.core.ui.NexusText(
+                        text = "Sheets",
+                        style = com.nexus.core.theme.NexusTheme.typography.title,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                    )
+                    LazyColumn(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                        itemsIndexed(sheetNames) { index, name ->
+                            val isSelected = index == currentSheet
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(com.nexus.core.theme.NexusTheme.shapes.medium)
+                                    .background(if (isSelected) com.nexus.core.theme.NexusTheme.colors.primary.copy(alpha = 0.1f) else androidx.compose.ui.graphics.Color.Transparent)
+                                    .clickable { onSheetSelected(index) }
+                                    .padding(vertical = 16.dp, horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_view_list),
+                                    contentDescription = null,
+                                    tint = if (isSelected) com.nexus.core.theme.NexusTheme.colors.primary else com.nexus.core.theme.NexusTheme.colors.textSecondary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                com.nexus.core.ui.NexusText(
+                                    text = name,
+                                    style = if (isSelected) com.nexus.core.theme.NexusTheme.typography.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) else com.nexus.core.theme.NexusTheme.typography.body,
+                                    color = if (isSelected) com.nexus.core.theme.NexusTheme.colors.primary else com.nexus.core.theme.NexusTheme.colors.textPrimary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

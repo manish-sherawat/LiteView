@@ -33,14 +33,17 @@ import com.nexus.core.theme.NexusTheme
 import com.nexus.core.ui.components.NexusButton
 import com.nexus.core.ui.NexusSurface
 import com.nexus.core.ui.NexusText
-import com.nexus.core.ui.components.NexusPillTopBar
+import com.nexus.core.ui.components.NexusTopBar
 import java.net.URLDecoder
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.text.withStyle
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.graphics.ColorFilter
 import com.nexus.core.ui.animations.shimmerEffect
 import com.nexus.core.ui.animations.springBounceClick
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TextReaderScreen(
     encodedUri: String,
@@ -59,9 +62,19 @@ fun TextReaderScreen(
     val displayName = try { URLDecoder.decode(URLDecoder.decode(fileName, "UTF-8"), "UTF-8") } catch (_: Exception) { fileName }
 
     var isImmersiveMode by remember { mutableStateOf(false) }
-    var fontSizeMultiplier by remember { mutableFloatStateOf(1f) }
     var showLineNumbers by remember { mutableStateOf(true) }
-    var wordWrap by remember { mutableStateOf(true) }
+    
+    val wordWrap by viewModel.isWordWrapEnabled.collectAsStateWithLifecycle()
+    val fontSizeSp by viewModel.fontSize.collectAsStateWithLifecycle()
+    val readerTheme by viewModel.readerTheme.collectAsStateWithLifecycle()
+    val matchCase by viewModel.matchCase.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
+    val currentSearchIndex by viewModel.currentSearchIndex.collectAsStateWithLifecycle()
+    
+    var showSearchSheet by remember { mutableStateOf(false) }
+    var showEncodingSheet by remember { mutableStateOf(false) }
+    var showGoToLineSheet by remember { mutableStateOf(false) }
     val bottomInset = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 16.dp else 140.dp)
     val bottomPadding by animateDpAsState(targetValue = if (isImmersiveMode) bottomInset else bottomInset + 100.dp)
@@ -87,24 +100,15 @@ fun TextReaderScreen(
         ) { state ->
                 when (state) {
                     is TextReaderUiState.Loading -> {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize().padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(15) { index ->
-                                val widthFraction = if (index % 3 == 0) 0.9f else if (index % 3 == 1) 0.7f else 1f
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth(widthFraction)
-                                        .height(16.dp)
-                                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
-                                        .shimmerEffect()
-                                )
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                androidx.compose.material3.CircularProgressIndicator(color = NexusTheme.colors.primary)
+                                NexusText("Parsing Text Document...", color = NexusTheme.colors.textSecondary, style = NexusTheme.typography.body)
                             }
                         }
                     }
                     is TextReaderUiState.Success -> {
-                        val scaledFontSize = 14.sp * fontSizeMultiplier
+                        val scaledFontSize = fontSizeSp.sp
                         val scaledLineHeight = scaledFontSize * 1.5f
                         val horizontalScrollState = androidx.compose.foundation.rememberScrollState()
                         val coroutineScope = rememberCoroutineScope()
@@ -142,22 +146,47 @@ fun TextReaderScreen(
                                             NexusText(
                                                 text = "${index + 1}",
                                                 color = NexusTheme.colors.textSecondary,
-                                                modifier = Modifier.width(48.dp),
+                                                modifier = Modifier.widthIn(min = 24.dp),
                                                 style = NexusTheme.typography.body.copy(
                                                     fontSize = scaledFontSize,
                                                     lineHeight = scaledLineHeight
                                                 ),
                                                 maxLines = 1
                                             )
-                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Spacer(modifier = Modifier.width(12.dp))
                                         }
-                                        NexusText(
-                                            text = line,
-                                            color = NexusTheme.colors.textPrimary,
+                                        
+                                        val isHighlighted = searchResults.contains(index)
+                                        val bgColor = if (isHighlighted && currentSearchIndex >= 0 && searchResults.getOrNull(currentSearchIndex) == index) NexusTheme.colors.primary.copy(alpha = 0.3f) else if (isHighlighted) NexusTheme.colors.primary.copy(alpha = 0.1f) else androidx.compose.ui.graphics.Color.Transparent
+                                        
+                                        val annotatedString = if (state.isCodeFile) {
+                                            androidx.compose.ui.text.buildAnnotatedString {
+                                                if (line.contains(Regex("""["'].*?["']"""))) {
+                                                    val parts = line.split(Regex("""(?<=["'])|(?=["'])"""))
+                                                    parts.forEach { part ->
+                                                        if (part.startsWith("\"") || part.startsWith("'")) {
+                                                            withStyle(androidx.compose.ui.text.SpanStyle(color = androidx.compose.ui.graphics.Color(0xFF8CAF7B))) { append(part) }
+                                                        } else {
+                                                            append(part)
+                                                        }
+                                                    }
+                                                } else {
+                                                    append(line)
+                                                }
+                                            }
+                                        } else {
+                                            androidx.compose.ui.text.AnnotatedString(line)
+                                        }
+
+                                        androidx.compose.foundation.text.BasicText(
+                                            text = annotatedString,
                                             style = NexusTheme.typography.body.copy(
                                                 fontSize = scaledFontSize,
-                                                lineHeight = scaledLineHeight
+                                                lineHeight = scaledLineHeight,
+                                                color = NexusTheme.colors.textPrimary,
+                                                fontFamily = if (state.isCodeFile) androidx.compose.ui.text.font.FontFamily.Monospace else androidx.compose.ui.text.font.FontFamily.Default
                                             ),
+                                            modifier = Modifier.background(bgColor),
                                             maxLines = if (wordWrap) Int.MAX_VALUE else 1
                                         )
                                     }
@@ -208,15 +237,12 @@ fun TextReaderScreen(
                     enter = expandVertically() + fadeIn(),
                     exit = shrinkVertically() + fadeOut()
                 ) {
-                    NexusPillTopBar(
+                    NexusTopBar(
                         title = displayTitle,
-                        outerVerticalPadding = 4.dp,
-                        innerVerticalPadding = 8.dp,
-                        iconSize = 40.dp,
                         navigationIcon = {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxSize()
+                                    .size(40.dp)
                                     .clip(androidx.compose.foundation.shape.CircleShape)
                                     .clickable { onBack() },
                                 contentAlignment = Alignment.Center
@@ -230,6 +256,12 @@ fun TextReaderScreen(
                             }
                         },
                         actions = {
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_search),
+                                contentDescription = "Search",
+                                colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary),
+                                modifier = Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).springBounceClick { showSearchSheet = true }.padding(8.dp)
+                            )
                             if (uiState is TextReaderUiState.Success && percent > 0) {
                                 NexusText(
                                     text = "$percent%",
@@ -238,6 +270,7 @@ fun TextReaderScreen(
                                     modifier = Modifier
                                         .background(NexusTheme.colors.primary.copy(alpha = 0.15f), androidx.compose.foundation.shape.CircleShape)
                                         .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        .clickable { showGoToLineSheet = true }
                                 )
                             }
                         }
@@ -258,50 +291,124 @@ fun TextReaderScreen(
                         modifier = Modifier.padding(horizontal = 16.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(androidx.compose.foundation.shape.CircleShape)
-                                    .springBounceClick { 
-                                        fontSizeMultiplier = kotlin.math.round((fontSizeMultiplier + 0.1f) * 10) / 10f
-                                    }
-                                    .padding(12.dp),
+                                modifier = Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).springBounceClick { viewModel.increaseFontSize() }.padding(8.dp),
                                 contentAlignment = Alignment.Center
-                            ) {
-                                NexusText("+", color = NexusTheme.colors.textPrimary, style = NexusTheme.typography.h2)
-                            }
+                            ) { NexusText("+", color = NexusTheme.colors.textPrimary, style = NexusTheme.typography.h2) }
+                            
                             Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(androidx.compose.foundation.shape.CircleShape)
-                                    .springBounceClick { 
-                                        if (fontSizeMultiplier > 0.5f) {
-                                            fontSizeMultiplier = kotlin.math.round((fontSizeMultiplier - 0.1f) * 10) / 10f
-                                        }
-                                    }
-                                    .padding(12.dp),
+                                modifier = Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).springBounceClick { viewModel.decreaseFontSize() }.padding(8.dp),
                                 contentAlignment = Alignment.Center
-                            ) {
-                                NexusText("-", color = NexusTheme.colors.textPrimary, style = NexusTheme.typography.h2)
-                            }
+                            ) { NexusText("-", color = NexusTheme.colors.textPrimary, style = NexusTheme.typography.h2) }
+                            
                             androidx.compose.foundation.Image(
                                 painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_view_list),
                                 contentDescription = "Toggle Line Numbers",
                                 colorFilter = ColorFilter.tint(if (showLineNumbers) NexusTheme.colors.primary else NexusTheme.colors.textPrimary),
-                                modifier = Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape).springBounceClick { showLineNumbers = !showLineNumbers }.padding(12.dp)
+                                modifier = Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).springBounceClick { showLineNumbers = !showLineNumbers }.padding(8.dp)
                             )
+                            
                             androidx.compose.foundation.Image(
                                 painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_view_grid),
                                 contentDescription = "Toggle Word Wrap",
                                 colorFilter = ColorFilter.tint(if (wordWrap) NexusTheme.colors.primary else NexusTheme.colors.textPrimary),
-                                modifier = Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape).springBounceClick { wordWrap = !wordWrap }.padding(12.dp)
+                                modifier = Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).springBounceClick { viewModel.toggleWordWrap() }.padding(8.dp)
+                            )
+                            
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(id = if (readerTheme == "LIGHT") com.nexus.core.R.drawable.ic_theme_dark else com.nexus.core.R.drawable.ic_theme_light),
+                                contentDescription = "Toggle Theme",
+                                colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary),
+                                modifier = Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).springBounceClick { viewModel.setReaderTheme(if (readerTheme == "LIGHT") "DARK" else "LIGHT") }.padding(8.dp)
+                            )
+                            
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_more_vert),
+                                contentDescription = "Encoding Options",
+                                colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary),
+                                modifier = Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).springBounceClick { showEncodingSheet = true }.padding(8.dp)
                             )
                         }
                     }
                 }
+                
+        if (showSearchSheet) {
+            androidx.compose.material3.ModalBottomSheet(onDismissRequest = { showSearchSheet = false }, containerColor = NexusTheme.colors.surface) {
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    NexusText("Find in Document", style = NexusTheme.typography.h2)
+                    androidx.compose.material3.OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { viewModel.setSearchQuery(it) },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { NexusText("Search...", color = NexusTheme.colors.textSecondary) },
+                        singleLine = true
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { viewModel.toggleMatchCase() }) {
+                            androidx.compose.material3.Checkbox(checked = matchCase, onCheckedChange = { viewModel.toggleMatchCase() })
+                            NexusText("Match Case", color = NexusTheme.colors.textPrimary)
+                        }
+                        if (searchResults.isNotEmpty()) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                NexusText("${currentSearchIndex + 1} of ${searchResults.size}", color = NexusTheme.colors.textSecondary)
+                                NexusButton(text = "Prev", onClick = { viewModel.previousSearchMatch() })
+                                NexusButton(text = "Next", onClick = { viewModel.nextSearchMatch() })
+                            }
+                        } else if (searchQuery.isNotEmpty()) {
+                            NexusText("No results", color = NexusTheme.colors.error)
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (showEncodingSheet) {
+            androidx.compose.material3.ModalBottomSheet(onDismissRequest = { showEncodingSheet = false }, containerColor = NexusTheme.colors.surface) {
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp).navigationBarsPadding()) {
+                    NexusText("Change Encoding", style = NexusTheme.typography.h2, modifier = Modifier.padding(bottom = 16.dp))
+                    listOf("UTF-8", "ISO-8859-1", "Windows-1252", "US-ASCII", "UTF-16").forEach { charset ->
+                        NexusText(
+                            text = charset,
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                viewModel.reloadWithCharset(charset)
+                                showEncodingSheet = false
+                            }.padding(vertical = 12.dp)
+                        )
+                    }
+                }
+            }
+        }
+        
+        if (showGoToLineSheet && uiState is TextReaderUiState.Success) {
+            var lineInput by remember { mutableStateOf("") }
+            val coroutineScope = rememberCoroutineScope()
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showGoToLineSheet = false },
+                containerColor = NexusTheme.colors.surface,
+                title = { NexusText("Go to Line", style = NexusTheme.typography.h2) },
+                text = {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = lineInput,
+                        onValueChange = { lineInput = it.filter { char -> char.isDigit() } },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                        singleLine = true
+                    )
+                },
+                confirmButton = {
+                    NexusButton(text = "Go", onClick = {
+                        val lineNum = lineInput.toIntOrNull() ?: 1
+                        coroutineScope.launch { listState.scrollToItem((lineNum - 1).coerceIn(0, (uiState as TextReaderUiState.Success).lines.size - 1)) }
+                        showGoToLineSheet = false
+                    })
+                },
+                dismissButton = {
+                    NexusButton(text = "Cancel", isOutlined = true, onClick = { showGoToLineSheet = false })
+                }
+            )
+        }
     }
 }

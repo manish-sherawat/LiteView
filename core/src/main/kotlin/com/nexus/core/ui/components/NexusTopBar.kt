@@ -55,13 +55,17 @@ fun NexusCollapsingTopBar(
         alpha = bgColor.alpha + (collapsedBgColor.alpha - bgColor.alpha) * progress
     )
 
-    Box(
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .background(blendedBg)
-            .statusBarsPadding()
-            .height(headerHeight)
     ) {
+        Spacer(Modifier.statusBarsPadding())
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(headerHeight)
+        ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -133,6 +137,7 @@ fun NexusCollapsingTopBar(
                 }
             }
         }
+        }
     }
 }
 
@@ -142,7 +147,7 @@ fun NexusTopBar(
     modifier: Modifier = Modifier,
     titleStyle: androidx.compose.ui.text.TextStyle? = null,
     navigationIcon: (@Composable () -> Unit)? = null,
-    actions: (@Composable () -> Unit)? = null
+    actions: @Composable RowScope.() -> Unit = {}
 ) {
     Box(
         modifier = modifier
@@ -150,32 +155,28 @@ fun NexusTopBar(
             .background(NexusTheme.colors.surface.copy(alpha = 0.92f))
             .statusBarsPadding()
     ) {
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(64.dp)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             if (navigationIcon != null) {
-                Box(modifier = Modifier.align(Alignment.CenterStart)) {
-                    navigationIcon()
-                }
+                navigationIcon()
             }
             NexusText(
                 text = title,
                 style = titleStyle ?: NexusTheme.typography.title,
                 color = NexusTheme.colors.textPrimary,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 maxLines = 1,
                 modifier = Modifier
-                    .align(Alignment.Center)
+                    .weight(1f)
+                    .padding(horizontal = 16.dp)
                     .basicMarquee()
-                    .padding(horizontal = 48.dp)
             )
-            if (actions != null) {
-                Row(modifier = Modifier.align(Alignment.CenterEnd)) {
-                    actions()
-                }
-            }
+            actions()
         }
     }
 }
@@ -186,9 +187,9 @@ fun NexusPillTopBar(
     modifier: Modifier = Modifier,
     titleStyle: androidx.compose.ui.text.TextStyle? = null,
     navigationIcon: (@Composable () -> Unit)? = null,
-    outerVerticalPadding: androidx.compose.ui.unit.Dp = 12.dp,
-    innerVerticalPadding: androidx.compose.ui.unit.Dp = 12.dp,
-    iconSize: androidx.compose.ui.unit.Dp = 48.dp,
+    outerVerticalPadding: androidx.compose.ui.unit.Dp = 4.dp,
+    innerVerticalPadding: androidx.compose.ui.unit.Dp = 4.dp,
+    iconSize: androidx.compose.ui.unit.Dp = 36.dp,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
     Row(
@@ -233,7 +234,7 @@ fun NexusPillTopBar(
             ) {
                 NexusText(
                     text = title,
-                    style = titleStyle ?: NexusTheme.typography.h2,
+                    style = titleStyle ?: NexusTheme.typography.title,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis

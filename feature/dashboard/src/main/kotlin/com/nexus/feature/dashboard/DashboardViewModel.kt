@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -85,14 +86,10 @@ class DashboardViewModel @Inject constructor(
             initialValue = null
         )
 
-    val permissionRationaleShown: StateFlow<Boolean?> = prefsRepository.permissionRationaleShown
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.Eagerly,
-            initialValue = null
-        )
-
     val updateState: StateFlow<UpdateState> = appUpdater.updateState
+    
+    private val _uiEvents = kotlinx.coroutines.flow.MutableSharedFlow<String>()
+    val uiEvents = _uiEvents.asSharedFlow()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<DashboardUiState> = combine(
@@ -132,10 +129,11 @@ class DashboardViewModel @Inject constructor(
         (selectionMode, selected, bannerDismissed): Triple<Boolean, Set<String>, Boolean>,
         (rationale, ascending, refreshing): Triple<Boolean?, Boolean, Boolean> ->
 
+        val dedupBase = docs + scanned
         val baseDocs = when (tab) {
-            DashboardTab.RECENT -> docs.distinctBy { "${it.fileName}_${it.fileSizeBytes}" }
-            DashboardTab.STARRED -> (docs + scanned).distinctBy { "${it.fileName}_${it.fileSizeBytes}" }.filter { starred.contains(it.uri) }
-            DashboardTab.ALL -> (docs + scanned).distinctBy { "${it.fileName}_${it.fileSizeBytes}" }
+            DashboardTab.RECENT -> docs.distinctBy { it.uri.ifEmpty { "${it.fileName}_${it.fileSizeBytes}" } }
+            DashboardTab.STARRED -> dedupBase.distinctBy { it.uri.ifEmpty { "${it.fileName}_${it.fileSizeBytes}" } }.filter { starred.contains(it.uri) }
+            DashboardTab.ALL -> dedupBase.distinctBy { it.uri.ifEmpty { "${it.fileName}_${it.fileSizeBytes}" } }
         }
 
         val mapped = baseDocs
@@ -200,13 +198,8 @@ class DashboardViewModel @Inject constructor(
 
             launch {
                 repository.observeRecentDocuments().collect { docs ->
-                    _isLoading.value = false
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        val invalid = docs.filter { doc ->
-                            !isUriAccessible(doc.uri)
-                        }.map { it.uri }.toSet()
-                        _inaccessibleUris.value = invalid
-                    }
+                    if (!_isRefreshing.value) _isLoading.value = false
+                    updateAccessibility(docs, _scannedDocuments.value)
                 }
             }
 
@@ -240,9 +233,11 @@ class DashboardViewModel @Inject constructor(
 
     private var scanJob: kotlinx.coroutines.Job? = null
 
-    fun scanStorage() {
+    fun scanStorage(isBackground: Boolean = false) {
         if (!hasStoragePermission(context)) return
-        _isLoading.value = true
+        if (!isBackground && !_isRefreshing.value) {
+            _isLoading.value = true
+        }
         scanJob?.cancel()
         scanJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
@@ -325,7 +320,9 @@ class DashboardViewModel @Inject constructor(
                         )
                     }
                 }
-                _scannedDocuments.value = scanned
+                val finalScanned = scanned.toList()
+                _scannedDocuments.value = finalScanned
+                updateAccessibility(repository.observeRecentDocuments().first(), finalScanned)
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -347,7 +344,10 @@ class DashboardViewModel @Inject constructor(
     fun setSearchQuery(query: String) { _searchQuery.value = query }
     fun setSortOrder(sort: SortOrder) { _sortOrder.value = sort }
     fun toggleGridView() { _isGridView.value = !_isGridView.value }
-    fun setSelectedTab(tab: DashboardTab) { _selectedTab.value = tab }
+    fun setSelectedTab(tab: DashboardTab) { 
+        _selectedTab.value = tab 
+        clearSelection()
+    }
     fun toggleStarred(uri: String) {
         viewModelScope.launch {
             val current = _starredUris.value.toMutableSet()
@@ -479,7 +479,7 @@ class DashboardViewModel @Inject constructor(
                 }
                 context.startActivity(chooser)
             } catch (e: Exception) {
-                // Ignore or log
+                _uiEvents.emit("Failed to share document")
             }
         }
     }
@@ -511,17 +511,31 @@ class DashboardViewModel @Inject constructor(
                 }
                 
                 if (success) {
-                    // Update recent document list if necessary by scanning again
-                    scanStorage()
+                    val currentScanned = _scannedDocuments.value.toMutableList()
+                    val idx = currentScanned.indexOfFirst { it.uri == uriStr }
+                    if (idx >= 0) {
+                        currentScanned[idx] = currentScanned[idx].copy(uri = newUriStr, fileName = newName)
+                        _scannedDocuments.value = currentScanned
+                    }
                     
-                    // Also update repository if it was a recent doc
                     val existing = uiState.value.documents.find { it.doc.uri == uriStr }?.doc
                     if (existing != null) {
                         repository.removeDocument(uriStr)
                         repository.recordOpen(existing.copy(uri = newUriStr, fileName = newName))
                     }
+                    
+                    val currentStarred = _starredUris.value.toMutableSet()
+                    if (currentStarred.contains(uriStr)) {
+                        currentStarred.remove(uriStr)
+                        currentStarred.add(newUriStr)
+                        prefsRepository.setStarredUris(currentStarred)
+                    }
+                } else {
+                    _uiEvents.emit("Rename failed")
                 }
-            } catch (e: Exception) {}
+            } catch (e: Exception) {
+                _uiEvents.emit("Rename failed: ${e.localizedMessage}")
+            }
         }
     }
 
@@ -620,6 +634,14 @@ class DashboardViewModel @Inject constructor(
             }
         } catch (_: Exception) {
             false
+        }
+    }
+
+    private fun updateAccessibility(docs: List<RecentDocument>, scanned: List<RecentDocument>) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val allDocs = docs + scanned
+            val invalid = allDocs.filter { !isUriAccessible(it.uri) }.map { it.uri }.toSet()
+            _inaccessibleUris.value = invalid
         }
     }
 }
