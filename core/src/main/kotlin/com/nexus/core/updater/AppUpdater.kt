@@ -38,7 +38,7 @@ class AppUpdater @Inject constructor(
     private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val updateState: StateFlow<UpdateState> = _updateState.asStateFlow()
     
-    suspend fun checkForUpdates(currentVersionName: String) {
+    suspend fun checkForUpdates(currentVersionName: String, showNotification: Boolean = true) {
         _updateState.value = UpdateState.Checking
         try {
             withContext(Dispatchers.IO) {
@@ -75,6 +75,9 @@ class AppUpdater @Inject constructor(
                     if (downloadUrl != null) {
                         if (isNewerVersion(latestVersion, currentVersionName)) {
                             _updateState.value = UpdateState.Available(latestVersion, body, downloadUrl)
+                            if (showNotification) {
+                                showUpdateNotification(latestVersion, body)
+                            }
                         } else {
                             _updateState.value = UpdateState.UpToDate
                         }
@@ -95,6 +98,51 @@ class AppUpdater @Inject constructor(
         }
     }
     
+    private fun showUpdateNotification(version: String, body: String) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        val channelId = "nexus_update_channel"
+        
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                channelId,
+                "App Updates",
+                android.app.NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Notifications for new app updates"
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+        
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                return
+            }
+        }
+
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        val pendingIntent = intent?.let {
+            it.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+            android.app.PendingIntent.getActivity(
+                context, 
+                0, 
+                it, 
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+        }
+
+        val notification = androidx.core.app.NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.stat_notify_sync)
+            .setContentTitle("New Update Available")
+            .setContentText("Version $version is available. Tap to open.")
+            .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText("Version $version is available.\n\n$body"))
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+            
+        notificationManager.notify(1001, notification)
+    }
+
     fun downloadAndInstallUpdate(url: String, version: String) {
         _updateState.value = UpdateState.Downloading
         try {

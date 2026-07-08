@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- File List Item -->
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_star">Star</string>
+    <string name="action_unstar">Unstar</string>
+    <string name="action_share">Share</string>
+    <string name="error_file_missing">File missing</string>
+    <string name="cd_thumbnail">Thumbnail</string>
+    <string name="cd_selected">Selected</string>
+    <string name="cd_inaccessible">Inaccessible</string>
+    <string name="cd_starred">Starred</string>
+    <string name="cd_more_options">More Options</string>
+    <string name="dialog_rename_title">Rename File</string>
+    <string name="hint_file_name">File name</string>
+    <string name="label_just_now">Just now</string>
+    <string name="label_m_ago">%1$dm ago</string>
+    <string name="label_h_ago">%1$dh ago</string>
+    <string name="label_yesterday">Yesterday</string>
+</resources>

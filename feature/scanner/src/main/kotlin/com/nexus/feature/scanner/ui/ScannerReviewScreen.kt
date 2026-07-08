@@ -22,6 +22,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.nexus.core.theme.NexusTheme
+import com.nexus.core.ui.animations.springBounceClick
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.components.NexusButton
 import com.nexus.core.ui.components.NexusTopBar
@@ -141,7 +142,7 @@ fun ScannerReviewScreen(
                             .size(60.dp, 80.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (index == selectedPageIndex) NexusTheme.colors.primary else Color.Gray)
-                        .clickable { selectedPageIndex = index }
+                        .springBounceClick { selectedPageIndex = index }
                         .padding(2.dp)
                     ) {
                         Image(
@@ -162,7 +163,7 @@ fun ScannerReviewScreen(
 @Composable
 private fun ActionIcon(iconRes: Int, label: String, onClick: () -> Unit) {
     Column(
-        modifier = Modifier.clickable { onClick() }.padding(8.dp),
+        modifier = Modifier.springBounceClick { onClick() }.padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Image(

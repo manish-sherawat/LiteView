@@ -205,6 +205,7 @@ fun PdfReaderScreen(
                             var scale by remember { mutableFloatStateOf(1f) }
                             var offsetX by remember { mutableFloatStateOf(0f) }
                             var offsetY by remember { mutableFloatStateOf(0f) }
+                            var snapJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
                             val maxZoom = 5f
                             val screenWidthDp = configuration.screenWidthDp.dp
                             val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
@@ -218,15 +219,24 @@ fun PdfReaderScreen(
                                         detectTapGestures(
                                             onDoubleTap = { tapOffset ->
                                                 val targetScale = if (scale > 1f) 1f else 2.5f
-                                                coroutineScope.launch {
+                                                snapJob?.cancel()
+                                                snapJob = coroutineScope.launch {
                                                     if (targetScale == 1f) {
                                                         launch { Animatable(scale).animateTo(1f) { scale = value } }
                                                         launch { Animatable(offsetX).animateTo(0f) { offsetX = value } }
                                                         launch { Animatable(offsetY).animateTo(0f) { offsetY = value } }
                                                     } else {
                                                         val zoomFactor = targetScale / scale
-                                                        val newOffsetX = tapOffset.x - (tapOffset.x - offsetX) * zoomFactor
-                                                        val newOffsetY = tapOffset.y - (tapOffset.y - offsetY) * zoomFactor
+                                                        val rawOffsetX = tapOffset.x - (tapOffset.x - offsetX) * zoomFactor
+                                                        val rawOffsetY = tapOffset.y - (tapOffset.y - offsetY) * zoomFactor
+                                                        
+                                                        val maxOffsetX = 0f
+                                                        val minOffsetX = -(screenWidthPxInt * targetScale - screenWidthPxInt)
+                                                        val maxOffsetY = 0f
+                                                        val minOffsetY = -(screenHeightPx * targetScale - screenHeightPx)
+                                                        
+                                                        val newOffsetX = rawOffsetX.coerceIn(minOffsetX, maxOffsetX)
+                                                        val newOffsetY = rawOffsetY.coerceIn(minOffsetY, maxOffsetY)
                                                         
                                                         launch { Animatable(scale).animateTo(targetScale) { scale = value } }
                                                         launch { Animatable(offsetX).animateTo(newOffsetX) { offsetX = value } }
@@ -240,6 +250,7 @@ fun PdfReaderScreen(
                                     .pointerInput(Unit) {
                                         awaitEachGesture {
                                             awaitFirstDown()
+                                            snapJob?.cancel()
                                             do {
                                                 val event = awaitPointerEvent()
                                                 val zoomChange = event.calculateZoom()
@@ -247,7 +258,7 @@ fun PdfReaderScreen(
                                                 val centroid = event.calculateCentroid()
                                                 
                                                 val isMultiTouch = event.changes.size > 1
-                                                if (scale > 1f || isMultiTouch) {
+                                                if ((scale > 1f && !isDrawMode) || isMultiTouch) {
                                                     if (centroid != Offset.Unspecified) {
                                                         val oldScale = scale
                                                         scale = (oldScale * zoomChange).coerceIn(1f, maxZoom)
@@ -261,6 +272,14 @@ fun PdfReaderScreen(
                                                         val maxOffsetY = 0f
                                                         val minOffsetY = -(screenHeightPx * scale - screenHeightPx)
                                                         
+                                                        val shouldConsume = if (isMultiTouch) true else {
+                                                            if (!isHorizontalLayout) {
+                                                                !(rawOffsetY > maxOffsetY && panChange.y > 0) && !(rawOffsetY < minOffsetY && panChange.y < 0)
+                                                            } else {
+                                                                !(rawOffsetX > maxOffsetX && panChange.x > 0) && !(rawOffsetX < minOffsetX && panChange.x < 0)
+                                                            }
+                                                        }
+
                                                         offsetX = if (rawOffsetX > maxOffsetX) {
                                                             maxOffsetX + (rawOffsetX - maxOffsetX) * 0.3f
                                                         } else if (rawOffsetX < minOffsetX) {
@@ -276,14 +295,16 @@ fun PdfReaderScreen(
                                                         } else {
                                                             rawOffsetY
                                                         }
+                                                        
+                                                        if (shouldConsume || scale != oldScale) {
+                                                            event.changes.forEach { it.consume() }
+                                                        }
                                                     }
-                                                    
-                                                    event.changes.forEach { it.consume() }
                                                 }
                                             } while (event.changes.any { it.pressed })
                                             
                                             if (scale <= 1f) {
-                                                coroutineScope.launch {
+                                                snapJob = coroutineScope.launch {
                                                     launch { Animatable(offsetX).animateTo(0f) { offsetX = value } }
                                                     launch { Animatable(offsetY).animateTo(0f) { offsetY = value } }
                                                 }
@@ -296,8 +317,12 @@ fun PdfReaderScreen(
                                                 val minOffsetY = -(screenHeightPx * scale - screenHeightPx)
                                                 val clampedOffsetY = offsetY.coerceIn(minOffsetY, maxOffsetY)
                                                 
-                                                if (offsetX != clampedOffsetX) coroutineScope.launch { Animatable(offsetX).animateTo(clampedOffsetX) { offsetX = value } }
-                                                if (offsetY != clampedOffsetY) coroutineScope.launch { Animatable(offsetY).animateTo(clampedOffsetY) { offsetY = value } }
+                                                if (offsetX != clampedOffsetX || offsetY != clampedOffsetY) {
+                                                    snapJob = coroutineScope.launch {
+                                                        if (offsetX != clampedOffsetX) launch { Animatable(offsetX).animateTo(clampedOffsetX) { offsetX = value } }
+                                                        if (offsetY != clampedOffsetY) launch { Animatable(offsetY).animateTo(clampedOffsetY) { offsetY = value } }
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -487,7 +512,7 @@ fun PdfReaderScreen(
                                     LazyRow(
                                         state = listState,
                                         modifier = Modifier.fillMaxSize(),
-                                        userScrollEnabled = scale <= 1f && !isDrawMode,
+                                        userScrollEnabled = !isDrawMode,
                                         contentPadding = PaddingValues(top = topPadding, start = 8.dp, end = 8.dp, bottom = bottomPadding),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         verticalAlignment = Alignment.CenterVertically
@@ -498,9 +523,10 @@ fun PdfReaderScreen(
                                     LazyColumn(
                                         state = listState,
                                         modifier = Modifier.fillMaxSize(),
-                                        userScrollEnabled = scale <= 1f && !isDrawMode,
+                                        userScrollEnabled = !isDrawMode,
                                         contentPadding = PaddingValues(top = topPadding, start = 8.dp, end = 8.dp, bottom = bottomPadding),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
                                         pdfContent()
                                     }
@@ -546,6 +572,7 @@ fun PdfReaderScreen(
                                     NexusVerticalScrollbar(
                                         pageCount = state.pageCount,
                                         sliderValue = sliderValue,
+                                        isScrolling = listState.isScrollInProgress,
                                         onSliderValueChange = { newValue ->
                                             sliderValue = newValue
                                             coroutineScope.launch {
@@ -580,7 +607,9 @@ fun PdfReaderScreen(
                                             .glassBackground(blurRadius = 40f, alpha = 0.85f, fallbackColor = NexusTheme.colors.surfaceVariant)
                                     ) {
                                         Row(
-                                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                                            modifier = Modifier
+                                                .horizontalScroll(androidx.compose.foundation.rememberScrollState())
+                                                .padding(horizontal = 24.dp, vertical = 8.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                                         ) {
@@ -685,18 +714,7 @@ fun PdfReaderScreen(
                                         )
                                     }
                                     
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(CircleShape)
-                                            .glassBackground(blurRadius = 40f, alpha = 0.85f, fallbackColor = NexusTheme.colors.surfaceVariant)
-                                    ) {
-                                        NexusText(
-                                            text = "$currentPage / ${state.pageCount}",
-                                            style = NexusTheme.typography.title, // Increased from body to title
-                                            color = NexusTheme.colors.textPrimary,
-                                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp) // Increased padding
-                                        )
-                                    }
+
                                 }
                             }
                         }
@@ -849,8 +867,8 @@ fun PdfReaderScreen(
                 AnimatedVisibility(
                     visible = isSearchMode && !isImmersiveMode,
                     modifier = Modifier.padding(top = 8.dp),
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
+                    enter = androidx.compose.animation.expandHorizontally() + androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.shrinkHorizontally() + androidx.compose.animation.fadeOut()
                 ) {
                     NexusSurface(
                         modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
@@ -1039,7 +1057,7 @@ fun PdfReaderScreen(
                             items(outline) { item ->
                                 NexusText(
                                     text = item.title,
-                                    modifier = Modifier.fillMaxWidth().clickable {
+                                    modifier = Modifier.fillMaxWidth().springBounceClick {
                                         showOutlineSheet = false
                                         coroutineScope.launch { listState.scrollToItem(item.pageIndex.coerceAtLeast(0)) }
                                     }.padding(vertical = 12.dp)
@@ -1086,6 +1104,7 @@ fun PdfReaderScreen(
         }
     }
 
+@androidx.compose.material3.ExperimentalMaterial3Api
 @Composable
 private fun PdfOptionsBottomSheet(
     onDismiss: () -> Unit,
@@ -1094,109 +1113,65 @@ private fun PdfOptionsBottomSheet(
     onPrint: () -> Unit,
     onInfo: () -> Unit
 ) {
-    Dialog(
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState()
+
+    androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        sheetState = sheetState,
+        containerColor = com.nexus.core.theme.NexusTheme.colors.surface,
+        contentColor = com.nexus.core.theme.NexusTheme.colors.textPrimary,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
-        Box(
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 24.dp)
-                .clickable(
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss
-                ),
-            contentAlignment = Alignment.BottomCenter
+                .fillMaxWidth()
+                .padding(bottom = 32.dp)
+                .padding(horizontal = 16.dp)
         ) {
-            com.nexus.core.ui.NexusSurface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .pointerInput(Unit) {
-                        var accumulatedDrag = 0f
-                        detectVerticalDragGestures(
-                            onDragEnd = { accumulatedDrag = 0f },
-                            onDragCancel = { accumulatedDrag = 0f },
-                            onVerticalDrag = { _, dragAmount ->
-                                accumulatedDrag += dragAmount
-                                if (accumulatedDrag > 100f) {
-                                    onDismiss()
-                                    accumulatedDrag = 0f
-                                }
-                            }
-                        )
-                    }
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null,
-                        onClick = {} // Prevent clicks on the dialog from dismissing it
-                    ),
-                shape = com.nexus.core.theme.NexusTheme.shapes.large,
-                elevation = 24.dp,
-                color = com.nexus.core.theme.NexusTheme.colors.surface
-            ) {
-                Column(
+            com.nexus.core.ui.NexusText(
+                text = "Document Options",
+                style = com.nexus.core.theme.NexusTheme.typography.title,
+                modifier = Modifier.padding(bottom = 16.dp, start = 8.dp, end = 8.dp)
+            )
+
+            val options = listOf(
+                MenuOption("File Info", "View document properties", com.nexus.core.R.drawable.ic_info, onInfo),
+                MenuOption("Rename", "Rename this file", com.nexus.core.R.drawable.ic_rename, onRename),
+                MenuOption("Favorite", "Add to bookmarks", com.nexus.core.R.drawable.ic_star, onFavorite),
+                MenuOption("Print", "Print or save as PDF", com.nexus.core.R.drawable.ic_printer, onPrint)
+            )
+
+            options.forEach { option ->
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .clip(com.nexus.core.theme.NexusTheme.shapes.medium)
+                        .springBounceClick { option.action() }
+                        .padding(vertical = 12.dp, horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .width(32.dp)
-                            .height(4.dp)
-                            .clip(com.nexus.core.theme.NexusTheme.shapes.pill)
-                            .background(com.nexus.core.theme.NexusTheme.colors.textSecondary.copy(alpha = 0.2f))
-                            .align(Alignment.CenterHorizontally)
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = option.icon),
+                        contentDescription = option.label,
+                        modifier = Modifier.size(24.dp),
+                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(com.nexus.core.theme.NexusTheme.colors.textPrimary)
                     )
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    com.nexus.core.ui.NexusText(
-                        text = "Document Options",
-                        style = com.nexus.core.theme.NexusTheme.typography.title,
-                        modifier = Modifier.padding(bottom = 16.dp, start = 8.dp, end = 8.dp)
-                    )
-
-                    val options = listOf(
-                        MenuOption("File Info", "View document properties", com.nexus.core.R.drawable.ic_info, onInfo),
-                        MenuOption("Rename", "Rename this file", com.nexus.core.R.drawable.ic_rename, onRename),
-                        MenuOption("Favorite", "Add to bookmarks", com.nexus.core.R.drawable.ic_star, onFavorite),
-                        MenuOption("Print", "Print or save as PDF", com.nexus.core.R.drawable.ic_printer, onPrint)
-                    )
-
-                    options.forEach { option ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(com.nexus.core.theme.NexusTheme.shapes.medium)
-                                .clickable { option.action() }
-                                .padding(vertical = 12.dp, horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            androidx.compose.foundation.Image(
-                                painter = androidx.compose.ui.res.painterResource(id = option.icon),
-                                contentDescription = option.label,
-                                modifier = Modifier.size(24.dp),
-                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(com.nexus.core.theme.NexusTheme.colors.textPrimary)
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                com.nexus.core.ui.NexusText(
-                                    text = option.label,
-                                    style = com.nexus.core.theme.NexusTheme.typography.body,
-                                    color = com.nexus.core.theme.NexusTheme.colors.textPrimary
-                                )
-                                com.nexus.core.ui.NexusText(
-                                    text = option.subtitle,
-                                    style = com.nexus.core.theme.NexusTheme.typography.caption,
-                                    color = com.nexus.core.theme.NexusTheme.colors.textSecondary
-                                )
-                            }
-                        }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        com.nexus.core.ui.NexusText(
+                            text = option.label,
+                            style = com.nexus.core.theme.NexusTheme.typography.body,
+                            color = com.nexus.core.theme.NexusTheme.colors.textPrimary
+                        )
+                        com.nexus.core.ui.NexusText(
+                            text = option.subtitle,
+                            style = com.nexus.core.theme.NexusTheme.typography.caption,
+                            color = com.nexus.core.theme.NexusTheme.colors.textSecondary
+                        )
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
@@ -1308,7 +1283,7 @@ fun ViewSettingsModal(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(com.nexus.core.theme.NexusTheme.shapes.pill)
-                                .clickable { if (isHorizontalLayout) onToggleHorizontalLayout() },
+                                .springBounceClick { if (isHorizontalLayout) onToggleHorizontalLayout() },
                             shape = com.nexus.core.theme.NexusTheme.shapes.pill,
                             color = if (!isHorizontalLayout) com.nexus.core.theme.NexusTheme.colors.primary else com.nexus.core.theme.NexusTheme.colors.surfaceVariant,
                             elevation = 0.dp
@@ -1336,7 +1311,7 @@ fun ViewSettingsModal(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(com.nexus.core.theme.NexusTheme.shapes.pill)
-                                .clickable { if (!isHorizontalLayout) onToggleHorizontalLayout() },
+                                .springBounceClick { if (!isHorizontalLayout) onToggleHorizontalLayout() },
                             shape = com.nexus.core.theme.NexusTheme.shapes.pill,
                             color = if (isHorizontalLayout) com.nexus.core.theme.NexusTheme.colors.primary else com.nexus.core.theme.NexusTheme.colors.surfaceVariant,
                             elevation = 0.dp
@@ -1380,7 +1355,7 @@ fun ViewSettingsModal(
                             com.nexus.core.ui.NexusSurface(
                                 modifier = Modifier
                                     .clip(com.nexus.core.theme.NexusTheme.shapes.medium)
-                                    .clickable { onBackgroundModeChange(mode) },
+                                    .springBounceClick { onBackgroundModeChange(mode) },
                                 shape = com.nexus.core.theme.NexusTheme.shapes.medium,
                                 color = if (backgroundMode == mode) com.nexus.core.theme.NexusTheme.colors.primary.copy(alpha = 0.1f) else com.nexus.core.theme.NexusTheme.colors.surfaceVariant,
                                 elevation = 0.dp

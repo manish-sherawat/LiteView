@@ -1,0 +1,13 @@
+Version 2.4.5 - Changelog
+
+🎉 New Features
+- System Update Notifications: The app now checks for updates in the background when you open the home screen. If a new version is found, you will receive a silent system notification. Tapping it will let you easily download and install the update!
+
+✨ UI Polish & Screen Improvements
+- Added new welcome screen and storage access screen
+
+🐛 Bug Fixes
+- Notification Fix: Fixed a bug on Android 13 and newer devices where the new update notifications were failing to show up due to missing system permissions.
+
+⚙️ Under the Hood
+- Bumped app version code to 245 (Version 2.4.5).

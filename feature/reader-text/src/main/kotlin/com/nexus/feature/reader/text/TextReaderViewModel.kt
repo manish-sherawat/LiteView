@@ -361,4 +361,37 @@ class TextReaderViewModel @Inject constructor(
         // Release the massive string list back to garbage collector
         allLines = emptyList()
     }
+
+    fun shareText(context: android.content.Context, encodedUri: String) {
+        viewModelScope.launch {
+            try {
+                val uriStr = java.net.URLDecoder.decode(java.net.URLDecoder.decode(encodedUri, "UTF-8"), "UTF-8")
+                val rawUri = android.net.Uri.parse(uriStr)
+                val shareUri = if (rawUri.scheme == "file") {
+                    val file = java.io.File(rawUri.path ?: "")
+                    androidx.core.content.FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        file
+                    )
+                } else {
+                    rawUri
+                }
+                
+                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(android.content.Intent.EXTRA_STREAM, shareUri)
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                val chooser = android.content.Intent.createChooser(intent, "Share Document").apply {
+                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(chooser)
+            } catch (e: Exception) {
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, "Failed to share: ${e.localizedMessage}", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 }

@@ -53,6 +53,7 @@ dependencies {
 
     implementation(libs.compose.animation)
     implementation(libs.compose.foundation)
+    implementation(libs.compose.material3)
     debugImplementation(libs.compose.ui.tooling)
 
     // Navigation

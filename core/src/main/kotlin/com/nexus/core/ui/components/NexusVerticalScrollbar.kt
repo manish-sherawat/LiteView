@@ -1,23 +1,35 @@
 package com.nexus.core.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.nexus.core.theme.NexusTheme
+import com.nexus.core.ui.NexusText
+import com.nexus.core.ui.utils.glassBackground
 import kotlin.math.roundToInt
 
 @Composable
 fun NexusVerticalScrollbar(
     pageCount: Int,
     sliderValue: Float,
+    isScrolling: Boolean = false,
     onSliderValueChange: (Float) -> Unit,
     onDragStarted: () -> Unit,
     onDragStopped: () -> Unit,
@@ -25,13 +37,17 @@ fun NexusVerticalScrollbar(
 ) {
     if (pageCount <= 1) return
 
+    var isDraggingLocal by remember { mutableStateOf(false) }
+    val showIndicator = isScrolling || isDraggingLocal
+
     BoxWithConstraints(
         modifier = modifier
-            .fillMaxHeight(0.6f)
-            .width(24.dp) // Thinner touch target for less interference
+            .fillMaxHeight(0.7f)
+            .width(48.dp) // Wider touch target for easier grabbing, thumb is aligned to right
             .pointerInput(pageCount) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
+                    isDraggingLocal = true
                     onDragStarted()
                     
                     do {
@@ -39,7 +55,7 @@ fun NexusVerticalScrollbar(
                         val y = event.changes.first().position.y
                         
                         val trackHeight = size.height.toFloat()
-                        val thumbHeightPx = 32.dp.toPx() // Slightly smaller thumb height
+                        val thumbHeightPx = 40.dp.toPx()
                         val maxScroll = (trackHeight - thumbHeightPx).coerceAtLeast(0f)
                         
                         val desiredThumbTop = y - thumbHeightPx / 2
@@ -53,12 +69,13 @@ fun NexusVerticalScrollbar(
                         event.changes.forEach { it.consume() }
                     } while (event.changes.any { it.pressed })
                     
+                    isDraggingLocal = false
                     onDragStopped()
                 }
             }
     ) {
         val trackHeight = constraints.maxHeight.toFloat()
-        val thumbHeightPx = with(androidx.compose.ui.platform.LocalDensity.current) { 32.dp.toPx() }
+        val thumbHeightPx = with(androidx.compose.ui.platform.LocalDensity.current) { 40.dp.toPx() }
         val maxScroll = (trackHeight - thumbHeightPx).coerceAtLeast(0f)
         
         // Protect from NaN or infinite when pageCount is 1
@@ -66,22 +83,61 @@ fun NexusVerticalScrollbar(
             (sliderValue - 1f) / (pageCount - 1f) * maxScroll
         } else 0f
 
-        // Track - very thin
+        // Track - subtle rounded line
         Box(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .width(2.dp)
-                .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f), CircleShape)
+                .width(4.dp)
+                .padding(vertical = 4.dp)
+                .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.4f), CircleShape)
         )
         
-        // Thumb - sleek pill attached to the right edge
-        Box(
+        val thumbWidth by animateDpAsState(
+            targetValue = if (isDraggingLocal) 10.dp else 6.dp,
+            animationSpec = tween(durationMillis = 150)
+        )
+        
+        val thumbHeight by animateDpAsState(
+            targetValue = if (isDraggingLocal) 48.dp else 40.dp,
+            animationSpec = tween(durationMillis = 150)
+        )
+
+        // Thumb and Indicator Row
+        Row(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .offset { IntOffset(0, thumbOffsetPx.roundToInt()) }
-                .size(width = 6.dp, height = 32.dp)
-                .background(NexusTheme.colors.primary, CircleShape)
-        )
+                .offset { IntOffset(0, thumbOffsetPx.roundToInt()) },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End
+        ) {
+            // Dynamic Page Indicator
+            AnimatedVisibility(
+                visible = showIndicator,
+                enter = fadeIn() + scaleIn(initialScale = 0.8f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)),
+                exit = fadeOut() + scaleOut(targetScale = 0.8f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(end = 12.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .glassBackground(blurRadius = 40f, alpha = 0.9f, fallbackColor = NexusTheme.colors.surfaceVariant)
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    NexusText(
+                        text = "${sliderValue.roundToInt()} / $pageCount",
+                        style = NexusTheme.typography.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                        color = NexusTheme.colors.textPrimary
+                    )
+                }
+            }
+            
+            // Thumb
+            Box(
+                modifier = Modifier
+                    .size(width = thumbWidth, height = thumbHeight)
+                    .background(NexusTheme.colors.primary, CircleShape)
+            )
+        }
     }
 }

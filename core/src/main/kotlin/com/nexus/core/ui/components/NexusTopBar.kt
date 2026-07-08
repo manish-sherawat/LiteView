@@ -169,7 +169,6 @@ fun NexusTopBar(
                 text = title,
                 style = titleStyle ?: NexusTheme.typography.title,
                 color = NexusTheme.colors.textPrimary,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 maxLines = 1,
                 modifier = Modifier
                     .weight(1f)

@@ -600,16 +600,20 @@ class OfficeReaderViewModel @Inject constructor(
         val spacingBefore = try { para.spacingBefore.toDouble() / 20.0 } catch (_: Exception) { null }
         val spacingAfter = try { para.spacingAfter.toDouble() / 20.0 } catch (_: Exception) { null }
         val spacingBetween = try { para.spacingBetween.toDouble() / 240.0 } catch (_: Exception) { null }
-        val indentLeft = try { para.indentationLeft.toDouble() / 20.0 } catch (_: Exception) { null }
-        val indentRight = try { para.indentationRight.toDouble() / 20.0 } catch (_: Exception) { null }
+        val indentLeft = try { (para.indentationLeft.toDouble() / 20.0).coerceAtLeast(0.0) } catch (_: Exception) { null }
+        val indentRight = try { (para.indentationRight.toDouble() / 20.0).coerceAtLeast(0.0) } catch (_: Exception) { null }
         val indentFirstLine = try { para.indentationFirstLine.toDouble() / 20.0 } catch (_: Exception) { null }
         val isPageBreak = try { para.isPageBreak } catch (_: Exception) { false }
         val bookmarks = try { para.ctp.bookmarkStartList.map { it.name } } catch (_: Exception) { emptyList() }
         val pStyles = buildString {
             append("text-align:$alignStr;")
+            // Enforce minimum line-height to prevent overlapping text (min 1.1x)
+            val safeLineHeight = spacingBetween?.coerceAtLeast(1.1) ?: 1.3
+            append("line-height:$safeLineHeight;")
+            append("min-height:1.2em;overflow:visible;") // dynamic height for text blocks
+            
             if (spacingBefore != null && spacingBefore > 0) append("margin-top:${spacingBefore}pt;")
             if (spacingAfter != null && spacingAfter > 0) append("margin-bottom:${spacingAfter}pt;")
-            if (spacingBetween != null && spacingBetween > 0) append("line-height:${spacingBetween};")
             if (indentLeft != null && indentLeft > 0 && !isList) append("margin-left:${indentLeft}pt;")
             if (indentRight != null && indentRight > 0) append("margin-right:${indentRight}pt;")
             if (indentFirstLine != null && indentFirstLine > 0 && !isList) append("text-indent:${indentFirstLine}pt;")
@@ -674,7 +678,7 @@ class OfficeReaderViewModel @Inject constructor(
                             else          -> "image/png"
                         }
                         val b64 = android.util.Base64.encodeToString(data, android.util.Base64.NO_WRAP)
-                        sb.append("""<img src="data:$mime;base64,$b64" style="max-width:100%">""")
+                        sb.append("""<img src="data:$mime;base64,$b64" style="max-width:100%; display:inline-block; overflow:hidden;">""")
                     } catch (_: Exception) { /* skip bad image data */ }
                 }
 
@@ -683,13 +687,18 @@ class OfficeReaderViewModel @Inject constructor(
 
                 val isBold      = try { run.isBold } catch (_: Exception) { false }
                 val isItalic    = try { run.isItalic } catch (_: Exception) { false }
-                val isUnderline = try { run.underline != org.apache.poi.xwpf.usermodel.UnderlinePatterns.NONE } catch (_: Exception) { false }
+                val underlinePattern = try { run.underline } catch (_: Exception) { null }
+                val isUnderline = underlinePattern != null && underlinePattern != org.apache.poi.xwpf.usermodel.UnderlinePatterns.NONE
                 val isStrike    = try { run.isStrikeThrough } catch (_: Exception) { false }
+                val isDoubleStrike = try { run.isDoubleStrikeThrough } catch (_: Exception) { false }
                 val colorHex    = try { run.color?.let { if (it.length == 6) "#$it" else null } } catch (_: Exception) { null }
                 val fontSize    = try { run.fontSizeAsDouble?.toInt()?.takeIf { it > 0 } } catch (_: Exception) { null }
+                val fontFamily  = try { run.fontFamily } catch (_: Exception) { null }
                 val vAlign      = try { run.verticalAlignment?.toString()?.lowercase() } catch (_: Exception) { null }
                 val isSubscript = vAlign == "subscript"
                 val isSuperscript = vAlign == "superscript"
+                val isCapitalized = try { run.isCapitalized } catch (_: Exception) { false }
+                val isSmallCaps   = try { run.isSmallCaps } catch (_: Exception) { false }
                 val highlightColor = try { run.textHighlightColor?.toString()?.takeIf { it != "none" && it.isNotBlank() } } catch (_: Exception) { null }
 
                 val isHyperlink = run is org.apache.poi.xwpf.usermodel.XWPFHyperlinkRun
@@ -718,14 +727,29 @@ class OfficeReaderViewModel @Inject constructor(
                 val styles = buildString {
                     if (colorHex != null) append("color:$colorHex;")
                     if (fontSize != null) append("font-size:${fontSize}pt;")
+                    if (fontFamily != null) append("font-family:'$fontFamily';")
                     if (highlightColor != null) append("background-color:$highlightColor;")
+                    if (isCapitalized) append("text-transform:uppercase;")
+                    if (isSmallCaps) append("font-variant:small-caps;")
+                    if (isUnderline) {
+                        val cssStyle = when {
+                            underlinePattern.name.contains("DOUBLE") -> "double"
+                            underlinePattern.name.contains("DASH") -> "dashed"
+                            underlinePattern.name.contains("DOT") -> "dotted"
+                            underlinePattern.name.contains("WAV") -> "wavy"
+                            else -> "solid"
+                        }
+                        if (cssStyle != "solid") {
+                            append("text-decoration:underline;text-decoration-style:$cssStyle;")
+                        }
+                    }
                 }
 
                 var span = escaped
                 if (isBold)      span = "<strong>$span</strong>"
                 if (isItalic)    span = "<em>$span</em>"
-                if (isUnderline) span = "<u>$span</u>"
-                if (isStrike)    span = "<s>$span</s>"
+                if (isUnderline && !styles.contains("text-decoration-style")) span = "<u>$span</u>"
+                if (isStrike || isDoubleStrike) span = "<s>$span</s>"
                 if (isSubscript) span = "<sub>$span</sub>"
                 if (isSuperscript) span = "<sup>$span</sup>"
                 if (styles.isNotEmpty()) span = """<span style="$styles">$span</span>"""

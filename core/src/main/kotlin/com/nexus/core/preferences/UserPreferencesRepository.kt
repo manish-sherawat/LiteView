@@ -50,6 +50,7 @@ class UserPreferencesRepository @Inject constructor(
         val READER_THEME = stringPreferencesKey("reader_theme")
         val WORD_WRAP_ENABLED = booleanPreferencesKey("word_wrap_enabled")
         val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback")
+        val IS_FIRST_LAUNCH = booleanPreferencesKey("is_first_launch")
     }
 
     val homeStyle: Flow<HomeStyle> = context.dataStore.data.map { prefs ->
@@ -131,6 +132,9 @@ class UserPreferencesRepository @Inject constructor(
 
     val hapticFeedbackEnabled: Flow<Boolean> = context.dataStore.data.map { prefs -> prefs[Keys.HAPTIC_FEEDBACK] ?: true }
     suspend fun setHapticFeedbackEnabled(value: Boolean) { context.dataStore.edit { prefs -> prefs[Keys.HAPTIC_FEEDBACK] = value } }
+
+    val isFirstLaunch: Flow<Boolean> = context.dataStore.data.map { prefs -> prefs[Keys.IS_FIRST_LAUNCH] ?: true }
+    suspend fun completeFirstLaunch() { context.dataStore.edit { prefs -> prefs[Keys.IS_FIRST_LAUNCH] = false } }
 
     suspend fun resetToDefaults() {
         context.dataStore.edit { prefs ->

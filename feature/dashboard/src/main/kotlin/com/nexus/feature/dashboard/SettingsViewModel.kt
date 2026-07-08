@@ -217,7 +217,7 @@ class SettingsViewModel @Inject constructor(
     fun checkForUpdates(isManual: Boolean = true) {
         viewModelScope.launch {
             _isManualUpdateCheck.value = isManual
-            appUpdater.checkForUpdates(getAppVersion())
+            appUpdater.checkForUpdates(getAppVersion(), showNotification = !isManual)
         }
     }
 

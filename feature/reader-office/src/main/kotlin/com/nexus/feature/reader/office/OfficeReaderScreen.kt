@@ -54,6 +54,7 @@ import android.content.Intent
 import android.print.PrintAttributes
 import android.print.PrintManager
 
+@androidx.compose.material3.ExperimentalMaterial3Api
 @Composable
 fun OfficeReaderScreen(
     encodedUri: String,
@@ -97,8 +98,7 @@ fun OfficeReaderScreen(
     var searchResultCount by remember { mutableStateOf(0) }
     var currentSearchIndex by remember { mutableStateOf(0) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
-    
-    var isPrintLayout by remember { mutableStateOf(false) }
+    var isWebView by remember { mutableStateOf(true) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showSheetNavigator by remember { mutableStateOf(false) }
@@ -106,7 +106,8 @@ fun OfficeReaderScreen(
     var renameText by remember { mutableStateOf("") }
     
     val systemDarkTheme = isSystemInDarkTheme()
-    var isDarkThemeOverride by remember { mutableStateOf<Boolean?>(null) }
+    // Default to light theme as requested
+    var isDarkThemeOverride by remember { mutableStateOf<Boolean?>(false) }
     val isDark = isDarkThemeOverride ?: systemDarkTheme
 
     var isFreezePanesEnabled by remember { mutableStateOf(true) }
@@ -176,7 +177,7 @@ fun OfficeReaderScreen(
                         }
                     }
                     is OfficeReaderUiState.DocxReady -> {
-                    val printCss = if (isPrintLayout) """
+                    val printCss = if (isWebView) """
                         body {
                             background-color: ${if(isDark) "#121212" else "#f0f0f0"} !important;
                             padding: 24px;
@@ -194,14 +195,14 @@ fun OfficeReaderScreen(
                         }
                     """.trimIndent() else """
                         body {
-                            padding: 24px;
+                            padding: 16px;
                             padding-top: 120px;
                             padding-bottom: 100px;
                             background-color: transparent !important;
                         }
                     """.trimIndent()
 
-                    val htmlWithScript = remember(state.htmlContent, isPrintLayout, isDark) {
+                    val htmlWithScript = remember(state.htmlContent, isWebView, isDark) {
                         var html = state.htmlContent
                         if (isDark) {
                             html = html.replace("<body>", "<body class=\"dark-mode\">")
@@ -464,8 +465,8 @@ fun OfficeReaderScreen(
             AnimatedVisibility(
                 visible = !isImmersiveMode && (uiState is OfficeReaderUiState.DocxReady || uiState is OfficeReaderUiState.XlsxReady),
                 modifier = Modifier.align(Alignment.BottomCenter),
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
+                enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }) + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) + androidx.compose.animation.fadeOut()
             ) {
                 NexusSurface(
                     modifier = Modifier
@@ -482,10 +483,10 @@ fun OfficeReaderScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (uiState is OfficeReaderUiState.DocxReady) {
-                            // Print Layout Mode
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { isPrintLayout = !isPrintLayout }.padding(8.dp)) {
-                                Icon(painter = androidx.compose.ui.res.painterResource(id = if (isPrintLayout) com.nexus.core.R.drawable.ic_printer else com.nexus.core.R.drawable.ic_world), contentDescription = "Layout", tint = if (isPrintLayout) NexusTheme.colors.primary else NexusTheme.colors.textPrimary)
-                                NexusText(if (isPrintLayout) "Print" else "Web", style = NexusTheme.typography.caption, color = if (isPrintLayout) NexusTheme.colors.primary else NexusTheme.colors.textPrimary)
+                            // View Mode (Web View / Mobile View)
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { isWebView = !isWebView }.padding(8.dp)) {
+                                Icon(painter = androidx.compose.ui.res.painterResource(id = if (isWebView) com.nexus.core.R.drawable.ic_world else com.nexus.core.R.drawable.ic_book), contentDescription = "View Mode", tint = NexusTheme.colors.textPrimary)
+                                NexusText(if (isWebView) "Web View" else "Mobile View", style = NexusTheme.typography.caption, color = NexusTheme.colors.textPrimary)
                             }
                         }
 
@@ -731,8 +732,8 @@ fun OfficeReaderScreen(
         AnimatedVisibility(
                 visible = !isImmersiveMode,
                 modifier = Modifier.align(Alignment.TopCenter),
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
+                enter = androidx.compose.animation.slideInVertically(initialOffsetY = { -it }) + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { -it }) + androidx.compose.animation.fadeOut()
             ) {
                 if (isSearchActive) {
                     NexusSurface(
@@ -833,6 +834,7 @@ private class ImmersiveToggleInterface(private val onToggle: () -> Unit) {
     }
 }
 
+@androidx.compose.material3.ExperimentalMaterial3Api
 @Composable
 private fun OfficeOptionsBottomSheet(
     onDismiss: () -> Unit,
@@ -841,95 +843,65 @@ private fun OfficeOptionsBottomSheet(
     onPrint: () -> Unit,
     onInfo: () -> Unit
 ) {
-    androidx.compose.ui.window.Dialog(
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState()
+    
+    androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        sheetState = sheetState,
+        containerColor = com.nexus.core.theme.NexusTheme.colors.surface,
+        contentColor = com.nexus.core.theme.NexusTheme.colors.textPrimary,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
-        Box(
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 24.dp)
-                .clickable(
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss
-                ),
-            contentAlignment = Alignment.BottomCenter
+                .fillMaxWidth()
+                .padding(bottom = 32.dp)
+                .padding(horizontal = 16.dp)
         ) {
-            com.nexus.core.ui.NexusSurface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null,
-                        onClick = {} // Prevent clicks on the dialog from dismissing it
-                    ),
-                shape = com.nexus.core.theme.NexusTheme.shapes.large,
-                elevation = 24.dp,
-                color = com.nexus.core.theme.NexusTheme.colors.surface
-            ) {
-                Column(
+            com.nexus.core.ui.NexusText(
+                text = "Document Options",
+                style = com.nexus.core.theme.NexusTheme.typography.title,
+                modifier = Modifier.padding(bottom = 16.dp, start = 8.dp, end = 8.dp)
+            )
+
+            val options = listOf(
+                MenuOption("File Info", "View document properties", com.nexus.core.R.drawable.ic_info, onInfo),
+                MenuOption("Rename", "Rename this file", com.nexus.core.R.drawable.ic_rename, onRename),
+                MenuOption("Favorite", "Add to bookmarks", com.nexus.core.R.drawable.ic_star, onFavorite),
+                MenuOption("Print", "Print or save as PDF", com.nexus.core.R.drawable.ic_printer, onPrint)
+            )
+
+            options.forEach { option ->
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .clip(com.nexus.core.theme.NexusTheme.shapes.medium)
+                        .clickable { option.action() }
+                        .padding(vertical = 12.dp, horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .width(32.dp)
-                            .height(4.dp)
-                            .clip(com.nexus.core.theme.NexusTheme.shapes.pill)
-                            .background(com.nexus.core.theme.NexusTheme.colors.textSecondary.copy(alpha = 0.2f))
-                            .align(Alignment.CenterHorizontally)
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = option.icon),
+                        contentDescription = option.label,
+                        modifier = Modifier.size(24.dp),
+                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(com.nexus.core.theme.NexusTheme.colors.textPrimary)
                     )
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    com.nexus.core.ui.NexusText(
-                        text = "Document Options",
-                        style = com.nexus.core.theme.NexusTheme.typography.title,
-                        modifier = Modifier.padding(bottom = 16.dp, start = 8.dp, end = 8.dp)
-                    )
-
-                    val options = listOf(
-                        MenuOption("File Info", "View document properties", com.nexus.core.R.drawable.ic_info, onInfo),
-                        MenuOption("Rename", "Rename this file", com.nexus.core.R.drawable.ic_rename, onRename),
-                        MenuOption("Favorite", "Add to bookmarks", com.nexus.core.R.drawable.ic_star, onFavorite),
-                        MenuOption("Print", "Print or save as PDF", com.nexus.core.R.drawable.ic_printer, onPrint)
-                    )
-
-                    options.forEach { option ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(com.nexus.core.theme.NexusTheme.shapes.medium)
-                                .clickable { option.action() }
-                                .padding(vertical = 12.dp, horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            androidx.compose.foundation.Image(
-                                painter = androidx.compose.ui.res.painterResource(id = option.icon),
-                                contentDescription = option.label,
-                                modifier = Modifier.size(24.dp),
-                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(com.nexus.core.theme.NexusTheme.colors.textPrimary)
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                com.nexus.core.ui.NexusText(
-                                    text = option.label,
-                                    style = com.nexus.core.theme.NexusTheme.typography.body,
-                                    color = com.nexus.core.theme.NexusTheme.colors.textPrimary
-                                )
-                                com.nexus.core.ui.NexusText(
-                                    text = option.subtitle,
-                                    style = com.nexus.core.theme.NexusTheme.typography.caption,
-                                    color = com.nexus.core.theme.NexusTheme.colors.textSecondary
-                                )
-                            }
-                        }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        com.nexus.core.ui.NexusText(
+                            text = option.label,
+                            style = com.nexus.core.theme.NexusTheme.typography.body,
+                            color = com.nexus.core.theme.NexusTheme.colors.textPrimary
+                        )
+                        com.nexus.core.ui.NexusText(
+                            text = option.subtitle,
+                            style = com.nexus.core.theme.NexusTheme.typography.caption,
+                            color = com.nexus.core.theme.NexusTheme.colors.textSecondary
+                        )
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
@@ -941,6 +913,7 @@ private data class MenuOption(
     val action: () -> Unit
 )
 
+@androidx.compose.material3.ExperimentalMaterial3Api
 @Composable
 private fun SheetNavigatorBottomSheet(
     sheetNames: List<String>,
@@ -948,75 +921,49 @@ private fun SheetNavigatorBottomSheet(
     onSheetSelected: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    androidx.compose.ui.window.Dialog(
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState()
+    
+    androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        sheetState = sheetState,
+        containerColor = com.nexus.core.theme.NexusTheme.colors.surface,
+        contentColor = com.nexus.core.theme.NexusTheme.colors.textPrimary,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
-        Box(
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 24.dp)
-                .clickable(
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss
-                ),
-            contentAlignment = Alignment.BottomCenter
+                .fillMaxWidth()
+                .padding(bottom = 32.dp)
         ) {
-            com.nexus.core.ui.NexusSurface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.6f)
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null,
-                        onClick = {}
-                    ),
-                shape = com.nexus.core.theme.NexusTheme.shapes.large,
-                elevation = 24.dp,
-                color = com.nexus.core.theme.NexusTheme.colors.surface
-            ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
-                    Box(
+            com.nexus.core.ui.NexusText(
+                text = "Sheets",
+                style = com.nexus.core.theme.NexusTheme.typography.title,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+            )
+            LazyColumn(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                itemsIndexed(sheetNames) { index, name ->
+                    val isSelected = index == currentSheet
+                    Row(
                         modifier = Modifier
-                            .width(32.dp)
-                            .height(4.dp)
-                            .clip(com.nexus.core.theme.NexusTheme.shapes.pill)
-                            .background(com.nexus.core.theme.NexusTheme.colors.textSecondary.copy(alpha = 0.2f))
-                            .align(Alignment.CenterHorizontally)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    com.nexus.core.ui.NexusText(
-                        text = "Sheets",
-                        style = com.nexus.core.theme.NexusTheme.typography.title,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
-                    )
-                    LazyColumn(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                        itemsIndexed(sheetNames) { index, name ->
-                            val isSelected = index == currentSheet
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(com.nexus.core.theme.NexusTheme.shapes.medium)
-                                    .background(if (isSelected) com.nexus.core.theme.NexusTheme.colors.primary.copy(alpha = 0.1f) else androidx.compose.ui.graphics.Color.Transparent)
-                                    .clickable { onSheetSelected(index) }
-                                    .padding(vertical = 16.dp, horizontal = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_view_list),
-                                    contentDescription = null,
-                                    tint = if (isSelected) com.nexus.core.theme.NexusTheme.colors.primary else com.nexus.core.theme.NexusTheme.colors.textSecondary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(16.dp))
-                                com.nexus.core.ui.NexusText(
-                                    text = name,
-                                    style = if (isSelected) com.nexus.core.theme.NexusTheme.typography.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) else com.nexus.core.theme.NexusTheme.typography.body,
-                                    color = if (isSelected) com.nexus.core.theme.NexusTheme.colors.primary else com.nexus.core.theme.NexusTheme.colors.textPrimary
-                                )
-                            }
-                        }
+                            .fillMaxWidth()
+                            .clip(com.nexus.core.theme.NexusTheme.shapes.medium)
+                            .background(if (isSelected) com.nexus.core.theme.NexusTheme.colors.primary.copy(alpha = 0.1f) else androidx.compose.ui.graphics.Color.Transparent)
+                            .clickable { onSheetSelected(index) }
+                            .padding(vertical = 16.dp, horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_view_list),
+                            contentDescription = null,
+                            tint = if (isSelected) com.nexus.core.theme.NexusTheme.colors.primary else com.nexus.core.theme.NexusTheme.colors.textSecondary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        com.nexus.core.ui.NexusText(
+                            text = name,
+                            style = if (isSelected) com.nexus.core.theme.NexusTheme.typography.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) else com.nexus.core.theme.NexusTheme.typography.body,
+                            color = if (isSelected) com.nexus.core.theme.NexusTheme.colors.primary else com.nexus.core.theme.NexusTheme.colors.textPrimary
+                        )
                     }
                 }
             }

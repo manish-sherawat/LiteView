@@ -1,14 +1,19 @@
 package com.nexus.core.ui.components
 
+import android.content.Context
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.Crossfade
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
@@ -34,6 +39,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -47,12 +54,15 @@ import com.nexus.core.ui.animations.pressSpring
 import com.nexus.core.ui.animations.springBounceClick
 import com.nexus.core.ui.animations.springBounceCombinedClick
 import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.ColorFilter
 import com.nexus.core.R
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -67,10 +77,9 @@ fun NexusCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(12.dp, NexusTheme.shapes.large, spotColor = Color.Black.copy(alpha = 0.12f), ambientColor = Color.Black.copy(alpha = 0.05f))
+            .shadow(8.dp, NexusTheme.shapes.large, spotColor = Color.Black.copy(alpha = 0.12f), ambientColor = Color.Black.copy(alpha = 0.05f))
             .clip(NexusTheme.shapes.large)
             .background(NexusTheme.colors.surfaceVariant)
-            .border(1.dp, NexusTheme.colors.textPrimary.copy(alpha = 0.2f), NexusTheme.shapes.large)
             .then(
                 if (onClick != null || onLongClick != null) 
                     Modifier.springBounceCombinedClick(
@@ -97,13 +106,26 @@ fun NexusSearchBar(
     modifier: Modifier = Modifier,
     placeholderText: String = "Search..."
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    
+    val bgColor by animateColorAsState(
+        targetValue = if (isFocused) NexusTheme.colors.surface else NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f),
+        label = "searchBg"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isFocused) NexusTheme.colors.primary else NexusTheme.colors.textPrimary.copy(alpha = 0.15f),
+        label = "searchBorder"
+    )
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .wrapContentHeight()
             .clip(NexusTheme.shapes.pill)
-            .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f))
+            .background(bgColor)
+            .border(1.5.dp, borderColor, NexusTheme.shapes.pill)
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.CenterStart
     ) {
@@ -114,7 +136,7 @@ fun NexusSearchBar(
             Image(
                 painter = painterResource(id = R.drawable.ic_search),
                 contentDescription = "Search",
-                colorFilter = ColorFilter.tint(NexusTheme.colors.textSecondary),
+                colorFilter = ColorFilter.tint(if (isFocused) NexusTheme.colors.primary else NexusTheme.colors.textSecondary),
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -123,6 +145,7 @@ fun NexusSearchBar(
                     value = query,
                     onValueChange = onQueryChange,
                     singleLine = true,
+                    interactionSource = interactionSource,
                     textStyle = NexusTheme.typography.body.copy(color = NexusTheme.colors.textPrimary),
                     cursorBrush = SolidColor(NexusTheme.colors.primary),
                     modifier = Modifier
@@ -135,20 +158,23 @@ fun NexusSearchBar(
                     NexusText(
                         text = placeholderText,
                         style = NexusTheme.typography.body,
-                        color = NexusTheme.colors.textSecondary
+                        color = NexusTheme.colors.textSecondary,
+                        modifier = Modifier.semantics { contentDescription = "" }
                     )
                 }
             }
             if (query.isNotEmpty()) {
                 Box(
                     modifier = Modifier
-                        .size(24.dp)
+                        .size(32.dp)
                         .clip(CircleShape)
-                        .background(NexusTheme.colors.surface)
-                        .clickable { onClear() },
+                        .clickable(role = Role.Button) { onClear() }
+                        .semantics { contentDescription = "Clear search" },
                     contentAlignment = Alignment.Center
                 ) {
-                    NexusText("x", style = NexusTheme.typography.caption)
+                    Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(NexusTheme.colors.surface), contentAlignment = Alignment.Center) {
+                        NexusText("x", style = NexusTheme.typography.caption)
+                    }
                 }
             }
         }
@@ -164,12 +190,21 @@ fun NexusButton(
     enabled: Boolean = true,
     containerColor: Color = NexusTheme.colors.primary,
     contentColor: Color = NexusTheme.colors.onPrimary,
-    shape: androidx.compose.ui.graphics.Shape = NexusTheme.shapes.pill
+    shape: androidx.compose.ui.graphics.Shape = NexusTheme.shapes.pill,
+    contentDescription: String = text,
+    isLoading: Boolean = false
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val context = LocalContext.current
+    
     val scale by animateFloatAsState(
-        targetValue = if (isPressed && enabled) 0.96f else 1f,
+        targetValue = when {
+            isPressed && enabled -> 0.96f
+            isFocused && enabled -> 1.02f
+            else -> 1f
+        },
         animationSpec = pressSpring(),
         label = "btnScale"
     )
@@ -177,18 +212,58 @@ fun NexusButton(
     val bgColor = if (isOutlined) Color.Transparent else containerColor
     val finalContentColor = if (isOutlined) containerColor else contentColor
 
+    val horizontalPadding by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (isLoading) 12.dp else 24.dp,
+        animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 300f),
+        label = "btnPadding"
+    )
+
     Box(
         modifier = modifier
             .scale(scale)
-            .alpha(if (enabled) 1f else 0.5f)
+            .alpha(if (enabled && !isLoading) 1f else if (isLoading) 1f else 0.5f)
             .heightIn(min = 48.dp)
             .clip(shape)
-            .then(if (isOutlined) Modifier.border(1.dp, containerColor, shape) else Modifier.background(bgColor))
-            .clickable(interactionSource, null, enabled = enabled, onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 12.dp),
+            .then(if (isOutlined) Modifier.border(1.5.dp, containerColor, shape) else Modifier.background(bgColor))
+            .indication(interactionSource, LocalIndication.current)
+            .clickable(
+                interactionSource = interactionSource, 
+                indication = null,
+                enabled = enabled && !isLoading, 
+                role = Role.Button,
+                onClick = {
+                    try {
+                        val vibrator = context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                        if (vibrator.hasVibrator()) {
+                            vibrator.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_CLICK))
+                        }
+                    } catch (e: Exception) { }
+                    onClick()
+                }
+            )
+            .padding(horizontal = horizontalPadding, vertical = 12.dp)
+            .animateContentSize(animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 300f))
+            .semantics {
+                this.contentDescription = contentDescription
+                this.role = Role.Button
+            },
         contentAlignment = Alignment.Center
     ) {
-        NexusText(text = text, color = finalContentColor, style = NexusTheme.typography.buttonLabel)
+        Crossfade(
+            targetState = isLoading, 
+            animationSpec = androidx.compose.animation.core.tween(200),
+            label = "btnCrossfade"
+        ) { loading ->
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = finalContentColor,
+                    strokeWidth = 2.5.dp
+                )
+            } else {
+                NexusText(text = text, color = finalContentColor, style = NexusTheme.typography.buttonLabel)
+            }
+        }
     }
 }
 
@@ -198,6 +273,14 @@ fun NexusSwitch(
     onCheckedChange: ((Boolean) -> Unit)?,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val springSpec = remember { 
+        androidx.compose.animation.core.spring<androidx.compose.ui.unit.Dp>(
+            dampingRatio = 0.65f,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+        )
+    }
+    
     val trackColor by animateColorAsState(
         targetValue = if (checked) NexusTheme.colors.primary else NexusTheme.colors.surfaceVariant.copy(alpha = 0.8f),
         animationSpec = com.nexus.core.ui.animations.colorSpring(),
@@ -209,16 +292,13 @@ fun NexusSwitch(
         label = "switchThumb"
     )
     val borderColor by animateColorAsState(
-        targetValue = if (checked) Color.Transparent else NexusTheme.colors.textSecondary.copy(alpha = 0.7f),
+        targetValue = if (checked) Color.Transparent else NexusTheme.colors.textSecondary,
         animationSpec = com.nexus.core.ui.animations.colorSpring(),
         label = "switchBorder"
     )
     val offset by animateDpAsState(
         targetValue = if (checked) 22.dp else 0.dp,
-        animationSpec = androidx.compose.animation.core.spring(
-            dampingRatio = 0.65f,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
-        ),
+        animationSpec = springSpec,
         label = "switchOffset"
     )
 
@@ -233,12 +313,24 @@ fun NexusSwitch(
                     Modifier.toggleable(
                         value = checked,
                         role = Role.Switch,
-                        onValueChange = onCheckedChange
+                        onValueChange = { newValue ->
+                            try {
+                                val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                                if (vibrator.hasVibrator()) {
+                                    vibrator.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_TICK))
+                                }
+                            } catch (e: Exception) { }
+                            onCheckedChange(newValue)
+                        }
                     )
                 } else {
                     Modifier
                 }
             )
+            .semantics {
+                this.contentDescription = if (checked) "Switch on" else "Switch off"
+                this.role = Role.Switch
+            }
             .padding(4.dp),
         contentAlignment = Alignment.CenterStart
     ) {
@@ -261,14 +353,22 @@ fun <T> NexusTabRow(
     optionLabel: (T) -> String,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    val context = LocalContext.current
+    val listState = rememberLazyListState()
+    
+    LazyRow(
+        state = listState,
         modifier = modifier
             .fillMaxWidth()
             .clip(NexusTheme.shapes.pill)
             .background(NexusTheme.colors.surfaceVariant)
+            .border(1.dp, if (!androidx.compose.foundation.isSystemInDarkTheme()) NexusTheme.colors.textPrimary.copy(alpha = 0.15f) else Color.Transparent, NexusTheme.shapes.pill)
             .padding(4.dp)
     ) {
-        options.forEach { option ->
+        items(
+            items = options,
+            key = { option -> option.hashCode() }
+        ) { option ->
             val isSelected = option == selectedOption
             
             val bgColor by animateColorAsState(
@@ -285,11 +385,24 @@ fun <T> NexusTabRow(
             
             Box(
                 modifier = Modifier
-                    .weight(1f)
+                    .fillParentMaxWidth(1f / options.size.coerceAtLeast(1))
                     .clip(NexusTheme.shapes.pill)
                     .background(bgColor)
-                    .springBounceClick { onOptionSelected(option) }
-                    .padding(vertical = 8.dp),
+                    .springBounceClick {
+                        try {
+                            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                            if (vibrator.hasVibrator()) {
+                                vibrator.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_TICK))
+                            }
+                        } catch (e: Exception) { }
+                        onOptionSelected(option)
+                    }
+                    .padding(vertical = 8.dp)
+                    .semantics {
+                        this.role = Role.Tab
+                        this.contentDescription = optionLabel(option)
+                        this.selected = isSelected
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 NexusText(
@@ -309,15 +422,24 @@ fun NexusSlider(
     modifier: Modifier = Modifier,
     valueRange: ClosedFloatingPointRange<Float> = 0f..1f
 ) {
+    var isDragging by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     val fraction = ((value - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
     
     BoxWithConstraints(
         modifier = modifier
-            .height(32.dp)
+            .height(48.dp)
             .fillMaxWidth()
             .pointerInput(valueRange) {
                 detectHorizontalDragGestures(
                     onDragStart = { offset ->
+                        isDragging = true
+                        try {
+                            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                            if (vibrator.hasVibrator()) {
+                                vibrator.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_TICK))
+                            }
+                        } catch (e: Exception) { }
                         val percent = (offset.x / size.width).coerceIn(0f, 1f)
                         onValueChange(valueRange.start + percent * (valueRange.endInclusive - valueRange.start))
                     },
@@ -325,6 +447,15 @@ fun NexusSlider(
                         change.consume()
                         val percent = (change.position.x / size.width).coerceIn(0f, 1f)
                         onValueChange(valueRange.start + percent * (valueRange.endInclusive - valueRange.start))
+                    },
+                    onDragEnd = {
+                        isDragging = false
+                        try {
+                            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                            if (vibrator.hasVibrator()) {
+                                vibrator.vibrate(android.os.VibrationEffect.createOneShot(20, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                            }
+                        } catch (e: Exception) { }
                     }
                 )
             }
@@ -333,10 +464,12 @@ fun NexusSlider(
                     val percent = (offset.x / size.width).coerceIn(0f, 1f)
                     onValueChange(valueRange.start + percent * (valueRange.endInclusive - valueRange.start))
                 }
+            }
+            .semantics {
+                this.contentDescription = "Slider"
             },
         contentAlignment = Alignment.CenterStart
     ) {
-        // Track
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -352,14 +485,31 @@ fun NexusSlider(
             )
         }
         
-        // Thumb
         Box(
             modifier = Modifier
-                .offset(x = maxWidth * fraction - 12.dp)
-                .size(24.dp)
+                .offset(x = maxWidth * fraction - if (isDragging) 14.dp else 12.dp)
+                .size(if (isDragging) 28.dp else 24.dp)
                 .clip(androidx.compose.foundation.shape.CircleShape)
+                .shadow(if (isDragging) 6.dp else 2.dp, CircleShape)
                 .background(NexusTheme.colors.primary)
         )
+        
+        if (isDragging) {
+            Box(
+                modifier = Modifier
+                    .offset(x = maxWidth * fraction - 20.dp, y = -36.dp)
+                    .background(NexusTheme.colors.primary, NexusTheme.shapes.pill)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                val displayValue = (valueRange.start + fraction * (valueRange.endInclusive - valueRange.start))
+                NexusText(
+                    text = "${Math.round(displayValue * 100) / 100f}",
+                    color = NexusTheme.colors.onPrimary,
+                    style = NexusTheme.typography.caption
+                )
+            }
+        }
     }
 }
 
@@ -372,12 +522,9 @@ fun NexusDialog(
     title: @Composable (() -> Unit)? = null,
     text: @Composable (() -> Unit)? = null
 ) {
-    var isVisible by remember { mutableStateOf(false) }
-    androidx.compose.runtime.LaunchedEffect(Unit) { isVisible = true }
-
     Dialog(onDismissRequest = onDismissRequest) {
         androidx.compose.animation.AnimatedVisibility(
-            visible = isVisible,
+            visible = true,
             enter = androidx.compose.animation.scaleIn(
                 animationSpec = com.nexus.core.ui.animations.dialogSpring(),
                 initialScale = 0.8f
@@ -391,35 +538,41 @@ fun NexusDialog(
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxWidth(0.85f)
                     .shadow(24.dp, NexusTheme.shapes.large)
                     .clip(NexusTheme.shapes.large)
                     .background(NexusTheme.colors.surface)
                     .padding(24.dp)
             ) {
-            Column {
-                if (title != null) {
-                    Box(modifier = Modifier.padding(bottom = 16.dp)) { title() }
-                }
-                if (text != null) {
-                    Box(modifier = Modifier
-                        .padding(bottom = 24.dp)
-                        .weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState())
-                    ) { text() }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    if (dismissButton != null) {
-                        dismissButton()
-                        Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    if (title != null) {
+                        Box(modifier = Modifier.padding(bottom = 16.dp)) { title() }
                     }
-                    confirmButton()
+                    if (text != null) {
+                        Box(
+                            modifier = Modifier
+                                .padding(bottom = 24.dp)
+                                .weight(1f, fill = false)
+                                .verticalScroll(rememberScrollState())
+                                .padding(end = 8.dp)
+                        ) { 
+                            text() 
+                        }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        if (dismissButton != null) {
+                            dismissButton()
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        confirmButton()
+                    }
                 }
             }
-        }
         }
     }
 }
@@ -431,6 +584,7 @@ fun NexusIconButton(
     containerColor: Color = NexusTheme.colors.surface,
     elevation: androidx.compose.ui.unit.Dp = 4.dp,
     enabled: Boolean = true,
+    contentDescription: String? = null,
     content: @Composable () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -447,7 +601,13 @@ fun NexusIconButton(
             .shadow(elevation, CircleShape)
             .clip(CircleShape)
             .background(containerColor)
-            .clickable(interactionSource, null, enabled = enabled, onClick = onClick),
+            .clickable(interactionSource, null, enabled = enabled, onClick = onClick)
+            .semantics {
+                this.role = Role.Button
+                if (contentDescription != null) {
+                    this.contentDescription = contentDescription
+                }
+            },
         contentAlignment = Alignment.Center
     ) {
         Box(

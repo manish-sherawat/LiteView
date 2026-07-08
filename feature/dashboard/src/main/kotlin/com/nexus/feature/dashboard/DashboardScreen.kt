@@ -1,6 +1,7 @@
 package com.nexus.feature.dashboard
 
 import android.net.Uri
+import androidx.compose.animation.core.tween
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -247,13 +248,13 @@ fun DashboardScreen(
                                 painter = painterResource(id = R.drawable.ic_text_scan),
                                 contentDescription = "Scan",
                                 modifier = Modifier.size(20.dp),
-                                colorFilter = ColorFilter.tint(Color.White)
+                                colorFilter = ColorFilter.tint(NexusTheme.colors.onPrimary)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             NexusText(
                                 text = "Scan",
                                 style = NexusTheme.typography.label,
-                                color = Color.White
+                                color = NexusTheme.colors.onPrimary
                             )
                         }
                     }
@@ -297,7 +298,7 @@ fun DashboardScreen(
                                     modifier = Modifier
                                         .clip(NexusTheme.shapes.pill)
                                         .background(NexusTheme.colors.surfaceVariant)
-                                        .clickable { sortMenuExpanded = true }
+                                        .springBounceClick { sortMenuExpanded = true }
                                         .padding(horizontal = 12.dp, vertical = 8.dp)
                                 ) {
                                     NexusText(
@@ -348,7 +349,7 @@ fun DashboardScreen(
                                 modifier = Modifier
                                     .clip(androidx.compose.foundation.shape.CircleShape)
                                     .background(if (!uiState.isGridView) NexusTheme.colors.primary.copy(alpha = 0.2f) else Color.Transparent)
-                                    .clickable { if (uiState.isGridView) viewModel.toggleGridView() }
+                                    .springBounceClick { if (uiState.isGridView) viewModel.toggleGridView() }
                                     .padding(8.dp)
                             ) {
                                 Image(
@@ -362,7 +363,7 @@ fun DashboardScreen(
                                 modifier = Modifier
                                     .clip(androidx.compose.foundation.shape.CircleShape)
                                     .background(if (uiState.isGridView) NexusTheme.colors.primary.copy(alpha = 0.2f) else Color.Transparent)
-                                    .clickable { if (!uiState.isGridView) viewModel.toggleGridView() }
+                                    .springBounceClick { if (!uiState.isGridView) viewModel.toggleGridView() }
                                     .padding(8.dp)
                             ) {
                                 Image(
@@ -479,11 +480,19 @@ fun DashboardScreen(
                 itemsIndexed(uiState.documents, key = { _, it -> it.doc.uri }) { index, uiModel ->
                     var isVisible by remember { mutableStateOf(false) }
                     LaunchedEffect(Unit) {
-                        kotlinx.coroutines.delay(index.toLong().coerceAtMost(15L) * 30L)
+                        kotlinx.coroutines.delay(index.toLong().coerceAtMost(10L) * 10L)
                         isVisible = true
                     }
-                    val alpha by androidx.compose.animation.core.animateFloatAsState(targetValue = if (isVisible) 1f else 0f, label = "alpha")
-                    val translationY by androidx.compose.animation.core.animateFloatAsState(targetValue = if (isVisible) 0f else 30f, label = "translateY")
+                    val alpha by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (isVisible) 1f else 0f, 
+                        animationSpec = tween(150),
+                        label = "alpha"
+                    )
+                    val translationY by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (isVisible) 0f else 20f, 
+                        animationSpec = tween(150),
+                        label = "translateY"
+                    )
 
                     val itemModifier = Modifier.animateItem().graphicsLayer {
                         this.alpha = alpha
@@ -512,7 +521,10 @@ fun DashboardScreen(
                             onLongClick = {
                                 viewModel.toggleSelection(uiModel.doc.uri)
                             },
-                            onRemove = { viewModel.removeDocument(uiModel.doc.uri) },
+                            onRemove = { 
+                                viewModel.removeDocument(uiModel.doc.uri)
+                                android.widget.Toast.makeText(context, "File deleted successfully", android.widget.Toast.LENGTH_SHORT).show()
+                            },
                             onShowDetails = { detailsDialogDoc = uiModel.doc },
                             onShare = { viewModel.shareDocument(uiModel.doc.uri) },
                             onRename = { newName -> viewModel.renameDocument(uiModel.doc.uri, newName) }
@@ -539,7 +551,10 @@ fun DashboardScreen(
                             onLongClick = {
                                 viewModel.toggleSelection(uiModel.doc.uri)
                             },
-                            onRemove = { viewModel.removeDocument(uiModel.doc.uri) },
+                            onRemove = { 
+                                viewModel.removeDocument(uiModel.doc.uri)
+                                android.widget.Toast.makeText(context, "File deleted successfully", android.widget.Toast.LENGTH_SHORT).show()
+                            },
                             onShowDetails = { detailsDialogDoc = uiModel.doc },
                             onShare = { viewModel.shareDocument(uiModel.doc.uri) },
                             onRename = { newName -> viewModel.renameDocument(uiModel.doc.uri, newName) }
@@ -609,14 +624,14 @@ fun DashboardScreen(
                             modifier = Modifier
                                 .clip(NexusTheme.shapes.small)
                                 .background(NexusTheme.colors.primary.copy(alpha = 0.1f))
-                                .clickable { viewModel.selectAll() }
+                                .springBounceClick { viewModel.selectAll() }
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             NexusText("Select all", style = NexusTheme.typography.label, color = NexusTheme.colors.primary)
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { uiState.selectedUris.forEach { viewModel.shareDocument(it) }; viewModel.clearSelection() }) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.springBounceClick { uiState.selectedUris.forEach { viewModel.shareDocument(it) }; viewModel.clearSelection() }) {
                             Image(
                                 painter = painterResource(id = R.drawable.ic_share),
                                 contentDescription = "Share",
@@ -630,7 +645,7 @@ fun DashboardScreen(
                             Spacer(modifier = Modifier.height(4.dp))
                             NexusText("Share", style = NexusTheme.typography.caption, color = NexusTheme.colors.textPrimary)
                         }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { viewModel.deleteSelected() }) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.springBounceClick { viewModel.deleteSelected() }) {
                             Image(
                                 painter = painterResource(id = R.drawable.ic_delete),
                                 contentDescription = "Delete",
@@ -644,7 +659,7 @@ fun DashboardScreen(
                             Spacer(modifier = Modifier.height(4.dp))
                             NexusText("Delete", style = NexusTheme.typography.caption, color = NexusTheme.colors.error)
                         }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { viewModel.clearSelection() }) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.springBounceClick { viewModel.clearSelection() }) {
                             Image(
                                 painter = painterResource(id = com.nexus.core.R.drawable.ic_close),
                                 contentDescription = "Close",
@@ -696,7 +711,7 @@ fun FileCard(
         elevation = 8.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .springBounceClick { onClick() }
     ) {
         Row(
             modifier = Modifier

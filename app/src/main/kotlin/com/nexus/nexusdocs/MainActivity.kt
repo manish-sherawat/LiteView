@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import kotlinx.coroutines.launch
 
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -15,9 +16,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.Modifier
-import com.nexus.core.ui.animations.DurationMedium1
-import com.nexus.core.ui.animations.DurationMedium3
-import com.nexus.core.ui.animations.DurationShort3
+import com.nexus.core.ui.animations.DurationQuickRelease
+import com.nexus.core.ui.animations.DurationScreenEnter
+import com.nexus.core.ui.animations.DurationFadeIn
 import com.nexus.core.ui.animations.EmphasizedAccelerateEasing
 import com.nexus.core.ui.animations.EmphasizedDecelerateEasing
 import com.nexus.core.ui.animations.navPillSpring
@@ -76,6 +77,18 @@ class MainActivity : ComponentActivity() {
 
             val hapticFeedbackEnabled by preferencesRepository.hapticFeedbackEnabled
                 .collectAsStateWithLifecycle(initialValue = true)
+
+            val isFirstLaunchState = preferencesRepository.isFirstLaunch
+                .collectAsStateWithLifecycle(initialValue = null)
+
+            val isFirstLaunch = isFirstLaunchState.value
+
+            if (isFirstLaunch == null) {
+                Box(modifier = Modifier.fillMaxSize())
+                return@setContent
+            }
+
+            val startDestination = if (isFirstLaunch) com.nexus.core.navigation.NexusRoute.Welcome.route else com.nexus.core.navigation.NexusRoute.Splash.route
 
             com.nexus.core.theme.NexusDocsViewerTheme(
                 themeMode = themeMode,
@@ -157,6 +170,12 @@ class MainActivity : ComponentActivity() {
                         NexusNavHost(
                             navController = navController,
                             router = router,
+                            startDestination = startDestination,
+                            onFirstLaunchComplete = {
+                                kotlinx.coroutines.MainScope().launch {
+                                    preferencesRepository.completeFirstLaunch()
+                                }
+                            },
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -172,19 +191,19 @@ class MainActivity : ComponentActivity() {
                             animationSpec  = navPillSpring()
                         ) + androidx.compose.animation.fadeIn(
                             animationSpec = androidx.compose.animation.core.tween(
-                                durationMillis = DurationMedium3,
+                                durationMillis = DurationScreenEnter,
                                 easing         = EmphasizedDecelerateEasing
                             )
                         ),
                         exit = androidx.compose.animation.slideOutVertically(
                             targetOffsetY = { it },
                             animationSpec = androidx.compose.animation.core.tween(
-                                durationMillis = DurationMedium1,
+                                durationMillis = DurationQuickRelease,
                                 easing         = EmphasizedAccelerateEasing
                             )
                         ) + androidx.compose.animation.fadeOut(
                             animationSpec = androidx.compose.animation.core.tween(
-                                durationMillis = DurationShort3,
+                                durationMillis = DurationFadeIn,
                                 easing         = EmphasizedAccelerateEasing
                             )
                         )

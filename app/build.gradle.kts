@@ -14,8 +14,8 @@ android {
         applicationId = "com.nexus.nexusdocs"
         minSdk = 26
         targetSdk = 35
-        versionCode = 241
-        versionName = "2.4.1"
+        versionCode = 245
+        versionName = "2.4.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -46,6 +46,10 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+        freeCompilerArgs = freeCompilerArgs + listOf(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi"
+        )
     }
 
     buildFeatures {
@@ -83,6 +87,7 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.foundation)
     implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.compose.material3)
 
     implementation(libs.compose.animation)
     debugImplementation(libs.compose.ui.tooling)

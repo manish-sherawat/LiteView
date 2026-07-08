@@ -54,6 +54,12 @@ sealed class NexusRoute(val route: String) {
     // Splash screen - initial startup
     data object Splash : NexusRoute("splash")
 
+    // Welcome Screen - First launch
+    data object Welcome : NexusRoute("welcome")
+
+    // Permission Screen - Post-welcome
+    data object Permission : NexusRoute("permission")
+
     // Dashboard — main entry point showing recent files
     data object Dashboard : NexusRoute("dashboard")
 

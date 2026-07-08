@@ -1,61 +1,566 @@
+@file:OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 package com.nexus.nexusdocs.navigation
 
+// ─── Android/AndroidX Imports ────────────────────────────────────────
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.clickable
-
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+
+// ─── Compose Animation Imports ──────────────────────────────────────
+import androidx.compose.animation.*
+import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.tween
-import com.nexus.core.navigation.DocumentReaderRouter
-import com.nexus.core.navigation.NexusRoute
-import com.nexus.core.ui.components.NexusTopBar
+
+// ─── Nexus Core Imports ─────────────────────────────────────────────
+import com.nexus.core.navigation.*
+import com.nexus.core.ui.animations.EmphasizedAccelerateEasing
+import com.nexus.core.ui.animations.EmphasizedDecelerateEasing
+
+// ─── Feature Imports ───────────────────────────────────────────────
 import com.nexus.feature.dashboard.DashboardScreen
+import com.nexus.feature.dashboard.DashboardViewModel
 import com.nexus.feature.dashboard.SettingsScreen
 import com.nexus.feature.reader.office.OfficeReaderScreen
 import com.nexus.feature.reader.pdf.PdfReaderScreen
 import com.nexus.feature.reader.text.TextReaderScreen
+import com.nexus.feature.scanner.ui.ScannerScreen
 import com.nexus.nexusdocs.ui.splash.NexusSplashScreen
 import com.nexus.nexusdocs.ui.UnsupportedFileScreen
+import com.nexus.nexusdocs.ui.welcome.WelcomeScreen
+import com.nexus.nexusdocs.ui.welcome.PermissionScreen
 
-import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.runtime.CompositionLocalProvider
-import com.nexus.core.navigation.LocalSharedTransitionScope
-import com.nexus.core.navigation.LocalAnimatedVisibilityScope
+// ─── Utilities ─────────────────────────────────────────────────────
+import android.util.Log
+import androidx.hilt.navigation.compose.hiltViewModel
+import java.net.URLDecoder
 
-import com.nexus.core.ui.animations.DurationMedium2
-import com.nexus.core.ui.animations.DurationMedium3
-import com.nexus.core.ui.animations.DurationShort4
-import com.nexus.core.ui.animations.EmphasizedDecelerateEasing
-import com.nexus.core.ui.animations.EmphasizedAccelerateEasing
+// ════════════════════════════════════════════════════════════════════
+// SECTION 1: CONSTANTS
+// ════════════════════════════════════════════════════════════════════
 
-// ─── Navigation Host ──────────────────────────────────────────────────────────
-// Central NavHost wiring all destinations together.
-// The :app module is the only place that imports feature modules —
-// all other modules only depend on :core.
+object NavConstants {
+    // ─── Animation Durations (milliseconds) ─────────────────────────
+    const val DURATION_SPLASH_ENTER = 400
+    const val DURATION_SPLASH_EXIT = 300
+    
+    const val DURATION_DASHBOARD_ENTER = 400
+    const val DURATION_DASHBOARD_EXIT = 300
+    const val DURATION_DASHBOARD_BACK = 300
+    
+    const val DURATION_SETTINGS_ENTER = 350
+    const val DURATION_SETTINGS_EXIT = 250
+    const val DURATION_SETTINGS_BACK = 300
+    
+    const val DURATION_SCANNER_ENTER = 400
+    const val DURATION_SCANNER_EXIT = 300
+    const val DURATION_SCANNER_BACK = 300
+    
+    const val DURATION_READER_ENTER = 400
+    const val DURATION_READER_EXIT = 350
+    const val DURATION_READER_BACK = 350
+    
+    const val DURATION_UNSUPPORTED_ENTER = 400
+    const val DURATION_UNSUPPORTED_EXIT = 300
+    const val DURATION_UNSUPPORTED_BACK = 350
+    
+    // ─── Default Values ─────────────────────────────────────────────
+    const val DEFAULT_FILE_NAME = "Document"
+    const val DEFAULT_DOC_TYPE = "DOCX"
+    
+    // ─── Offset Values (dp) ─────────────────────────────────────────
+    const val OFFSET_SLIDE_HORIZONTAL_READER = 500
+    const val OFFSET_SLIDE_VERTICAL_SPLASH = 100
+    const val OFFSET_SLIDE_SETTINGS = 300
+    const val OFFSET_SLIDE_DASHBOARD = 200
+    
+    // ─── Scale Values ───────────────────────────────────────────────
+    const val SCALE_SCANNER_ENTER = 0.8f
+    const val SCALE_SCANNER_EXIT = 0.8f
+    const val SCALE_SPLASH_EXIT = 0.95f
+    const val SCALE_NORMAL = 1.0f
+}
 
-@OptIn(ExperimentalSharedTransitionApi::class)
+// ════════════════════════════════════════════════════════════════════
+// SECTION 2: ANIMATION SPECIFICATIONS
+// ════════════════════════════════════════════════════════════════════
+
+sealed class NavTransitionSpec(
+    val enterDuration: Int,
+    val exitDuration: Int,
+    val enterEasing: Easing,
+    val exitEasing: Easing
+) {
+    /** Splash screen: app launch ceremony animation */
+    object SplashScreen : NavTransitionSpec(
+        enterDuration = NavConstants.DURATION_SPLASH_ENTER,
+        exitDuration = NavConstants.DURATION_SPLASH_EXIT,
+        enterEasing = EmphasizedDecelerateEasing,
+        exitEasing = EmphasizedAccelerateEasing
+    )
+    
+    /** Dashboard: hub screen, welcoming entrance */
+    object DashboardScreen : NavTransitionSpec(
+        enterDuration = NavConstants.DURATION_DASHBOARD_ENTER,
+        exitDuration = NavConstants.DURATION_DASHBOARD_EXIT,
+        enterEasing = EmphasizedDecelerateEasing,
+        exitEasing = EmphasizedAccelerateEasing
+    )
+    
+    /** Settings: secondary screen, horizontal slide */
+    object SettingsScreen : NavTransitionSpec(
+        enterDuration = NavConstants.DURATION_SETTINGS_ENTER,
+        exitDuration = NavConstants.DURATION_SETTINGS_EXIT,
+        enterEasing = EmphasizedDecelerateEasing,
+        exitEasing = EmphasizedAccelerateEasing
+    )
+    
+    /** Scanner: action screen, pop animation */
+    object ScannerScreen : NavTransitionSpec(
+        enterDuration = NavConstants.DURATION_SCANNER_ENTER,
+        exitDuration = NavConstants.DURATION_SCANNER_EXIT,
+        enterEasing = EmphasizedDecelerateEasing,
+        exitEasing = EmphasizedAccelerateEasing
+    )
+    
+    /** Reader screens: content viewers, horizontal slide */
+    object ReaderScreen : NavTransitionSpec(
+        enterDuration = NavConstants.DURATION_READER_ENTER,
+        exitDuration = NavConstants.DURATION_READER_EXIT,
+        enterEasing = EmphasizedDecelerateEasing,
+        exitEasing = EmphasizedAccelerateEasing
+    )
+    
+    /** Unsupported file: error state, shake animation */
+    object UnsupportedFileScreen : NavTransitionSpec(
+        enterDuration = NavConstants.DURATION_UNSUPPORTED_ENTER,
+        exitDuration = NavConstants.DURATION_UNSUPPORTED_EXIT,
+        enterEasing = EmphasizedDecelerateEasing,
+        exitEasing = EmphasizedAccelerateEasing
+    )
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SECTION 3: ANIMATION BUILDERS
+// ════════════════════════════════════════════════════════════════════
+
+// ─── SPLASH SCREEN ANIMATIONS ────────────────────────────────────────
+fun splashEnterTransition(): EnterTransition = fadeIn(
+    animationSpec = tween(NavConstants.DURATION_SPLASH_ENTER, easing = EmphasizedDecelerateEasing)
+) + slideInVertically(
+    initialOffsetY = { 100 },
+    animationSpec = tween(NavConstants.DURATION_SPLASH_ENTER, easing = EmphasizedDecelerateEasing)
+) + scaleIn(
+    initialScale = 0.95f,
+    animationSpec = tween(NavConstants.DURATION_SPLASH_ENTER, easing = EmphasizedDecelerateEasing)
+)
+
+fun splashExitTransition(): ExitTransition = fadeOut(
+    animationSpec = tween(NavConstants.DURATION_SPLASH_EXIT, easing = EmphasizedAccelerateEasing)
+) + slideOutVertically(
+    targetOffsetY = { -100 },
+    animationSpec = tween(NavConstants.DURATION_SPLASH_EXIT, easing = EmphasizedAccelerateEasing)
+) + scaleOut(
+    targetScale = 0.95f,
+    animationSpec = tween(NavConstants.DURATION_SPLASH_EXIT, easing = EmphasizedAccelerateEasing)
+)
+
+// ─── DASHBOARD SCREEN ANIMATIONS ─────────────────────────────────────
+fun dashboardEnterTransition(): EnterTransition = fadeIn(
+    animationSpec = tween(NavConstants.DURATION_DASHBOARD_ENTER, easing = EmphasizedDecelerateEasing)
+) + slideInVertically(
+    initialOffsetY = { 100 },
+    animationSpec = tween(NavConstants.DURATION_DASHBOARD_ENTER, easing = EmphasizedDecelerateEasing)
+)
+
+fun dashboardExitTransition(): ExitTransition = fadeOut(
+    animationSpec = tween(NavConstants.DURATION_DASHBOARD_EXIT, easing = EmphasizedAccelerateEasing)
+) + slideOutHorizontally(
+    targetOffsetX = { 200 },
+    animationSpec = tween(NavConstants.DURATION_DASHBOARD_EXIT, easing = EmphasizedAccelerateEasing)
+)
+
+fun dashboardBackEnterTransition(): EnterTransition = fadeIn(
+    animationSpec = tween(NavConstants.DURATION_DASHBOARD_BACK, easing = EmphasizedDecelerateEasing)
+) + slideInHorizontally(
+    initialOffsetX = { -200 },
+    animationSpec = tween(NavConstants.DURATION_DASHBOARD_BACK, easing = EmphasizedDecelerateEasing)
+)
+
+fun dashboardBackExitTransition(): ExitTransition = fadeOut(
+    animationSpec = tween(NavConstants.DURATION_DASHBOARD_BACK, easing = EmphasizedAccelerateEasing)
+) + slideOutHorizontally(
+    targetOffsetX = { 200 },
+    animationSpec = tween(NavConstants.DURATION_DASHBOARD_BACK, easing = EmphasizedAccelerateEasing)
+)
+
+// ─── SETTINGS SCREEN ANIMATIONS ──────────────────────────────────────
+fun settingsEnterTransition(): EnterTransition = fadeIn(
+    animationSpec = tween(NavConstants.DURATION_SETTINGS_ENTER, easing = EmphasizedDecelerateEasing)
+) + slideInHorizontally(
+    initialOffsetX = { 300 },
+    animationSpec = tween(NavConstants.DURATION_SETTINGS_ENTER, easing = EmphasizedDecelerateEasing)
+)
+
+fun settingsExitTransition(): ExitTransition = fadeOut(
+    animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedAccelerateEasing)
+) + slideOutHorizontally(
+    targetOffsetX = { 300 },
+    animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedAccelerateEasing)
+)
+
+fun settingsBackEnterTransition(): EnterTransition = fadeIn(
+    animationSpec = tween(NavConstants.DURATION_SETTINGS_BACK, easing = EmphasizedDecelerateEasing)
+) + slideInHorizontally(
+    initialOffsetX = { -300 },
+    animationSpec = tween(NavConstants.DURATION_SETTINGS_BACK, easing = EmphasizedDecelerateEasing)
+)
+
+fun settingsBackExitTransition(): ExitTransition = fadeOut(
+    animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedAccelerateEasing)
+) + slideOutHorizontally(
+    targetOffsetX = { 300 },
+    animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedAccelerateEasing)
+)
+
+// ─── SCANNER SCREEN ANIMATIONS ───────────────────────────────────────
+fun scannerEnterTransition(): EnterTransition = fadeIn(
+    animationSpec = tween(NavConstants.DURATION_SCANNER_ENTER, easing = EmphasizedDecelerateEasing)
+) + scaleIn(
+    initialScale = 0.8f,
+    animationSpec = tween(NavConstants.DURATION_SCANNER_ENTER, easing = EmphasizedDecelerateEasing)
+)
+
+fun scannerExitTransition(): ExitTransition = fadeOut(
+    animationSpec = tween(NavConstants.DURATION_SCANNER_EXIT, easing = EmphasizedAccelerateEasing)
+) + scaleOut(
+    targetScale = 0.8f,
+    animationSpec = tween(NavConstants.DURATION_SCANNER_EXIT, easing = EmphasizedAccelerateEasing)
+)
+
+fun scannerBackEnterTransition(): EnterTransition = fadeIn(
+    animationSpec = tween(NavConstants.DURATION_SCANNER_BACK, easing = EmphasizedDecelerateEasing)
+) + scaleIn(
+    initialScale = 0.95f,
+    animationSpec = tween(NavConstants.DURATION_SCANNER_BACK, easing = EmphasizedDecelerateEasing)
+)
+
+fun scannerBackExitTransition(): ExitTransition = fadeOut(
+    animationSpec = tween(NavConstants.DURATION_SCANNER_EXIT, easing = EmphasizedAccelerateEasing)
+) + scaleOut(
+    targetScale = 0.8f,
+    animationSpec = tween(NavConstants.DURATION_SCANNER_EXIT, easing = EmphasizedAccelerateEasing)
+)
+
+// ─── READER SCREEN ANIMATIONS ────────────────────────────────────────
+fun readerEnterTransition(): EnterTransition = fadeIn(
+    animationSpec = tween(NavConstants.DURATION_READER_ENTER, easing = EmphasizedDecelerateEasing)
+) + slideInHorizontally(
+    initialOffsetX = { 500 },
+    animationSpec = tween(NavConstants.DURATION_READER_ENTER, easing = EmphasizedDecelerateEasing)
+)
+
+fun readerExitTransition(): ExitTransition = fadeOut(
+    animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedAccelerateEasing)
+) + slideOutHorizontally(
+    targetOffsetX = { 500 },
+    animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedAccelerateEasing)
+)
+
+fun readerBackEnterTransition(): EnterTransition = fadeIn(
+    animationSpec = tween(NavConstants.DURATION_READER_BACK, easing = EmphasizedDecelerateEasing)
+) + slideInHorizontally(
+    initialOffsetX = { -500 },
+    animationSpec = tween(NavConstants.DURATION_READER_BACK, easing = EmphasizedDecelerateEasing)
+)
+
+fun readerBackExitTransition(): ExitTransition = fadeOut(
+    animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedAccelerateEasing)
+) + slideOutHorizontally(
+    targetOffsetX = { 500 },
+    animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedAccelerateEasing)
+)
+
+// ─── UNSUPPORTED FILE SCREEN ANIMATIONS ──────────────────────────────
+fun unsupportedEnterTransition(): EnterTransition = fadeIn(
+    animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_ENTER, easing = EmphasizedDecelerateEasing)
+) + slideInVertically(
+    initialOffsetY = { -50 },
+    animationSpec = tween(200, easing = EmphasizedAccelerateEasing)
+)
+
+fun unsupportedExitTransition(): ExitTransition = fadeOut(
+    animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_EXIT, easing = EmphasizedAccelerateEasing)
+) + slideOutVertically(
+    targetOffsetY = { 100 },
+    animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_EXIT, easing = EmphasizedAccelerateEasing)
+)
+
+fun unsupportedBackEnterTransition(): EnterTransition = fadeIn(
+    animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_BACK, easing = EmphasizedDecelerateEasing)
+) + slideInVertically(
+    initialOffsetY = { 100 },
+    animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_BACK, easing = EmphasizedDecelerateEasing)
+)
+
+fun unsupportedBackExitTransition(): ExitTransition = fadeOut(
+    animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_EXIT, easing = EmphasizedAccelerateEasing)
+) + slideOutVertically(
+    targetOffsetY = { 100 },
+    animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_EXIT, easing = EmphasizedAccelerateEasing)
+)
+
+// ════════════════════════════════════════════════════════════════════
+// SECTION 4: ARGUMENT EXTENSION HELPERS
+// ════════════════════════════════════════════════════════════════════
+
+object NavArgumentExtensions {
+    fun NavBackStackEntry.getStringArgument(
+        key: String,
+        default: String = ""
+    ): String = arguments?.getString(key)?.takeIf { it.isNotBlank() } ?: default
+    
+    fun NavBackStackEntry.getDecodedUri(key: String): String {
+        val encoded = arguments?.getString(key) ?: return ""
+        return try {
+            URLDecoder.decode(encoded, "UTF-8")
+        } catch (e: Exception) {
+            Log.e("NavArguments", "Failed to decode URI: ${e.message}")
+            ""
+        }
+    }
+    
+    fun NavBackStackEntry.validateDocumentType(
+        key: String,
+        validTypes: List<String> = listOf("DOCX", "XLSX", "PPTX", "PDF", "TXT")
+    ): String {
+        val type = arguments?.getString(key) ?: return NavConstants.DEFAULT_DOC_TYPE
+        return if (type in validTypes) type else NavConstants.DEFAULT_DOC_TYPE
+    }
+    
+    fun NavBackStackEntry.getFileNameArgument(
+        key: String,
+        fallback: String = NavConstants.DEFAULT_FILE_NAME
+    ): String {
+        return try {
+            val encoded = arguments?.getString(key) ?: return fallback
+            URLDecoder.decode(encoded, "UTF-8")
+        } catch (e: Exception) {
+            Log.w("NavArguments", "Failed to decode file name, using fallback")
+            fallback
+        }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SECTION 5: COMPOSABLE WRAPPERS & HELPERS
+// ════════════════════════════════════════════════════════════════════
+
+/**
+ * Wraps screen content with proper AnimatedVisibilityScope.
+ * Eliminates repetitive CompositionLocalProvider boilerplate.
+ */
+@Composable
+private inline fun AnimatedVisibilityScope.AnimatedScreen(
+    crossinline content: @Composable () -> Unit
+) {
+    CompositionLocalProvider(
+        LocalAnimatedVisibilityScope provides this@AnimatedScreen
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun AnimatedVisibilityScope.SplashRoute(navController: NavHostController) {
+    AnimatedScreen {
+        NexusSplashScreen(
+            onSplashComplete = {
+                navController.navigate(NexusRoute.Dashboard.route) {
+                    popUpTo(NexusRoute.Splash.route) { inclusive = true }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun AnimatedVisibilityScope.WelcomeRoute(navController: NavHostController) {
+    AnimatedScreen {
+        WelcomeScreen(
+            onFinish = {
+                navController.navigate(NexusRoute.Permission.route) {
+                    popUpTo(NexusRoute.Welcome.route) { inclusive = true }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun AnimatedVisibilityScope.PermissionRoute(navController: NavHostController, onFirstLaunchComplete: () -> Unit) {
+    AnimatedScreen {
+        PermissionScreen(
+            onPermissionHandled = {
+                onFirstLaunchComplete()
+                navController.navigate(NexusRoute.Splash.route) {
+                    popUpTo(NexusRoute.Permission.route) { inclusive = true }
+                }
+            }
+        )
+    }
+}
+
+private tailrec fun android.content.Context.findActivity(): ComponentActivity? = when (this) {
+    is ComponentActivity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+@Composable
+private fun AnimatedVisibilityScope.DashboardRoute(router: DocumentReaderRouter) {
+    AnimatedScreen {
+        val activity = LocalContext.current.findActivity()
+        if (activity == null) {
+            Log.e("NexusNavHost", "Activity not available for Dashboard")
+        } else {
+            val viewModel: DashboardViewModel = hiltViewModel(activity)
+            DashboardScreen(router = router, viewModel = viewModel)
+        }
+    }
+}
+
+@Composable
+private fun AnimatedVisibilityScope.SettingsRoute(router: DocumentReaderRouter) {
+    AnimatedScreen {
+        SettingsScreen(onBack = { router.navigateBack() })
+    }
+}
+
+@Composable
+private fun AnimatedVisibilityScope.ScannerRoute(router: DocumentReaderRouter) {
+    AnimatedScreen {
+        ScannerScreen(onBack = { router.navigateBack() })
+    }
+}
+
+@Composable
+private fun AnimatedVisibilityScope.PdfReaderRoute(
+    backStackEntry: NavBackStackEntry,
+    router: DocumentReaderRouter
+) {
+    AnimatedScreen {
+        val encodedUri = with(NavArgumentExtensions) { backStackEntry.getDecodedUri(NexusRoute.PdfReader.ARG_URI) }
+        val fileName = with(NavArgumentExtensions) { backStackEntry.getFileNameArgument(NexusRoute.PdfReader.ARG_FILE_NAME) }
+        
+        if (encodedUri.isBlank()) {
+            Log.w("PdfReader", "No URI provided, showing unsupported screen")
+            UnsupportedFileScreen(fileName = fileName, onBack = { router.navigateBack() })
+        } else {
+            PdfReaderScreen(
+                encodedUri = encodedUri,
+                fileName = fileName,
+                onBack = { router.navigateBack() }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AnimatedVisibilityScope.OfficeReaderRoute(
+    backStackEntry: NavBackStackEntry,
+    router: DocumentReaderRouter
+) {
+    AnimatedScreen {
+        val encodedUri = with(NavArgumentExtensions) { backStackEntry.getDecodedUri(NexusRoute.OfficeReader.ARG_URI) }
+        val fileName = with(NavArgumentExtensions) { backStackEntry.getFileNameArgument(NexusRoute.OfficeReader.ARG_FILE_NAME) }
+        val docType = with(NavArgumentExtensions) { backStackEntry.validateDocumentType(NexusRoute.OfficeReader.ARG_DOC_TYPE) }
+        
+        if (encodedUri.isBlank()) {
+            Log.w("OfficeReader", "No URI provided, showing unsupported screen")
+            UnsupportedFileScreen(fileName = fileName, onBack = { router.navigateBack() })
+        } else {
+            OfficeReaderScreen(
+                encodedUri = encodedUri,
+                fileName = fileName,
+                docType = docType,
+                onBack = { router.navigateBack() }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AnimatedVisibilityScope.TextReaderRoute(
+    backStackEntry: NavBackStackEntry,
+    router: DocumentReaderRouter
+) {
+    AnimatedScreen {
+        val encodedUri = with(NavArgumentExtensions) { backStackEntry.getDecodedUri(NexusRoute.TextReader.ARG_URI) }
+        val fileName = with(NavArgumentExtensions) { backStackEntry.getFileNameArgument(NexusRoute.TextReader.ARG_FILE_NAME) }
+        
+        if (encodedUri.isBlank()) {
+            Log.w("TextReader", "No URI provided, showing unsupported screen")
+            UnsupportedFileScreen(fileName = fileName, onBack = { router.navigateBack() })
+        } else {
+            TextReaderScreen(
+                encodedUri = encodedUri,
+                fileName = fileName,
+                onBack = { router.navigateBack() }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AnimatedVisibilityScope.UnsupportedFileRoute(
+    backStackEntry: NavBackStackEntry,
+    router: DocumentReaderRouter
+) {
+    AnimatedScreen {
+        val fileName = with(NavArgumentExtensions) { backStackEntry.getFileNameArgument("fileName", NavConstants.DEFAULT_FILE_NAME) }
+        UnsupportedFileScreen(fileName = fileName, onBack = { router.navigateBack() })
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SECTION 6: MAIN NAVIGATION HOST
+// ════════════════════════════════════════════════════════════════════
+
+/**
+ * Central navigation host wiring all application destinations.
+ * 
+ * Provides coordinated screen transitions with Material Design 3 motion guidelines:
+ * - Entrance transitions: Smooth, welcoming animations (EmphasizedDecelerate easing)
+ * - Exit transitions: Quick, responsive animations (EmphasizedAccelerate easing)
+ * - Back navigation: Faster, predictable reverse animations
+ * 
+ * Each route has unique animation profile reflecting its purpose:
+ * - Dashboard: Hub screen with upward slide (welcoming)
+ * - Settings/Scanner: Secondary screens with horizontal slide (distinct)
+ * - Readers: Content screens with side slide (purposeful)
+ * - Unsupported: Error state with shake (warning)
+ * 
+ * @param navController Controls navigation between routes
+ * @param router Handles document-specific navigation logic
+ * @param modifier Compose modifier for layout customization
+ * 
+ * @see NavTransitionSpec for animation configuration
+ * @see NavArgumentExtensions for safe argument retrieval
+ */
 @Composable
 fun NexusNavHost(
     navController: NavHostController,
     router: DocumentReaderRouter,
+    startDestination: String,
+    onFirstLaunchComplete: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     SharedTransitionLayout {
@@ -64,112 +569,113 @@ fun NexusNavHost(
         ) {
             NavHost(
                 navController = navController,
-                startDestination = NexusRoute.Splash.route,
-                modifier = modifier,
-                // ── Forward push: new screen fades in ──────────────────
-                enterTransition = {
-                    fadeIn(animationSpec = tween(DurationMedium2, easing = EmphasizedDecelerateEasing))
-                },
-                // ── Forward push: old screen fades out ────────────────────
-                exitTransition = {
-                    fadeOut(animationSpec = tween(DurationShort4, easing = EmphasizedAccelerateEasing))
-                },
-                // ── Back pop: previous screen fades in ─────────────
-                popEnterTransition = {
-                    fadeIn(animationSpec = tween(DurationMedium2, easing = EmphasizedDecelerateEasing))
-                },
-                // ── Back pop: current screen fades out ───────────────────
-                popExitTransition = {
-                    fadeOut(animationSpec = tween(DurationShort4, easing = EmphasizedAccelerateEasing))
-                }
+                startDestination = startDestination,
+                modifier = modifier
             ) {
-                // ── Splash ────────────────────────────────────────────────────────────
-                composable(route = NexusRoute.Splash.route) {
-                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
-                        NexusSplashScreen(
-                            onSplashComplete = {
-                                navController.navigate(NexusRoute.Dashboard.route) {
-                                    popUpTo(NexusRoute.Splash.route) { inclusive = true }
-                                }
-                            }
-                        )
-                    }
+                // ─── Welcome Screen ──────────────────────────────────────
+                composable(
+                    route = NexusRoute.Welcome.route,
+                    enterTransition = { splashEnterTransition() },
+                    exitTransition = { splashExitTransition() }
+                ) {
+                    WelcomeRoute(navController)
                 }
 
-                // ── Dashboard ─────────────────────────────────────────────────────────
-                composable(route = NexusRoute.Dashboard.route) {
-                    val activity = androidx.compose.ui.platform.LocalContext.current as androidx.activity.ComponentActivity
-                    val dashboardViewModel: com.nexus.feature.dashboard.DashboardViewModel = androidx.hilt.navigation.compose.hiltViewModel(activity)
-                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
-                        DashboardScreen(router = router, viewModel = dashboardViewModel)
-                    }
+                // ─── Permission Screen ───────────────────────────────────
+                composable(
+                    route = NexusRoute.Permission.route,
+                    enterTransition = { splashEnterTransition() },
+                    exitTransition = { splashExitTransition() }
+                ) {
+                    PermissionRoute(navController, onFirstLaunchComplete)
                 }
 
-                // ── Settings ──────────────────────────────────────────────────────────
-                composable(route = NexusRoute.Settings.route) {
-                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
-                        SettingsScreen(onBack = { router.navigateBack() })
-                    }
+                // ─── Splash Screen ───────────────────────────────────────
+                composable(
+                    route = NexusRoute.Splash.route,
+                    enterTransition = { splashEnterTransition() },
+                    exitTransition = { splashExitTransition() }
+                ) {
+                    SplashRoute(navController)
                 }
 
-                // ── Scanner ───────────────────────────────────────────────────────────
-                composable(route = NexusRoute.Scanner.route) {
-                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
-                        com.nexus.feature.scanner.ui.ScannerScreen(onBack = { router.navigateBack() })
-                    }
+                // ─── Dashboard Screen ────────────────────────────────────
+                composable(
+                    route = NexusRoute.Dashboard.route,
+                    enterTransition = { dashboardEnterTransition() },
+                    exitTransition = { dashboardExitTransition() },
+                    popEnterTransition = { dashboardBackEnterTransition() },
+                    popExitTransition = { dashboardBackExitTransition() }
+                ) {
+                    DashboardRoute(router)
                 }
 
-                // ── PDF Reader ────────────────────────────────────────────────────────
-                composable(route = NexusRoute.PdfReader.ROUTE) { backStackEntry ->
-                    val encodedUri = backStackEntry.arguments?.getString(NexusRoute.PdfReader.ARG_URI) ?: ""
-                    val fileName = backStackEntry.arguments?.getString(NexusRoute.PdfReader.ARG_FILE_NAME) ?: "Document"
-                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
-                        PdfReaderScreen(
-                            encodedUri = encodedUri,
-                            fileName = fileName,
-                            onBack = { router.navigateBack() }
-                        )
-                    }
+                // ─── Settings Screen ─────────────────────────────────────
+                composable(
+                    route = NexusRoute.Settings.route,
+                    enterTransition = { settingsEnterTransition() },
+                    exitTransition = { settingsExitTransition() },
+                    popEnterTransition = { settingsBackEnterTransition() },
+                    popExitTransition = { settingsBackExitTransition() }
+                ) {
+                    SettingsRoute(router)
                 }
 
-                // ── Office Reader (DOCX / XLSX) ──────────────────────────────────────
-                composable(route = NexusRoute.OfficeReader.ROUTE) { backStackEntry ->
-                    val encodedUri = backStackEntry.arguments?.getString(NexusRoute.OfficeReader.ARG_URI) ?: ""
-                    val fileName = backStackEntry.arguments?.getString(NexusRoute.OfficeReader.ARG_FILE_NAME) ?: "Document"
-                    val docType = backStackEntry.arguments?.getString(NexusRoute.OfficeReader.ARG_DOC_TYPE) ?: "DOCX"
-                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
-                        OfficeReaderScreen(
-                            encodedUri = encodedUri,
-                            fileName = fileName,
-                            docType = docType,
-                            onBack = { router.navigateBack() }
-                        )
-                    }
+                // ─── Scanner Screen ──────────────────────────────────────
+                composable(
+                    route = NexusRoute.Scanner.route,
+                    enterTransition = { scannerEnterTransition() },
+                    exitTransition = { scannerExitTransition() },
+                    popEnterTransition = { scannerBackEnterTransition() },
+                    popExitTransition = { scannerBackExitTransition() }
+                ) {
+                    ScannerRoute(router)
                 }
 
-                // ── Text Reader ───────────────────────────────────────────────────────
-                composable(route = NexusRoute.TextReader.ROUTE) { backStackEntry ->
-                    val encodedUri = backStackEntry.arguments?.getString(NexusRoute.TextReader.ARG_URI) ?: ""
-                    val fileName = backStackEntry.arguments?.getString(NexusRoute.TextReader.ARG_FILE_NAME) ?: "Document.txt"
-                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
-                        TextReaderScreen(
-                            encodedUri = encodedUri,
-                            fileName = fileName,
-                            onBack = { router.navigateBack() }
-                        )
-                    }
+                // ─── PDF Reader Screen ────────────────────────────────────
+                composable(
+                    route = NexusRoute.PdfReader.ROUTE,
+                    enterTransition = { readerEnterTransition() },
+                    exitTransition = { readerExitTransition() },
+                    popEnterTransition = { readerBackEnterTransition() },
+                    popExitTransition = { readerBackExitTransition() }
+                ) { backStackEntry ->
+                    PdfReaderRoute(backStackEntry, router)
                 }
 
-                // ── Unsupported File ──────────────────────────────────────────────────
-                composable(route = NexusRoute.Unsupported.ROUTE) { backStackEntry ->
-                    val fileName = backStackEntry.arguments?.getString("fileName")
-                        ?.let { java.net.URLDecoder.decode(java.net.URLDecoder.decode(it, "UTF-8"), "UTF-8") } ?: "Unknown file"
-                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
-                        UnsupportedFileScreen(fileName = fileName, onBack = { router.navigateBack() })
-                    }
+                // ─── Office Reader Screen ─────────────────────────────────
+                composable(
+                    route = NexusRoute.OfficeReader.ROUTE,
+                    enterTransition = { readerEnterTransition() },
+                    exitTransition = { readerExitTransition() },
+                    popEnterTransition = { readerBackEnterTransition() },
+                    popExitTransition = { readerBackExitTransition() }
+                ) { backStackEntry ->
+                    OfficeReaderRoute(backStackEntry, router)
+                }
+
+                // ─── Text Reader Screen ───────────────────────────────────
+                composable(
+                    route = NexusRoute.TextReader.ROUTE,
+                    enterTransition = { readerEnterTransition() },
+                    exitTransition = { readerExitTransition() },
+                    popEnterTransition = { readerBackEnterTransition() },
+                    popExitTransition = { readerBackExitTransition() }
+                ) { backStackEntry ->
+                    TextReaderRoute(backStackEntry, router)
+                }
+
+                // ─── Unsupported File Screen ──────────────────────────────
+                composable(
+                    route = NexusRoute.Unsupported.ROUTE,
+                    enterTransition = { unsupportedEnterTransition() },
+                    exitTransition = { unsupportedExitTransition() },
+                    popEnterTransition = { unsupportedBackEnterTransition() },
+                    popExitTransition = { unsupportedBackExitTransition() }
+                ) { backStackEntry ->
+                    UnsupportedFileRoute(backStackEntry, router)
                 }
             }
         }
     }
 }
-

@@ -154,28 +154,11 @@ fun SettingsScreen(
             .fillMaxSize()
             .background(NexusTheme.colors.background)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            NexusTopBar(
-                title = "Settings",
-                navigationIcon = {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_back),
-                        contentDescription = "Back",
-                        modifier = Modifier
-                            .clip(androidx.compose.foundation.shape.CircleShape)
-                            .springBounceClick { onBack() }
-                            .padding(16.dp)
-                            .size(24.dp),
-                        colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
-                    )
-                }
-            )
-            
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 80.dp, bottom = 120.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
                 item {
                     SettingsSectionGroup(
                         label = "Appearance"
@@ -306,7 +289,23 @@ fun SettingsScreen(
                     }
                 }
             }
-        }
+        
+        NexusTopBar(
+            title = "Settings",
+            modifier = Modifier.align(Alignment.TopCenter),
+            navigationIcon = {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_back),
+                    contentDescription = "Back",
+                    modifier = Modifier
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .springBounceClick { onBack() }
+                        .padding(16.dp)
+                        .size(24.dp),
+                    colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
+                )
+            }
+        )
     }
 
     if (showClearCacheDialog) {
@@ -456,15 +455,10 @@ private fun SettingsSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     iconRes: Int
 ) {
-    val backgroundColor by animateColorAsState(
-        targetValue = if (checked) NexusTheme.colors.primary.copy(alpha = 0.05f) else Color.Transparent,
-        label = "switchRowBackground"
-    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .springBounceClick { onCheckedChange(!checked) }
-            .background(backgroundColor)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -624,6 +618,7 @@ private fun SettingsDivider() {
     )
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun ThemeSelectionDialog(
     currentTheme: ThemeMode,
@@ -640,147 +635,89 @@ private fun ThemeSelectionDialog(
         Triple(ThemeMode.SUNSET, "Sunset", R.drawable.ic_theme_sunset)
     )
 
-    var dragOffset by remember { mutableStateOf(0f) }
-    var isVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { isVisible = true }
-    
-    val animatedOffset by animateFloatAsState(
-        targetValue = if (isVisible) dragOffset else 1000f,
-        animationSpec = androidx.compose.animation.core.spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
-        ),
-        finishedListener = { if (!isVisible) onDismiss() }
-    )
-    
-    val handleDismiss = { isVisible = false }
-
-    Dialog(
-        onDismissRequest = handleDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState()
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = NexusTheme.colors.surface,
+        contentColor = NexusTheme.colors.textPrimary,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
-        Box(
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 24.dp)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = handleDismiss
-                ),
-            contentAlignment = Alignment.BottomCenter
+                .fillMaxWidth()
+                .padding(bottom = 32.dp)
+                .padding(horizontal = 16.dp)
         ) {
-            NexusSurface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .offset { androidx.compose.ui.unit.IntOffset(0, animatedOffset.toInt()) }
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures(
-                            onDragEnd = { 
-                                if (dragOffset > 150f) handleDismiss() else dragOffset = 0f 
-                            },
-                            onDragCancel = { dragOffset = 0f },
-                            onVerticalDrag = { _, dragAmount ->
-                                dragOffset = (dragOffset + dragAmount).coerceAtLeast(0f)
-                            }
-                        )
-                    }
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {} // Prevent clicks on the dialog from dismissing it
-                    ),
-                shape = NexusTheme.shapes.large,
-                elevation = 24.dp,
-                color = NexusTheme.colors.surface
-            ) {
-                Column(
+            NexusText(
+                text = "Theme",
+                style = NexusTheme.typography.title,
+                modifier = Modifier.padding(bottom = 4.dp, start = 8.dp, end = 8.dp)
+            )
+            NexusText(
+                text = "Choose how the app looks",
+                style = NexusTheme.typography.body,
+                color = NexusTheme.colors.textSecondary,
+                modifier = Modifier.padding(bottom = 16.dp, start = 8.dp, end = 8.dp)
+            )
+
+            options.forEach { (mode, label, iconRes) ->
+                val isSelected = currentTheme == mode
+                val contentColor = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textPrimary
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .clip(NexusTheme.shapes.medium)
+                        .springBounceClick { onThemeSelected(mode) }
+                        .padding(vertical = 12.dp, horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
-                            .width(32.dp)
-                            .height(4.dp)
-                            .clip(NexusTheme.shapes.pill)
-                            .background(NexusTheme.colors.textSecondary.copy(alpha = 0.2f))
-                            .align(Alignment.CenterHorizontally)
-                    )
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    NexusText(
-                        text = "Theme",
-                        style = NexusTheme.typography.title,
-                        modifier = Modifier.padding(bottom = 4.dp, start = 8.dp, end = 8.dp)
-                    )
-                    NexusText(
-                        text = "Choose how the app looks",
-                        style = NexusTheme.typography.body,
-                        color = NexusTheme.colors.textSecondary,
-                        modifier = Modifier.padding(bottom = 16.dp, start = 8.dp, end = 8.dp)
-                    )
-
-                    options.forEach { (mode, label, iconRes) ->
-                        val isSelected = currentTheme == mode
-                        val contentColor = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textPrimary
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(NexusTheme.shapes.medium)
-                                .springBounceClick { onThemeSelected(mode) }
-                                .padding(vertical = 12.dp, horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(contentColor.copy(alpha = 0.1f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Image(
-                                    painter = painterResource(id = iconRes),
-                                    contentDescription = label,
-                                    modifier = Modifier.size(20.dp),
-                                    colorFilter = ColorFilter.tint(contentColor)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            
-                            val swatchColor = when (mode) {
-                                ThemeMode.LIGHT -> Color(0xFFF8F9FA)
-                                ThemeMode.DARK -> Color(0xFF1E1E1E)
-                                ThemeMode.AMOLED -> Color.Black
-                                ThemeMode.SEPIA -> Color(0xFFF4ECD8)
-                                ThemeMode.FOREST -> Color(0xFF2C3E2D)
-                                ThemeMode.SUNSET -> Color(0xFF3B2A38)
-                                ThemeMode.SYSTEM -> Color.Gray
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .clip(CircleShape)
-                                    .background(swatchColor)
-                                    .border(1.dp, NexusTheme.colors.textSecondary.copy(alpha = 0.3f), CircleShape)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            
-                            NexusText(
-                                text = label,
-                                style = NexusTheme.typography.body,
-                                color = contentColor,
-                                modifier = Modifier.weight(1f)
-                            )
-                            if (isSelected) {
-                                NexusText("\u2713", color = NexusTheme.colors.primary, style = NexusTheme.typography.title)
-                            }
-                        }
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(contentColor.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = iconRes),
+                            contentDescription = label,
+                            modifier = Modifier.size(20.dp),
+                            colorFilter = ColorFilter.tint(contentColor)
+                        )
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
+                    
+                    val swatchColor = when (mode) {
+                        ThemeMode.LIGHT -> Color(0xFFF8F9FA)
+                        ThemeMode.DARK -> Color(0xFF1E1E1E)
+                        ThemeMode.AMOLED -> Color.Black
+                        ThemeMode.SEPIA -> Color(0xFFF4ECD8)
+                        ThemeMode.FOREST -> Color(0xFF2C3E2D)
+                        ThemeMode.SUNSET -> Color(0xFF3B2A38)
+                        ThemeMode.SYSTEM -> Color.Gray
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(16.dp)
+                            .clip(CircleShape)
+                            .background(swatchColor)
+                            .border(1.dp, NexusTheme.colors.textSecondary.copy(alpha = 0.3f), CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    NexusText(
+                        text = label,
+                        style = NexusTheme.typography.body,
+                        color = contentColor,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (isSelected) {
+                        NexusText("\u2713", color = NexusTheme.colors.primary, style = NexusTheme.typography.title)
+                    }
                 }
             }
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }

@@ -312,7 +312,7 @@ private fun NexusBottomNavIcon(
 
     val iconTint by animateColorAsState(
         targetValue   = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textSecondary,
-        animationSpec = tween(durationMillis = DurationMedium3, easing = EmphasizedDecelerateEasing),
+        animationSpec = tween(durationMillis = DurationScreenEnter, easing = EmphasizedDecelerateEasing),
         label         = "iconTint"
     )
 

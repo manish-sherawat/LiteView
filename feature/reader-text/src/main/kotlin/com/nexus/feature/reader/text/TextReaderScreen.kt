@@ -60,13 +60,26 @@ fun TextReaderScreen(
     val listState = rememberLazyListState()
     
     val displayName = try { URLDecoder.decode(URLDecoder.decode(fileName, "UTF-8"), "UTF-8") } catch (_: Exception) { fileName }
+    val context = LocalContext.current
+    val decodedUri = try { URLDecoder.decode(encodedUri, "UTF-8") } catch (_: Exception) { encodedUri }
+    
+    val readerTheme by viewModel.readerTheme.collectAsStateWithLifecycle()
+    val readerBackgroundColor = when (readerTheme) {
+        "DARK" -> androidx.compose.ui.graphics.Color(0xFF1E1E1E)
+        "SEPIA" -> androidx.compose.ui.graphics.Color(0xFFF4ECD8)
+        else -> androidx.compose.ui.graphics.Color(0xFFF8F9FA) // LIGHT
+    }
+    val readerTextColor = when (readerTheme) {
+        "DARK" -> androidx.compose.ui.graphics.Color(0xFFE0E0E0)
+        "SEPIA" -> androidx.compose.ui.graphics.Color(0xFF5B4636)
+        else -> androidx.compose.ui.graphics.Color(0xFF1E1E1E) // LIGHT
+    }
 
     var isImmersiveMode by remember { mutableStateOf(false) }
     var showLineNumbers by remember { mutableStateOf(true) }
     
     val wordWrap by viewModel.isWordWrapEnabled.collectAsStateWithLifecycle()
     val fontSizeSp by viewModel.fontSize.collectAsStateWithLifecycle()
-    val readerTheme by viewModel.readerTheme.collectAsStateWithLifecycle()
     val matchCase by viewModel.matchCase.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
@@ -75,6 +88,10 @@ fun TextReaderScreen(
     var showSearchSheet by remember { mutableStateOf(false) }
     var showEncodingSheet by remember { mutableStateOf(false) }
     var showGoToLineSheet by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    var showInfoDialog by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var renameText by remember { mutableStateOf("") }
     val bottomInset = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 16.dp else 140.dp)
     val bottomPadding by animateDpAsState(targetValue = if (isImmersiveMode) bottomInset else bottomInset + 100.dp)
@@ -88,7 +105,7 @@ fun TextReaderScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(NexusTheme.colors.background)
+            .background(readerBackgroundColor)
     ) {
         AnimatedContent(
             targetState = uiState,
@@ -183,7 +200,7 @@ fun TextReaderScreen(
                                             style = NexusTheme.typography.body.copy(
                                                 fontSize = scaledFontSize,
                                                 lineHeight = scaledLineHeight,
-                                                color = NexusTheme.colors.textPrimary,
+                                                color = readerTextColor,
                                                 fontFamily = if (state.isCodeFile) androidx.compose.ui.text.font.FontFamily.Monospace else androidx.compose.ui.text.font.FontFamily.Default
                                             ),
                                             modifier = Modifier.background(bgColor),
@@ -206,6 +223,7 @@ fun TextReaderScreen(
                                     NexusVerticalScrollbar(
                                         pageCount = state.lines.size,
                                         sliderValue = sliderValue,
+                                        isScrolling = listState.isScrollInProgress,
                                         onSliderValueChange = { newValue ->
                                             sliderValue = newValue
                                             coroutineScope.launch {
@@ -234,8 +252,8 @@ fun TextReaderScreen(
                 AnimatedVisibility(
                     visible = !isImmersiveMode,
                     modifier = Modifier.align(Alignment.TopCenter),
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
+                    enter = androidx.compose.animation.slideInVertically(initialOffsetY = { -it }) + androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { -it }) + androidx.compose.animation.fadeOut()
                 ) {
                     NexusTopBar(
                         title = displayTitle,
@@ -273,6 +291,16 @@ fun TextReaderScreen(
                                         .clickable { showGoToLineSheet = true }
                                 )
                             }
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_more_vert),
+                                contentDescription = "More",
+                                colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary),
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(androidx.compose.foundation.shape.CircleShape)
+                                    .springBounceClick { showMenu = true }
+                                    .padding(8.dp)
+                            )
                         }
                     )
                 }
@@ -281,8 +309,8 @@ fun TextReaderScreen(
                 AnimatedVisibility(
                     visible = !isImmersiveMode,
                     modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 32.dp),
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
+                    enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }) + androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) + androidx.compose.animation.fadeOut()
                 ) {
                     NexusSurface(
                         shape = androidx.compose.foundation.shape.CircleShape,
@@ -291,7 +319,9 @@ fun TextReaderScreen(
                         modifier = Modifier.padding(horizontal = 16.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            modifier = Modifier
+                                .horizontalScroll(androidx.compose.foundation.rememberScrollState())
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
@@ -324,6 +354,13 @@ fun TextReaderScreen(
                                 contentDescription = "Toggle Theme",
                                 colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary),
                                 modifier = Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).springBounceClick { viewModel.setReaderTheme(if (readerTheme == "LIGHT") "DARK" else "LIGHT") }.padding(8.dp)
+                            )
+                            
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_share),
+                                contentDescription = "Share",
+                                colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary),
+                                modifier = Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).springBounceClick { viewModel.shareText(context, encodedUri) }.padding(8.dp)
                             )
                             
                             androidx.compose.foundation.Image(
@@ -409,6 +446,121 @@ fun TextReaderScreen(
                     NexusButton(text = "Cancel", isOutlined = true, onClick = { showGoToLineSheet = false })
                 }
             )
+        }
+
+        if (showMenu) {
+            TextOptionsBottomSheet(
+                onDismiss = { showMenu = false },
+                onRename = {
+                    showMenu = false
+                    renameText = displayName
+                    showRenameDialog = true
+                },
+                onFavorite = {
+                    showMenu = false
+                    // Favorite logic not fully implemented for txt yet, show toast
+                    android.widget.Toast.makeText(context, "Added to Favorites", android.widget.Toast.LENGTH_SHORT).show()
+                },
+                onPrint = {
+                    showMenu = false
+                    android.widget.Toast.makeText(context, "Printing text is not supported yet.", android.widget.Toast.LENGTH_SHORT).show()
+                },
+                onInfo = {
+                    showMenu = false
+                    showInfoDialog = true
+                }
+            )
+        }
+
+        if (showInfoDialog && uiState is TextReaderUiState.Success) {
+            val successState = uiState as TextReaderUiState.Success
+            com.nexus.core.ui.components.NexusDialog(
+                onDismissRequest = { showInfoDialog = false },
+                title = { NexusText("Document Info", style = NexusTheme.typography.h2) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        NexusText("File: $displayName", color = NexusTheme.colors.textPrimary)
+                        NexusText("Lines: ${successState.totalLineCount}", color = NexusTheme.colors.textPrimary)
+                        NexusText("Encoding: ${successState.charset}", color = NexusTheme.colors.textPrimary)
+                    }
+                },
+                confirmButton = {
+                    NexusButton(text = "OK", onClick = { showInfoDialog = false })
+                }
+            )
+        }
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun TextOptionsBottomSheet(
+    onDismiss: () -> Unit,
+    onRename: () -> Unit,
+    onFavorite: () -> Unit,
+    onPrint: () -> Unit,
+    onInfo: () -> Unit
+) {
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState()
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = com.nexus.core.theme.NexusTheme.colors.surface,
+        contentColor = com.nexus.core.theme.NexusTheme.colors.textPrimary,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 32.dp)
+                .padding(horizontal = 16.dp)
+        ) {
+            com.nexus.core.ui.NexusText(
+                text = "Document Options",
+                style = com.nexus.core.theme.NexusTheme.typography.title,
+                modifier = Modifier.padding(bottom = 16.dp, start = 8.dp, end = 8.dp)
+            )
+
+            val options = listOf(
+                Pair("File Info", "View document properties") to (com.nexus.core.R.drawable.ic_info to onInfo),
+                Pair("Rename", "Rename this file") to (com.nexus.core.R.drawable.ic_rename to onRename),
+                Pair("Favorite", "Add to bookmarks") to (com.nexus.core.R.drawable.ic_star to onFavorite),
+                Pair("Print", "Print or save as PDF") to (com.nexus.core.R.drawable.ic_printer to onPrint)
+            )
+
+            options.forEach { (labels, actionData) ->
+                val (title, subtitle) = labels
+                val (iconRes, action) = actionData
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(com.nexus.core.theme.NexusTheme.shapes.medium)
+                        .clickable { action() }
+                        .padding(vertical = 12.dp, horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = iconRes),
+                        contentDescription = title,
+                        modifier = Modifier.size(24.dp),
+                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(com.nexus.core.theme.NexusTheme.colors.textPrimary)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        com.nexus.core.ui.NexusText(
+                            text = title,
+                            style = com.nexus.core.theme.NexusTheme.typography.body,
+                            color = com.nexus.core.theme.NexusTheme.colors.textPrimary
+                        )
+                        com.nexus.core.ui.NexusText(
+                            text = subtitle,
+                            style = com.nexus.core.theme.NexusTheme.typography.caption,
+                            color = com.nexus.core.theme.NexusTheme.colors.textSecondary
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
