@@ -34,29 +34,32 @@ import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
 object WelcomeAnimationSpecs {
+    private val expoEasing = CubicBezierEasing(0.87f, 0f, 0.13f, 1f)
+    private val expoOutEasing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
+
     val pageTransitionSpec = tween<Float>(
-        durationMillis = 400,
-        easing = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)
+        durationMillis = 600,
+        easing = expoEasing
     )
     val buttonPressSpec = tween<Float>(
-        durationMillis = 150,
-        easing = FastOutSlowInEasing
+        durationMillis = 200,
+        easing = expoOutEasing
     )
     val fadeInSpec = tween<Float>(
-        durationMillis = 300,
-        easing = FastOutLinearInEasing
+        durationMillis = 400,
+        easing = expoOutEasing
     )
     val dotTransitionSpec = tween<Float>(
-        durationMillis = 300,
-        easing = CubicBezierEasing(0.77f, 0f, 0.175f, 1f)
+        durationMillis = 400,
+        easing = expoEasing
     )
     val screenEntrySpec = tween<Float>(
-        durationMillis = 400,
-        easing = FastOutSlowInEasing
+        durationMillis = 600,
+        easing = expoOutEasing
     )
-    const val staggerDelay = 100L
-    const val fadeInDuration = 300
-    const val pageTransitionDuration = 400
+    const val staggerDelay = 150L
+    const val fadeInDuration = 400
+    const val pageTransitionDuration = 600
 }
 
 @Composable

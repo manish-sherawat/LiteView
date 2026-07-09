@@ -1,0 +1,11 @@
+Version 2.5.0 - Changelog
+
+🎉 New Features
+- Brand New App Icon: Updated the app's launcher icon to a fresh, modern design. The icon now fully supports Android's adaptive shapes with a clean white background.
+
+✨ UI Polish & Screen Improvements
+- Welcome Screen Overhaul: Completely revamped the animations on the Welcome screen. Upgraded standard transitions to smooth, premium exponential easing curves that make the app feel incredibly fast, fluid, and physics-based.
+
+🐛 Bug Fixes
+- Adaptive Icon Cutoff Fix: Zoomed out the launcher icon's foreground to properly fit inside Android's adaptive shapes (like squircles and circles) so the logo no longer gets cut off.
+
