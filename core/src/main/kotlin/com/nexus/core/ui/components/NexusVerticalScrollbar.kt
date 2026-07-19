@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
@@ -17,9 +18,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.nexus.core.theme.NexusTheme
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.utils.glassBackground
@@ -107,27 +111,34 @@ fun NexusVerticalScrollbar(
         Row(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .offset { IntOffset(0, thumbOffsetPx.roundToInt()) },
+                .offset { IntOffset(0, thumbOffsetPx.roundToInt()) }
+                .wrapContentWidth(align = Alignment.End, unbounded = true),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.End
         ) {
             // Dynamic Page Indicator
             AnimatedVisibility(
                 visible = showIndicator,
-                enter = fadeIn() + scaleIn(initialScale = 0.8f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)),
-                exit = fadeOut() + scaleOut(targetScale = 0.8f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f))
+                enter = fadeIn() + scaleIn(initialScale = 0.85f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)),
+                exit = fadeOut() + scaleOut(targetScale = 0.85f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f))
             ) {
                 Box(
                     modifier = Modifier
                         .padding(end = 12.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .glassBackground(blurRadius = 40f, alpha = 0.9f, fallbackColor = NexusTheme.colors.surfaceVariant)
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .shadow(elevation = 6.dp, shape = NexusTheme.shapes.pill)
+                        .clip(NexusTheme.shapes.pill)
+                        .background(NexusTheme.colors.surface)
+                        .border(0.8.dp, NexusTheme.colors.divider.copy(alpha = 0.6f), NexusTheme.shapes.pill)
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
                 ) {
                     NexusText(
                         text = "${sliderValue.roundToInt()} / $pageCount",
-                        style = NexusTheme.typography.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
-                        color = NexusTheme.colors.textPrimary
+                        style = NexusTheme.typography.body.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        ),
+                        color = NexusTheme.colors.primary,
+                        maxLines = 1
                     )
                 }
             }

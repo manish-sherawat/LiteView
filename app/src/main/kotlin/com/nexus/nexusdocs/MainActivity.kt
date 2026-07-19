@@ -39,7 +39,6 @@ import com.nexus.core.preferences.UserPreferencesRepository
 import android.net.Uri
 
 import com.nexus.core.ui.components.NexusFloatingBottomNav
-import com.nexus.core.ui.components.NexusFloatingBottomNav
 import com.nexus.core.ui.components.NexusNavItem
 import com.nexus.nexusdocs.navigation.DocumentReaderRouterImpl
 import com.nexus.nexusdocs.navigation.NexusNavHost

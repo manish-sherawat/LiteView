@@ -19,8 +19,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import android.os.Build
 import com.nexus.core.theme.NexusTheme
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.NexusSurface
@@ -149,34 +152,45 @@ fun NexusTopBar(
     navigationIcon: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(NexusTheme.colors.surface.copy(alpha = 0.92f))
-            .statusBarsPadding()
+    Column(
+        modifier = modifier.fillMaxWidth()
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .background(NexusTheme.colors.surface)
+                .statusBarsPadding()
         ) {
-            if (navigationIcon != null) {
-                navigationIcon()
-            }
-            NexusText(
-                text = title,
-                style = titleStyle ?: NexusTheme.typography.title,
-                color = NexusTheme.colors.textPrimary,
-                maxLines = 1,
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 16.dp)
-                    .basicMarquee()
-            )
-            actions()
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (navigationIcon != null) {
+                    navigationIcon()
+                }
+                NexusText(
+                    text     = title,
+                    style    = titleStyle ?: NexusTheme.typography.title,
+                    color    = NexusTheme.colors.textPrimary,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 12.dp)
+                        .basicMarquee()
+                )
+                actions()
+            }
         }
+        // Hairline bottom divider
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(0.8.dp)
+                .background(NexusTheme.colors.divider.copy(alpha = 0.5f))
+        )
     }
 }
 

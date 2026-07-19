@@ -468,7 +468,6 @@ class DashboardViewModel @Inject constructor(
                 } else {
                     rawUri
                 }
-                
                 val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                     type = "*/*"
                     putExtra(android.content.Intent.EXTRA_STREAM, shareUri)
@@ -480,6 +479,55 @@ class DashboardViewModel @Inject constructor(
                 context.startActivity(chooser)
             } catch (e: Exception) {
                 _uiEvents.emit("Failed to share document")
+            }
+        }
+    }
+
+    /** Share multiple selected documents in a single chooser sheet. */
+    fun shareSelectedDocuments(uris: Set<String>) {
+        viewModelScope.launch {
+            try {
+                val shareUris = ArrayList<Uri>()
+                for (uriStr in uris) {
+                    val rawUri = Uri.parse(uriStr)
+                    val shareUri = if (rawUri.scheme == "file") {
+                        val file = java.io.File(rawUri.path ?: "")
+                        androidx.core.content.FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            file
+                        )
+                    } else {
+                        rawUri
+                    }
+                    shareUris.add(shareUri)
+                }
+                if (shareUris.isEmpty()) return@launch
+
+                val intent = if (shareUris.size == 1) {
+                    // Single file — use ACTION_SEND for better app compatibility
+                    android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "*/*"
+                        putExtra(android.content.Intent.EXTRA_STREAM, shareUris[0])
+                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                } else {
+                    // Multiple files — use ACTION_SEND_MULTIPLE
+                    android.content.Intent(android.content.Intent.ACTION_SEND_MULTIPLE).apply {
+                        type = "*/*"
+                        putParcelableArrayListExtra(android.content.Intent.EXTRA_STREAM, shareUris)
+                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                }
+                val chooser = android.content.Intent.createChooser(
+                    intent,
+                    if (shareUris.size == 1) "Share File" else "Share ${shareUris.size} Files"
+                ).apply {
+                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(chooser)
+            } catch (e: Exception) {
+                _uiEvents.emit("Failed to share documents")
             }
         }
     }

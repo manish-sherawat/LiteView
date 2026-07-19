@@ -55,6 +55,9 @@ import com.nexus.core.ui.NexusSurface
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.NexusTextField
 import com.nexus.core.R
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import android.graphics.RenderEffect
+import android.graphics.Shader
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -208,7 +211,9 @@ fun DashboardScreen(
         ) {
             LazyVerticalGrid(
                 columns = if (uiState.isGridView) GridCells.Fixed(2) else GridCells.Fixed(1),
-                modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 contentPadding = PaddingValues(
@@ -602,14 +607,19 @@ fun DashboardScreen(
             exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) + androidx.compose.animation.fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
+            val isDark = androidx.compose.foundation.isSystemInDarkTheme()
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 24.dp)
                     .clip(NexusTheme.shapes.large)
-                    .glassBackground(blurRadius = 40f, alpha = 0.85f, fallbackColor = NexusTheme.colors.surface)
-                    .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.3f), NexusTheme.shapes.large)
+                    .glassBackground(
+                        blurRadius = 40f,
+                        fallbackColor = NexusTheme.colors.surface,
+                        alpha = if (isDark) 0.4f else 0.55f,
+                        shape = NexusTheme.shapes.large
+                    )
                     .padding(16.dp)
             ) {
                 Row(
@@ -631,7 +641,7 @@ fun DashboardScreen(
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.springBounceClick { uiState.selectedUris.forEach { viewModel.shareDocument(it) }; viewModel.clearSelection() }) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.springBounceClick { viewModel.shareSelectedDocuments(uiState.selectedUris); viewModel.clearSelection() }) {
                             Image(
                                 painter = painterResource(id = R.drawable.ic_share),
                                 contentDescription = "Share",

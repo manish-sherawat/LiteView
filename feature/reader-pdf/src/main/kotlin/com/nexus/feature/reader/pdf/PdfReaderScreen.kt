@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -77,6 +78,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nexus.core.theme.NexusTheme
@@ -597,8 +599,42 @@ fun PdfReaderScreen(
                             ) {
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
+                                    // Floating Page Number Viewer Pill
+                                    if (state.pageCount > 1) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(NexusTheme.shapes.pill)
+                                                .background(NexusTheme.colors.surface)
+                                                .border(
+                                                    0.8.dp,
+                                                    NexusTheme.colors.divider.copy(alpha = 0.6f),
+                                                    NexusTheme.shapes.pill
+                                                )
+                                                .springBounceClick {
+                                                    goToPageText = currentPage.toString()
+                                                    showGoToPageDialog = true
+                                                }
+                                                .padding(horizontal = 16.dp, vertical = 7.dp)
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                NexusText(
+                                                    text = "Page $currentPage",
+                                                    style = NexusTheme.typography.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                                                    color = NexusTheme.colors.primary
+                                                )
+                                                NexusText(
+                                                    text = "of ${state.pageCount}",
+                                                    style = NexusTheme.typography.caption,
+                                                    color = NexusTheme.colors.textSecondary
+                                                )
+                                            }
+                                        }
+                                    }
 
                                     Box(
                                         modifier = Modifier
@@ -987,20 +1023,112 @@ fun PdfReaderScreen(
                 val successState = uiState as PdfReaderUiState.Success
                 com.nexus.core.ui.components.NexusDialog(
                     onDismissRequest = { showGoToPageDialog = false },
-                    title = { NexusText("Go to Page (1 - ${successState.pageCount})", style = NexusTheme.typography.h2) },
+                    title = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            NexusText("Go to Page", style = NexusTheme.typography.h2)
+                            Box(
+                                modifier = Modifier
+                                    .clip(NexusTheme.shapes.pill)
+                                    .background(NexusTheme.colors.primary.copy(alpha = 0.12f))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                NexusText(
+                                    text = "1 - ${successState.pageCount}",
+                                    style = NexusTheme.typography.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                                    color = NexusTheme.colors.primary
+                                )
+                            }
+                        }
+                    },
                     text = {
-                        androidx.compose.foundation.text.BasicTextField(
-                            value = goToPageText,
-                            onValueChange = { if (it.isEmpty() || it.all { char -> char.isDigit() }) goToPageText = it },
-                            textStyle = NexusTheme.typography.body.copy(color = NexusTheme.colors.textPrimary),
-                            modifier = Modifier.fillMaxWidth().padding(8.dp).background(NexusTheme.colors.surfaceVariant, NexusTheme.shapes.small).padding(16.dp),
-                            singleLine = true,
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
-                        )
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                        ) {
+                            // Stepper Row: - button, input, + button
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(NexusTheme.colors.surfaceVariant)
+                                        .springBounceClick {
+                                            val currentVal = goToPageText.toIntOrNull() ?: 1
+                                            if (currentVal > 1) goToPageText = (currentVal - 1).toString()
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    NexusText("-", style = NexusTheme.typography.h1, color = NexusTheme.colors.textPrimary)
+                                }
+
+                                androidx.compose.foundation.text.BasicTextField(
+                                    value = goToPageText,
+                                    onValueChange = { input ->
+                                        if (input.isEmpty() || input.all { char -> char.isDigit() }) {
+                                            val num = input.toIntOrNull()
+                                            if (num == null || num <= successState.pageCount) {
+                                                goToPageText = input
+                                            }
+                                        }
+                                    },
+                                    textStyle = NexusTheme.typography.title.copy(
+                                        color = NexusTheme.colors.textPrimary,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        fontSize = 20.sp,
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(NexusTheme.colors.surfaceVariant, NexusTheme.shapes.medium)
+                                        .padding(vertical = 12.dp, horizontal = 16.dp),
+                                    singleLine = true,
+                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                    )
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(NexusTheme.colors.surfaceVariant)
+                                        .springBounceClick {
+                                            val currentVal = goToPageText.toIntOrNull() ?: 1
+                                            if (currentVal < successState.pageCount) goToPageText = (currentVal + 1).toString()
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    NexusText("+", style = NexusTheme.typography.h2, color = NexusTheme.colors.textPrimary)
+                                }
+                            }
+
+                            // Interactive Page Slider
+                            val sliderPos = (goToPageText.toFloatOrNull() ?: 1f).coerceIn(1f, successState.pageCount.toFloat())
+                            androidx.compose.material3.Slider(
+                                value = sliderPos,
+                                onValueChange = { newPos ->
+                                    goToPageText = newPos.roundToInt().toString()
+                                },
+                                valueRange = 1f..successState.pageCount.toFloat(),
+                                colors = androidx.compose.material3.SliderDefaults.colors(
+                                    thumbColor = NexusTheme.colors.primary,
+                                    activeTrackColor = NexusTheme.colors.primary,
+                                    inactiveTrackColor = NexusTheme.colors.surfaceVariant
+                                )
+                            )
+                        }
                     },
                     confirmButton = {
                         NexusButton(
-                            text = "Go",
+                            text = "Jump to Page",
                             onClick = {
                                 val pageNum = goToPageText.toIntOrNull()
                                 if (pageNum != null && pageNum in 1..successState.pageCount) {
