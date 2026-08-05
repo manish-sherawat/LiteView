@@ -144,6 +144,7 @@ class TextReaderViewModel @Inject constructor(
         if (matches.isEmpty()) return
         val current = _currentSearchIndex.value
         _currentSearchIndex.value = (current + 1) % matches.size
+        ensureSearchMatchVisible()
     }
 
     fun previousSearchMatch() {
@@ -167,6 +168,17 @@ class TextReaderViewModel @Inject constructor(
         }
     }
 
+    private fun safeDecode(str: String): String {
+        return try {
+            val d1 = URLDecoder.decode(str, StandardCharsets.UTF_8.toString())
+            if (d1.contains("%")) {
+                try { URLDecoder.decode(d1, StandardCharsets.UTF_8.toString()) } catch (_: Exception) { d1 }
+            } else d1
+        } catch (_: Exception) {
+            str
+        }
+    }
+
     fun toggleWordWrap() {
         val newValue = !_isWordWrapEnabled.value
         _isWordWrapEnabled.value = newValue
@@ -186,7 +198,7 @@ class TextReaderViewModel @Inject constructor(
             _uiState.value = TextReaderUiState.Loading
             withContext(Dispatchers.IO) {
                 try {
-                    val uriStr = URLDecoder.decode(URLDecoder.decode(encodedUri, StandardCharsets.UTF_8.toString()), StandardCharsets.UTF_8.toString())
+                    val uriStr = safeDecode(encodedUri)
                     val uri = Uri.parse(uriStr)
                     val inputStream = if (uri.scheme == "file") {
                         java.io.FileInputStream(java.io.File(uri.path ?: throw IllegalArgumentException("Invalid file path")))

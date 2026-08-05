@@ -136,15 +136,23 @@ class OfficeReaderViewModel @Inject constructor(
         }
     }
 
+    private fun safeDecode(str: String): String {
+        return try {
+            val d1 = URLDecoder.decode(str, StandardCharsets.UTF_8.toString())
+            if (d1.contains("%")) {
+                try { URLDecoder.decode(d1, StandardCharsets.UTF_8.toString()) } catch (_: Exception) { d1 }
+            } else d1
+        } catch (_: Exception) {
+            str
+        }
+    }
+
     fun loadDocument(encodedUri: String, docType: String, password: String? = null) {
         viewModelScope.launch {
             _uiState.value = OfficeReaderUiState.Loading()
             withContext(Dispatchers.IO) {
                 try {
-                    val uriStr = URLDecoder.decode(
-                        URLDecoder.decode(encodedUri, StandardCharsets.UTF_8.toString()),
-                        StandardCharsets.UTF_8.toString()
-                    )
+                    val uriStr = safeDecode(encodedUri)
                     val uri = Uri.parse(uriStr)
 
                     // Enforce 50 MB file size limit

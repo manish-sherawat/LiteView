@@ -133,6 +133,20 @@ fun PdfReaderScreen(
 
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
+    val keepScreenAwake by viewModel.keepScreenAwake.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    DisposableEffect(keepScreenAwake) {
+        val window = (context as? android.app.Activity)?.window
+        if (keepScreenAwake) {
+            window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
     val searchHighlights by viewModel.searchHighlights.collectAsStateWithLifecycle()
     val currentSearchMatchIndex by viewModel.currentSearchMatchIndex.collectAsStateWithLifecycle()
     
@@ -141,7 +155,6 @@ fun PdfReaderScreen(
     val drawnStrokes = remember { androidx.compose.runtime.mutableStateMapOf<Int, List<List<Offset>>>() }
     var showOutlineSheet by remember { mutableStateOf(false) }
     var isSavingAnnotations by remember { mutableStateOf(false) }
-    val context = androidx.compose.ui.platform.LocalContext.current
 
     val decodedUri = try { URLDecoder.decode(encodedUri, "UTF-8") } catch (_: Exception) { encodedUri }
     val sharedScope = com.nexus.core.navigation.LocalSharedTransitionScope.current

@@ -139,15 +139,26 @@ class PdfReaderViewModel @Inject constructor(
 
 
 
+    private fun safeDecode(str: String): String {
+        return try {
+            val d1 = URLDecoder.decode(str, StandardCharsets.UTF_8.toString())
+            if (d1.contains("%")) {
+                try { URLDecoder.decode(d1, StandardCharsets.UTF_8.toString()) } catch (_: Exception) { d1 }
+            } else d1
+        } catch (_: Exception) {
+            str
+        }
+    }
+
     fun loadPdf(encodedUri: String, encodedFileName: String, password: String? = null) {
         viewModelScope.launch {
             _uiState.value = PdfReaderUiState.Loading
             
             val decodedName = try {
-                URLDecoder.decode(URLDecoder.decode(encodedFileName, StandardCharsets.UTF_8.toString()), StandardCharsets.UTF_8.toString())
+                safeDecode(encodedFileName)
             } catch (e: Exception) {
                 try {
-                    val uriStr = URLDecoder.decode(URLDecoder.decode(encodedUri, StandardCharsets.UTF_8.toString()), StandardCharsets.UTF_8.toString())
+                    val uriStr = safeDecode(encodedUri)
                     Uri.parse(uriStr).lastPathSegment ?: "Document"
                 } catch (_: Exception) {
                     encodedFileName
@@ -165,10 +176,10 @@ class PdfReaderViewModel @Inject constructor(
             }
             
             val uriStrDecoded = withContext(Dispatchers.IO) {
-                URLDecoder.decode(URLDecoder.decode(encodedUri, StandardCharsets.UTF_8.toString()), StandardCharsets.UTF_8.toString())
+                safeDecode(encodedUri)
             }
             
-            renderedPagesCache.values.forEach { it.recycle() }
+            renderedPagesCache.values.forEach { if (!it.isRecycled) it.recycle() }
             currentUri = uriStrDecoded
 
             viewModelScope.launch {
@@ -249,17 +260,19 @@ class PdfReaderViewModel @Inject constructor(
                         .putInt(uriStr, count)
                         .apply()
 
-                    // Extract Text using MuPDF
+                    // Extract Text using MuPDF safely under lock
                     try {
                         val textList = mutableListOf<String>()
                         for (i in 0 until count) {
-                            val page = doc.loadPage(i)
-                            val htmlBytes = page.textAsHtml()
-                            val htmlStr = htmlBytes?.decodeToString() ?: ""
-                            // Strip HTML for basic text searching
-                            val text = htmlStr.replace(Regex("<[^>]*>"), "")
-                            textList.add(text)
-                            page.destroy()
+                            val pageText = renderMutex.withLock {
+                                val page = doc.loadPage(i)
+                                val htmlBytes = page.textAsHtml()
+                                val htmlStr = htmlBytes?.decodeToString() ?: ""
+                                val text = htmlStr.replace(Regex("<[^>]*>"), "")
+                                page.destroy()
+                                text
+                            }
+                            textList.add(pageText)
                         }
                         pdfTextByPage = textList
                     } catch (_: Exception) {
@@ -322,26 +335,28 @@ class PdfReaderViewModel @Inject constructor(
                         
                         if (doc != null) {
                             try {
-                                val page = doc.loadPage(index)
-                                val rect = page.bounds
-                                val width = rect.x1 - rect.x0
-                                val height = rect.y1 - rect.y0
-                                
-                                val quads = page.search(query)
-                                val rectList = mutableListOf<android.graphics.RectF>()
-                                if (quads != null) {
-                                    for (qArray in quads) {
-                                        for (q in qArray) {
-                                            val left = minOf(q.ul_x, q.ll_x) / width
-                                            val top = minOf(q.ul_y, q.ur_y) / height
-                                            val right = maxOf(q.ur_x, q.lr_x) / width
-                                            val bottom = maxOf(q.ll_y, q.lr_y) / height
-                                            rectList.add(android.graphics.RectF(left, top, right, bottom))
+                                renderMutex.withLock {
+                                    val page = doc.loadPage(index)
+                                    val rect = page.bounds
+                                    val width = rect.x1 - rect.x0
+                                    val height = rect.y1 - rect.y0
+                                    
+                                    val quads = page.search(query)
+                                    val rectList = mutableListOf<android.graphics.RectF>()
+                                    if (quads != null) {
+                                        for (qArray in quads) {
+                                            for (q in qArray) {
+                                                val left = minOf(q.ul_x, q.ll_x) / width
+                                                val top = minOf(q.ul_y, q.ur_y) / height
+                                                val right = maxOf(q.ur_x, q.lr_x) / width
+                                                val bottom = maxOf(q.ll_y, q.lr_y) / height
+                                                rectList.add(android.graphics.RectF(left, top, right, bottom))
+                                            }
                                         }
                                     }
+                                    highlightsMap[index] = rectList
+                                    page.destroy()
                                 }
-                                highlightsMap[index] = rectList
-                                page.destroy()
                             } catch (e: Exception) {
                                 e.printStackTrace()
                             }
@@ -554,8 +569,7 @@ class PdfReaderViewModel @Inject constructor(
                         renderedPagesCache[pageIndex] = bitmap
                         if (renderedPagesCache.size > maxCacheSize) {
                             val oldestKey = renderedPagesCache.keys.first()
-                            val evicted = renderedPagesCache.remove(oldestKey)
-                            evicted?.recycle()
+                            renderedPagesCache.remove(oldestKey)
                         }
                         _renderedPages.value = renderedPagesCache.toMap()
                     }
@@ -569,12 +583,18 @@ class PdfReaderViewModel @Inject constructor(
         _currentPage.value = index
     }
 
+    private var lastSavedIndex = -1
+    private var lastSavedOffset = -1
+
     fun saveScrollPosition(encodedUri: String, index: Int, offset: Int) {
+        if (index == lastSavedIndex && Math.abs(offset - lastSavedOffset) < 50) return
+        lastSavedIndex = index
+        lastSavedOffset = offset
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val rememberPosition = prefsRepository.rememberReadingPosition.first()
                 if (rememberPosition) {
-                    val uriStr = URLDecoder.decode(URLDecoder.decode(encodedUri, StandardCharsets.UTF_8.toString()), StandardCharsets.UTF_8.toString())
+                    val uriStr = safeDecode(encodedUri)
                     recentDocumentDao.updateScrollPosition(uriStr, index, offset)
                 }
             } catch (_: Throwable) {}

@@ -75,6 +75,20 @@ fun TextReaderScreen(
         else -> androidx.compose.ui.graphics.Color(0xFF1E1E1E) // LIGHT
     }
 
+    val keepScreenAwake by viewModel.keepScreenAwake.collectAsStateWithLifecycle()
+
+    DisposableEffect(keepScreenAwake) {
+        val window = (context as? android.app.Activity)?.window
+        if (keepScreenAwake) {
+            window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
     var isImmersiveMode by remember { mutableStateOf(false) }
     var showLineNumbers by remember { mutableStateOf(true) }
     

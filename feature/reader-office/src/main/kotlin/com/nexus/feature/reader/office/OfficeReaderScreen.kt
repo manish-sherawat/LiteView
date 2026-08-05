@@ -77,6 +77,20 @@ fun OfficeReaderScreen(
     val context = LocalContext.current
     val activity = context as? android.app.Activity
     
+    val keepScreenAwake by viewModel.keepScreenAwake.collectAsStateWithLifecycle()
+
+    DisposableEffect(keepScreenAwake) {
+        val window = activity?.window
+        if (keepScreenAwake) {
+            window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
     androidx.compose.runtime.LaunchedEffect(isImmersiveMode) {
         activity?.window?.let { window ->
             val controller = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)

@@ -30,6 +30,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -65,6 +66,12 @@ import com.nexus.core.ui.components.NexusTopBar
 import com.nexus.core.updater.UpdateState
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
+import com.nexus.core.ui.animations.EaseInOutSine
 
 // ─── Settings Screen ──────────────────────────────────────────────────────────
 
@@ -178,9 +185,89 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
+            // ── Hero Banner Header ───────────────────────────────────────────
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fadeSlideIn(delay = 0, offsetY = 16.dp)
+                        .clip(NexusTheme.shapes.large)
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    NexusTheme.colors.primary.copy(alpha = 0.12f),
+                                    NexusTheme.colors.surfaceVariant.copy(alpha = 0.40f),
+                                    NexusTheme.colors.primary.copy(alpha = 0.04f)
+                                )
+                            )
+                        )
+                        .border(
+                            width = 0.8.dp,
+                            color = NexusTheme.colors.primary.copy(alpha = 0.20f),
+                            shape = NexusTheme.shapes.large
+                        )
+                        .padding(18.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(NexusTheme.colors.primary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                painter            = painterResource(id = R.drawable.ic_settings),
+                                contentDescription = null,
+                                modifier           = Modifier.size(24.dp),
+                                colorFilter        = ColorFilter.tint(Color.White)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                NexusText(
+                                    text  = "LiteView Settings",
+                                    style = NexusTheme.typography.title.copy(fontWeight = FontWeight.Bold),
+                                    color = NexusTheme.colors.textPrimary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(NexusTheme.colors.primary.copy(alpha = 0.15f))
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    NexusText(
+                                        text  = uiState.appVersion,
+                                        style = NexusTheme.typography.caption.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize   = 11.sp
+                                        ),
+                                        color = NexusTheme.colors.primary
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            NexusText(
+                                text  = "Customize layout, themes & app preferences",
+                                style = NexusTheme.typography.caption,
+                                color = NexusTheme.colors.textSecondary
+                            )
+                        }
+                    }
+                }
+            }
+
             // ── Appearance ───────────────────────────────────────────────────
             item {
-                SettingsSectionGroup(label = "Appearance") {
+                SettingsSectionGroup(
+                    label    = "Appearance",
+                    modifier = Modifier.fadeSlideIn(delay = 60, offsetY = 16.dp)
+                ) {
                     val themeText = when (uiState.themeMode) {
                         ThemeMode.LIGHT  -> "Light"
                         ThemeMode.DARK   -> "Dark"
@@ -191,19 +278,24 @@ fun SettingsScreen(
                         ThemeMode.SYSTEM -> "System Default"
                     }
                     SettingsNavRow(
-                        iconRes = R.drawable.ic_theme,
-                        title   = "Theme",
-                        value   = themeText,
-                        onClick = { showThemeDialog = true }
+                        iconRes  = R.drawable.ic_theme,
+                        iconTint = NexusTheme.colors.primary,
+                        title    = "Theme",
+                        value    = themeText,
+                        onClick  = { showThemeDialog = true }
                     )
                 }
             }
 
             // ── Reader ───────────────────────────────────────────────────────
             item {
-                SettingsSectionGroup(label = "Reader") {
+                SettingsSectionGroup(
+                    label    = "Reader",
+                    modifier = Modifier.fadeSlideIn(delay = 120, offsetY = 16.dp)
+                ) {
                     SettingsSwitchRow(
                         iconRes         = R.drawable.ic_book,
+                        iconTint        = Color(0xFF10B981),
                         title           = "Remember Position",
                         subtitle        = "Resume where you left off",
                         checked         = uiState.rememberReadingPosition,
@@ -212,6 +304,7 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsSwitchRow(
                         iconRes         = R.drawable.ic_screen_awake,
+                        iconTint        = Color(0xFFF59E0B),
                         title           = "Keep Screen Awake",
                         subtitle        = "Prevent sleep while reading",
                         checked         = uiState.keepScreenAwake,
@@ -222,9 +315,13 @@ fun SettingsScreen(
 
             // ── General ──────────────────────────────────────────────────────
             item {
-                SettingsSectionGroup(label = "General") {
+                SettingsSectionGroup(
+                    label    = "General",
+                    modifier = Modifier.fadeSlideIn(delay = 180, offsetY = 16.dp)
+                ) {
                     SettingsSwitchRow(
                         iconRes         = R.drawable.ic_haptic,
+                        iconTint        = Color(0xFF6366F1),
                         title           = "Haptic Feedback",
                         subtitle        = "Vibrate on button taps and interactions",
                         checked         = uiState.hapticFeedbackEnabled,
@@ -233,14 +330,16 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsSwitchRow(
                         iconRes         = R.drawable.ic_startup,
+                        iconTint        = Color(0xFF8B5CF6),
                         title           = "Startup to Picker",
-                        subtitle        = "Bypass the Home screen and open file picker\n(Long-press the app icon to access Settings)",
+                        subtitle        = "Bypass Home screen and open file picker\n(Long-press app icon to access Settings)",
                         checked         = uiState.startupToPicker,
                         onCheckedChange = { viewModel.setStartupToPicker(it) }
                     )
                     SettingsDivider()
                     SettingsSwitchRow(
                         iconRes         = R.drawable.ic_view_grid,
+                        iconTint        = Color(0xFF0EA5E9),
                         title           = "Default to Grid View",
                         subtitle        = "Show documents in a grid layout by default",
                         checked         = uiState.defaultIsGridView,
@@ -258,7 +357,10 @@ fun SettingsScreen(
 
             // ── Permissions ──────────────────────────────────────────────────
             item {
-                SettingsSectionGroup(label = "Permissions") {
+                SettingsSectionGroup(
+                    label    = "Permissions",
+                    modifier = Modifier.fadeSlideIn(delay = 240, offsetY = 16.dp)
+                ) {
                     SettingsPermissionRow(
                         iconRes   = R.drawable.ic_folder,
                         title     = "Storage Access",
@@ -270,27 +372,33 @@ fun SettingsScreen(
 
             // ── About ────────────────────────────────────────────────────────
             item {
-                SettingsSectionGroup(label = "About") {
+                SettingsSectionGroup(
+                    label    = "About",
+                    modifier = Modifier.fadeSlideIn(delay = 300, offsetY = 16.dp)
+                ) {
                     SettingsInfoRow(
-                        iconRes = R.drawable.ic_info,
-                        title   = "App Version",
-                        value   = uiState.appVersion
+                        iconRes  = R.drawable.ic_info,
+                        iconTint = Color(0xFF64748B),
+                        title    = "App Version",
+                        value    = uiState.appVersion
                     )
                     SettingsDivider()
                     SettingsNavRow(
-                        iconRes = R.drawable.ic_changelog,
-                        title   = "Changelog",
-                        value   = "What's new",
-                        onClick = {
+                        iconRes  = R.drawable.ic_changelog,
+                        iconTint = Color(0xFFF43F5E),
+                        title    = "Changelog",
+                        value    = "What's new",
+                        onClick  = {
                             viewModel.fetchChangelog()
                             showChangelogDialog = true
                         }
                     )
                     SettingsDivider()
                     SettingsNavRow(
-                        iconRes = R.drawable.ic_update_progress,
-                        title   = "Check for Updates",
-                        value   = when (updateState) {
+                        iconRes  = R.drawable.ic_update_progress,
+                        iconTint = Color(0xFF0284C7),
+                        title    = "Check for Updates",
+                        value    = when (updateState) {
                             is UpdateState.Checking    -> "Checking…"
                             is UpdateState.Downloading -> "Downloading…"
                             is UpdateState.Available   -> "Update available"
@@ -416,10 +524,11 @@ private fun SettingsSectionGroup(
 
 @Composable
 private fun SettingsNavRow(
-    title:   String,
-    value:   String,
-    onClick: () -> Unit,
-    iconRes: Int
+    title:    String,
+    value:    String,
+    onClick:  () -> Unit,
+    iconRes:  Int,
+    iconTint: Color = NexusTheme.colors.primary
 ) {
     Row(
         modifier = Modifier
@@ -428,12 +537,20 @@ private fun SettingsNavRow(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Image(
-            painter            = painterResource(id = iconRes),
-            contentDescription = title,
-            modifier           = Modifier.size(22.dp),
-            colorFilter        = ColorFilter.tint(NexusTheme.colors.textPrimary)
-        )
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(iconTint.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter            = painterResource(id = iconRes),
+                contentDescription = title,
+                modifier           = Modifier.size(20.dp),
+                colorFilter        = ColorFilter.tint(iconTint)
+            )
+        }
         Spacer(modifier = Modifier.width(14.dp))
         NexusText(
             text     = title,
@@ -461,7 +578,8 @@ private fun SettingsSwitchRow(
     subtitle:        String,
     checked:         Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    iconRes:         Int
+    iconRes:         Int,
+    iconTint:        Color = NexusTheme.colors.primary
 ) {
     Row(
         modifier = Modifier
@@ -470,12 +588,20 @@ private fun SettingsSwitchRow(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Image(
-            painter            = painterResource(id = iconRes),
-            contentDescription = title,
-            modifier           = Modifier.size(22.dp),
-            colorFilter        = ColorFilter.tint(NexusTheme.colors.textPrimary)
-        )
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(iconTint.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter            = painterResource(id = iconRes),
+                contentDescription = title,
+                modifier           = Modifier.size(20.dp),
+                colorFilter        = ColorFilter.tint(iconTint)
+            )
+        }
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             NexusText(
@@ -496,10 +622,11 @@ private fun SettingsSwitchRow(
 
 @Composable
 private fun SettingsDestructiveRow(
-    title:   String,
+    title:    String,
     subtitle: String,
-    onClick: () -> Unit,
-    iconRes: Int
+    onClick:  () -> Unit,
+    iconRes:  Int,
+    iconTint: Color = NexusTheme.colors.error
 ) {
     Row(
         modifier = Modifier
@@ -508,12 +635,20 @@ private fun SettingsDestructiveRow(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Image(
-            painter            = painterResource(id = iconRes),
-            contentDescription = title,
-            modifier           = Modifier.size(22.dp),
-            colorFilter        = ColorFilter.tint(NexusTheme.colors.error)
-        )
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(iconTint.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter            = painterResource(id = iconRes),
+                contentDescription = title,
+                modifier           = Modifier.size(20.dp),
+                colorFilter        = ColorFilter.tint(iconTint)
+            )
+        }
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             NexusText(
@@ -536,7 +671,8 @@ private fun SettingsPermissionRow(
     title:     String,
     isGranted: Boolean,
     onClick:   (() -> Unit)?,
-    iconRes:   Int
+    iconRes:   Int,
+    iconTint:  Color = if (isGranted) Color(0xFF14B8A6) else NexusTheme.colors.error
 ) {
     val statusColor = if (isGranted) NexusTheme.colors.success else NexusTheme.colors.error
 
@@ -547,12 +683,20 @@ private fun SettingsPermissionRow(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Image(
-            painter            = painterResource(id = iconRes),
-            contentDescription = title,
-            modifier           = Modifier.size(22.dp),
-            colorFilter        = ColorFilter.tint(NexusTheme.colors.textPrimary)
-        )
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(iconTint.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter            = painterResource(id = iconRes),
+                contentDescription = title,
+                modifier           = Modifier.size(20.dp),
+                colorFilter        = ColorFilter.tint(iconTint)
+            )
+        }
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             NexusText(
@@ -599,9 +743,10 @@ private fun SettingsPermissionRow(
 
 @Composable
 private fun SettingsInfoRow(
-    title:   String,
-    value:   String,
-    iconRes: Int
+    title:    String,
+    value:    String,
+    iconRes:  Int,
+    iconTint: Color = NexusTheme.colors.primary
 ) {
     Row(
         modifier = Modifier
@@ -609,12 +754,20 @@ private fun SettingsInfoRow(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Image(
-            painter            = painterResource(id = iconRes),
-            contentDescription = title,
-            modifier           = Modifier.size(22.dp),
-            colorFilter        = ColorFilter.tint(NexusTheme.colors.textPrimary)
-        )
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(iconTint.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter            = painterResource(id = iconRes),
+                contentDescription = title,
+                modifier           = Modifier.size(20.dp),
+                colorFilter        = ColorFilter.tint(iconTint)
+            )
+        }
         Spacer(modifier = Modifier.width(14.dp))
         NexusText(
             text     = title,
@@ -636,7 +789,7 @@ private fun SettingsDivider() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 52.dp)
+            .padding(start = 68.dp)
             .height(0.8.dp)
             .background(NexusTheme.colors.divider.copy(alpha = 0.6f))
     )
@@ -675,41 +828,86 @@ private fun ThemeSelectionDialog(
                 .padding(bottom = 32.dp)
                 .padding(horizontal = 16.dp)
         ) {
-            NexusText(
-                text     = "Theme",
-                style    = NexusTheme.typography.title,
-                modifier = Modifier.padding(bottom = 2.dp, start = 8.dp, end = 8.dp)
-            )
-            NexusText(
-                text     = "Choose how the app looks",
-                style    = NexusTheme.typography.body,
-                color    = NexusTheme.colors.textSecondary,
-                modifier = Modifier.padding(bottom = 16.dp, start = 8.dp, end = 8.dp)
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 12.dp, start = 4.dp, end = 4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(NexusTheme.colors.primary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_theme),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        colorFilter = ColorFilter.tint(NexusTheme.colors.primary)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    NexusText(
+                        text  = "Appearance Theme",
+                        style = NexusTheme.typography.title.copy(fontWeight = FontWeight.Bold)
+                    )
+                    NexusText(
+                        text  = "Select your preferred color profile",
+                        style = NexusTheme.typography.caption,
+                        color = NexusTheme.colors.textSecondary
+                    )
+                }
+            }
 
             options.forEach { (mode, label, iconRes) ->
                 val isSelected  = currentTheme == mode
-                val contentColor by animateColorAsState(
-                    targetValue   = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textPrimary,
-                    animationSpec = tween(200),
-                    label         = "themeColor"
-                )
+                val accentColor = when (mode) {
+                    ThemeMode.LIGHT  -> Color(0xFF2563EB)
+                    ThemeMode.DARK   -> Color(0xFF60A5FA)
+                    ThemeMode.AMOLED -> Color(0xFF38BDF8)
+                    ThemeMode.SEPIA  -> Color(0xFFD97706)
+                    ThemeMode.FOREST -> Color(0xFF10B981)
+                    ThemeMode.SUNSET -> Color(0xFFF43F5E)
+                    ThemeMode.SYSTEM -> NexusTheme.colors.primary
+                }
 
                 val swatchColor = when (mode) {
                     ThemeMode.LIGHT  -> Color(0xFFF8F9FA)
                     ThemeMode.DARK   -> Color(0xFF1E1E1E)
                     ThemeMode.AMOLED -> Color.Black
                     ThemeMode.SEPIA  -> Color(0xFFF4ECD8)
-                    ThemeMode.FOREST -> Color(0xFF2C3E2D)
-                    ThemeMode.SUNSET -> Color(0xFF3B2A38)
-                    ThemeMode.SYSTEM -> Color.Gray
+                    ThemeMode.FOREST -> Color(0xFF1F2E20)
+                    ThemeMode.SUNSET -> Color(0xFF2E1C2B)
+                    ThemeMode.SYSTEM -> NexusTheme.colors.surfaceVariant
                 }
+
+                val contentColor by animateColorAsState(
+                    targetValue   = if (isSelected) accentColor else NexusTheme.colors.textPrimary,
+                    animationSpec = tween(200),
+                    label         = "themeColor"
+                )
+
+                val checkScale by androidx.compose.animation.core.animateFloatAsState(
+                    targetValue   = if (isSelected) 1f else 0f,
+                    animationSpec = androidx.compose.animation.core.spring(
+                        stiffness    = androidx.compose.animation.core.Spring.StiffnessMedium,
+                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy
+                    ),
+                    label = "checkScale"
+                )
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(vertical = 4.dp)
                         .clip(NexusTheme.shapes.medium)
-                        .then(if (isSelected) Modifier.background(NexusTheme.colors.primary.copy(alpha = 0.06f)) else Modifier)
+                        .background(if (isSelected) accentColor.copy(alpha = 0.08f) else NexusTheme.colors.surface)
+                        .border(
+                            width = if (isSelected) 1.5.dp else 0.6.dp,
+                            color = if (isSelected) accentColor else NexusTheme.colors.divider.copy(alpha = 0.4f),
+                            shape = NexusTheme.shapes.medium
+                        )
                         .springBounceClick { onThemeSelected(mode) }
                         .padding(vertical = 12.dp, horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -717,38 +915,42 @@ private fun ThemeSelectionDialog(
                     Box(
                         modifier = Modifier
                             .size(38.dp)
-                            .clip(CircleShape)
-                            .background(contentColor.copy(alpha = 0.10f)),
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(swatchColor)
+                            .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
                             painter            = painterResource(id = iconRes),
                             contentDescription = label,
                             modifier           = Modifier.size(20.dp),
-                            colorFilter        = ColorFilter.tint(contentColor)
+                            colorFilter        = ColorFilter.tint(accentColor)
                         )
                     }
                     Spacer(modifier = Modifier.width(14.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(14.dp)
-                            .clip(CircleShape)
-                            .background(swatchColor)
-                            .border(1.dp, NexusTheme.colors.textSecondary.copy(alpha = 0.25f), CircleShape)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
                     NexusText(
                         text     = label,
-                        style    = NexusTheme.typography.body,
+                        style    = NexusTheme.typography.body.copy(
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                        ),
                         color    = contentColor,
                         modifier = Modifier.weight(1f)
                     )
                     if (isSelected) {
-                        NexusText(
-                            text  = "✓",
-                            color = NexusTheme.colors.primary,
-                            style = NexusTheme.typography.title
-                        )
+                        Box(
+                            modifier = Modifier
+                                .scale(checkScale)
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(accentColor),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            NexusText(
+                                text  = "✓",
+                                color = Color.White,
+                                style = NexusTheme.typography.caption.copy(fontWeight = FontWeight.Bold)
+                            )
+                        }
                     }
                 }
             }
@@ -846,18 +1048,39 @@ private fun TimelineItem(
     release: com.nexus.core.updater.GithubRelease,
     isLast:  Boolean
 ) {
+    val pulseTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseAlpha by pulseTransition.animateFloat(
+        initialValue  = 0.3f,
+        targetValue   = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(1000, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
+
     Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier            = Modifier.width(24.dp).fillMaxHeight()
         ) {
             Box(
-                modifier = Modifier
-                    .padding(top = 6.dp)
-                    .size(12.dp)
-                    .clip(CircleShape)
-                    .background(NexusTheme.colors.primary)
-            )
+                contentAlignment = Alignment.Center,
+                modifier         = Modifier.padding(top = 6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(NexusTheme.colors.primary.copy(alpha = pulseAlpha))
+                )
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(NexusTheme.colors.primary)
+                )
+            }
             if (!isLast) {
                 Box(
                     modifier = Modifier

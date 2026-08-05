@@ -1,8 +1,7 @@
-# 🚀 LiteView v2.5.1 Release Notes
+# 🚀 LiteView v2.5.1 
+**LiteView v2.5.1** (`versionCode 251`), introducing a complete redesign of the floating navigation bar with fluid spring physics, a refined Settings screen architecture, single-line page indicator controls, and seamless multi-file sharing!
 
-We are excited to release **LiteView v2.5.1** (`versionCode 251`), introducing a complete redesign of the floating navigation bar with fluid spring physics, a refined Settings screen architecture, single-line page indicator controls, and seamless multi-file sharing!
 
----
 
 ## 🎨 Navigation Bar & Physics Animations
 - **Floating Pill Redesign**: Transformed the bottom navigation bar into a modern floating pill with physics-based spring interactions (`squish`, `snap`, and `splat` indicator dynamics).
@@ -10,7 +9,7 @@ We are excited to release **LiteView v2.5.1** (`versionCode 251`), introducing a
 - **Frosted Glass Layering**: Isolated blur rendering pipelines from stroke layers to ensure 100% pure glassmorphism without shader distortion.
 - **Inactive Tab Labels**: Enabled text labels for inactive navigation items with smooth scale (`0.88x`), alpha (`0.70f`), and font-weight transitions.
 
----
+
 
 ## ⚙️ Settings Screen Architecture & Polish
 - **Anchored Top Bar Layout**: Re-architected the Settings Screen with a fixed top app bar and isolated scroll container, completely eliminating top bar overlap.
@@ -18,7 +17,7 @@ We are excited to release **LiteView v2.5.1** (`versionCode 251`), introducing a
 - **Interactive Permission Badges**: Added pill-shaped status badges for storage access (`Granted` in green / `Denied` in red).
 - **Aligned Dividers**: Standardized row padding (14dp vertical) and aligned divider start insets (52dp) directly with text columns.
 
----
+
 
 ## 📖 Page Indicator & Document Reader UI
 - **Floating Page Number Pill**: Introduced a floating page viewer pill (`Page X of Y`) in PDF Reader above the bottom toolbar. Tapping it directly opens the page jump dialog.
@@ -28,7 +27,7 @@ We are excited to release **LiteView v2.5.1** (`versionCode 251`), introducing a
   - Interactive Page Slider (`1..N`) for live drag-to-page previewing.
 - **Single-Line Scrollbar Indicator**: Fixed vertical line-wrapping bugs where page indicators broke onto multiple lines (`2 / / 21`). Page numbers now render cleanly in a single horizontal row (`2 / 21`) with 6dp drop shadow.
 
----
+
 
 ## 🛠️ System, Performance & Sharing Fixes
 - **Crisp Top Bar Surface**: Removed background render-effect blur from `NexusTopBar` to guarantee 100% sharp, non-distorted typography on all screens.
@@ -36,10 +35,4 @@ We are excited to release **LiteView v2.5.1** (`versionCode 251`), introducing a
 - **Single-Intent Multi-File Share**: Updated multi-selection sharing to send all selected documents in a single system chooser sheet via `ACTION_SEND_MULTIPLE`.
 - **Clean Multi-Select Mode**: Removed intrusive background list blur during multi-select mode for a smoother file browsing experience.
 
----
 
-## 📦 Technical Metadata
-- **Version**: `2.5.1`
-- **Build Code**: `251`
-- **Target SDK**: Android 15 (`API 35`)
-- **Min SDK**: Android 8.0 (`API 26`)
