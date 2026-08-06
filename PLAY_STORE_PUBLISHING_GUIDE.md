@@ -1,130 +1,137 @@
-# Google Play Store Publishing Guide - LiteView
+# 📱 Google Play Store Publishing Guide — LiteView
 
-## 📱 App Metadata Summary
-- **App Name**: LiteView
-- **Package Name**: `com.nexus.nexusdocs`
-- **Version Name**: `2.5.2`
-- **Version Code**: `252`
-- **Target SDK**: 35 (Android 15)
-- **Min SDK**: 26 (Android 8.0)
-- **Primary Category**: Tools / Productivity
-- **Support Contact Email**: `sherawat003@gmail.com`
-- **Privacy Policy URL**: `https://manish-sherawat.github.io/LiteView/privacy.html` *(or your custom domain/Vercel URL)*
+Welcome to the official publishing guide for **LiteView** (`v2.5.2`). This guide provides all pre-configured metadata, store listing copy, policy questionnaire answers, and step-by-step submission steps to publish LiteView to the Google Play Console without friction.
 
 ---
 
-## 📦 Build Instructions
+## 📌 1. App Metadata Overview
 
-### Generate Android App Bundle (.aab)
-To generate the production `.aab` file for Google Play:
+| Property | Value |
+| :--- | :--- |
+| **App Name** | `LiteView` |
+| **Package Name** | `com.nexus.nexusdocs` |
+| **Version Name** | `2.5.2` |
+| **Version Code** | `252` |
+| **Target SDK** | `35` (Android 15) |
+| **Min SDK** | `26` (Android 8.0) |
+| **Primary Category** | `Tools` / `Productivity` |
+| **Support Email** | `sherawat003@gmail.com` |
+| **Privacy Policy URL** | `https://lite-view.vercel.app/privacy.html` |
 
-```cmd
+> [!NOTE]
+> The legal Privacy Policy is deployed live at `https://lite-view.vercel.app/privacy.html` and available locally at [website/privacy.html](file:///d:/Kotlin/Dex%20Files/NexusDocsViewer/website/privacy.html).
+
+---
+
+## 📦 2. Build & Release Bundle (.aab)
+
+To generate the signed Android App Bundle (`.aab`) for Google Play upload:
+
+```powershell
 .\gradlew.bat bundleRelease
 ```
 
-### Output File Location
-- **Path**: `app/build/outputs/bundle/release/app-release.aab`
-- **File Size**: ~39.8 MB
+### Output Bundle Details
+- **Location**: `app/build/outputs/bundle/release/app-release.aab`
+- **File Size**: `~39.8 MB`
+- **Build Status**: Verified release build with R8 minification enabled.
 
 ---
 
-## 📝 Play Store Listing Content Template
+## 📝 3. Store Listing Copy & Asset Specs
 
-### Short Description (max 80 chars)
-Fast, lightweight document viewer & scanner for PDF, Office files, and text docs.
+### Short Description *(80 characters max)*
+> Fast, lightweight document viewer & scanner for PDF, Office files, and text docs.
 
-### Full Description (max 4000 chars)
+### Full Description *(4000 characters max)*
+```text
 LiteView is a fast, lightweight, and privacy-focused document reader and scanner for Android. View, annotate, scan, and manage all your documents offline with maximum efficiency and high performance.
 
 Key Features:
-- 📄 **PDF Reader & Annotator**: View PDFs smoothly, add text highlights, freehand drawings, sticky notes, and signatures.
-- 📊 **Office Document Viewer**: Open Word (.docx), Excel (.xlsx), and PowerPoint (.pptx) documents seamlessly.
-- 📝 **Text Reader**: Quick viewing for plain text (.txt), Markdown (.md), and code files.
-- 📷 **Built-in Document Scanner**: Scan physical documents into clean, multi-page PDF files directly using your camera.
-- 📁 **Offline File Management**: Fast local file browsing with recent documents access, search, and bookmarking.
-- ⚡ **Modern & Clean UI**: Built with Jetpack Compose, supporting dark mode and dynamic accent colors.
+- 📄 PDF Reader & Annotator: View PDFs smoothly, add text highlights, freehand drawings, sticky notes, and digital signatures.
+- 📊 Office Document Viewer: Open Word (.docx), Excel (.xlsx), and PowerPoint (.pptx) documents seamlessly.
+- 📝 Text Reader: Quick viewing for plain text (.txt), Markdown (.md), and code files.
+- 📷 Built-in Document Scanner: Scan physical documents into clean, multi-page PDF files directly using your camera.
+- 📁 Offline File Management: Fast local file browsing with recent documents access, search, and bookmarking.
+- ⚡ Modern & Clean UI: Built with Jetpack Compose, supporting dark mode and dynamic accent colors.
+```
+
+### Store Graphic Asset Requirements
+- **App Icon**: `512 x 512 px` (PNG format, 32-bit with alpha, max 1MB)
+- **Feature Graphic**: `1024 x 500 px` (JPEG or 24-bit PNG)
+- **Phone Screenshots**: Minimum 2 screenshots (Ratio 16:9 or 9:16)
 
 ---
 
-## 📋 Complete Google Play Console Questionnaires & Answers
+## 📋 4. Google Play Console Policy Cheat Sheet
 
-Use these exact answers when filling out the mandatory **"App Content"** section in your Google Play Console dashboard.
+Copy and paste these exact answers into the **App Content** declarations section of your Play Console dashboard:
 
-### 1. Privacy Policy Link
-- **URL Field**: `https://manish-sherawat.github.io/LiteView/privacy.html`
-- **Local File Reference**: [website/privacy.html](file:///d:/Kotlin/Dex%20Files/NexusDocsViewer/website/privacy.html)
+### 🔒 Policy Questionnaire Answers
 
-### 2. App Access Questionnaire
-- **Question**: Does your app have restricted functionality based on login, credentials, or subscriptions?
-- **Answer**: **No, all functionality is available without restrictions.**
-
-### 3. Ads Questionnaire
-- **Question**: Does your app contain advertisements?
-- **Answer**: **No, my app does not contain ads.**
-
-### 4. Content Rating Questionnaire (IARC)
-- **Category**: Utility / Productivity / Tools
-- **Email Address**: `sherawat003@gmail.com`
-- **Questionnaire Answers**:
-  - Does the app contain violence? $\rightarrow$ **No**
-  - Does the app contain sexual content or nudity? $\rightarrow$ **No**
-  - Does the app contain profanity or crude humor? $\rightarrow$ **No**
-  - Does the app contain controlled substances/drugs? $\rightarrow$ **No**
-  - Does the app allow users to interact or exchange content online? $\rightarrow$ **No**
-  - Does the app share user physical location? $\rightarrow$ **No**
-  - Does the app allow purchasing digital goods? $\rightarrow$ **No**
-- **Expected Rating**: **PEGI 3 / Everyone (3+)**
-
-### 5. Target Audience & Content
-- **Target Age Groups**: **13+, 16-17, 18 and older**
-- **Could your store listing unintentionally appeal to children?**: **No**
-
-### 6. News App Questionnaire
-- **Question**: Is your app a news app?
-- **Answer**: **No**
-
-### 7. COVID-19 Contact Tracing & Status App
-- **Answer**: **My app is not a publicly available COVID-19 contact tracing or status app.**
-
-### 8. Data Safety Questionnaire (Detailed Answers)
-- **Data Collection & Sharing**:
-  - Does your app collect or share any of the required user data types? $\rightarrow$ **No**
-  - Is all user data collected processed locally on device? $\rightarrow$ **Yes**
-- **Security Practices**:
-  - Is user data encrypted in transit? $\rightarrow$ **N/A (No data transmitted over the internet)**
-  - Do you provide a way for users to request data deletion? $\rightarrow$ **Yes** *(Users can delete any local file, annotation, or app data anytime directly on their device settings or file manager; no server accounts exist)*
-
-### 9. Storage / All Files Access Permission (`MANAGE_EXTERNAL_STORAGE`)
-- **Core Functionality Declaration**: Document Reader, Manager & Camera Scanner.
-- **Justification Statement**: 
-  > "LiteView is a local document reader and scanner. Its core feature is allowing users to search, open, read, annotate, edit, and organize PDF, Word, Excel, PowerPoint, and Text files stored across local device storage and external SD cards."
+| Policy Section | Play Console Question | Required Answer |
+| :--- | :--- | :--- |
+| **Privacy Policy** | Provide Privacy Policy URL | `https://lite-view.vercel.app/privacy.html` |
+| **App Access** | Is app functionality restricted? | **No, all functionality is available without restrictions.** |
+| **Ads Declaration** | Does your app contain ads? | **No, my app does not contain ads.** |
+| **Content Rating** | Category & Violence / Drugs / Profanity | Select **Utility/Tools** $\rightarrow$ Answer **No** to all content flags $\rightarrow$ Rating: **PEGI 3 / Everyone 3+** |
+| **Target Audience** | Target Age Group | Select **13+, 16-17, 18+** $\rightarrow$ Appeal to children: **No** |
+| **News App** | Is your app a news app? | **No** |
+| **COVID-19 Status** | Is your app a COVID-19 contact app? | **No** |
 
 ---
 
-## 🚀 Step-by-Step Google Play Console Publishing
+### 🛡️ Data Safety Form Questionnaire
 
-1. **Log in to Play Console**: Go to [Google Play Console](https://play.google.com/console).
-2. **Create App**:
-   - App Name: `LiteView`
-   - Language: `English (US)`
-   - Type: `App` | Price: `Free`
-3. **Set Up Store Listing**:
-   - Copy & paste the **Short Description** and **Full Description** provided above.
-   - Upload **App Icon**: 512 x 512 px PNG.
-   - Upload **Feature Graphic**: 1024 x 500 px PNG.
-   - Upload **Phone & Tablet Screenshots**: At least 2 screenshots showing PDF reader and Scanner screens.
-4. **Complete App Content Questionnaires**:
-   - Use the **Questionnaires & Answers** section above to complete all 9 policy declarations.
-5. **Create Production / Internal Release**:
-   - Navigate to **Production** (or **Testing > Internal testing**).
-   - Click **Create new release**.
-   - Upload `app-release.aab`.
+| Data Safety Question | Answer |
+| :--- | :--- |
+| **Does your app collect or share any user data?** | **No** |
+| **Is all user data processed locally on device?** | **Yes** |
+| **Is user data encrypted in transit?** | **N/A** *(No data transmitted over the network)* |
+| **Do you provide a way for users to request data deletion?** | **Yes** *(Users can delete local files, annotations, or app data anytime directly from their device settings or file manager; no server accounts exist)* |
+
+---
+
+### 📂 All Files Access Permission (`MANAGE_EXTERNAL_STORAGE`)
+
+If prompted to justify file storage access in the Play Console:
+
+> [!IMPORTANT]
+> **Declaration Core Functionality**: Document Reader, Manager & Camera Scanner.  
+> **Justification Statement**:  
+> *"LiteView is a local document reader and scanner. Its core feature is allowing users to search, open, read, annotate, edit, and organize PDF, Word, Excel, PowerPoint, and Text files stored across local device storage and external SD cards."*
+
+---
+
+## 🚀 5. Step-by-Step Submission Walkthrough
+
+```mermaid
+flowchart LR
+    A["1. Create App in Play Console"] --> B["2. Fill Store Listing"]
+    B --> C["3. Fill App Content Policy"]
+    C --> D["4. Upload app-release.aab"]
+    D --> E["5. Submit for Google Review"]
+```
+
+1. **Log in to Play Console**: Open [Google Play Console](https://play.google.com/console).
+2. **Create New App**:
+   - Title: `LiteView`
+   - Default Language: `English (US)`
+   - App Type: `App` | Pricing: `Free`
+3. **Complete Main Store Listing**:
+   - Copy & paste the **Short Description** and **Full Description** from Section 3.
+   - Upload **App Icon**, **Feature Graphic**, and **Screenshots**.
+4. **Complete App Content Declarations**:
+   - Use the **Policy Cheat Sheet** tables in Section 4 to fill out all policy forms.
+5. **Create Release & Upload Bundle**:
+   - Go to **Production** $\rightarrow$ **Create new release**.
+   - Upload `app/build/outputs/bundle/release/app-release.aab`.
    - Add Release Notes:
      ```text
-     LiteView v2.5.2 Update:
-     - Improved PDF rendering performance and smooth vector zooming.
-     - Enhanced annotation tools, sticky notes, and digital signatures.
-     - Upgraded document scanner quality and multi-page export.
-     - Bug fixes, performance optimizations, and UI polish.
+     LiteView v2.5.2 Release Notes:
+     - High-performance PDF rendering engine with smooth vector zooming.
+     - Rich annotation tools, sticky notes, and digital signatures.
+     - Built-in HD document camera scanner with auto edge alignment.
+     - 100% offline security with zero data collection.
      ```
-6. **Submit for Review**: Click **Review release** and submit your app for Google Play review.
+6. **Submit for Review**: Click **Review release** and submit your app for Google Play approval!
