@@ -8,6 +8,8 @@
 - **Target SDK**: 35 (Android 15)
 - **Min SDK**: 26 (Android 8.0)
 - **Primary Category**: Tools / Productivity
+- **Support Contact Email**: `sherawat003@gmail.com`
+- **Privacy Policy URL**: `https://manish-sherawat.github.io/LiteView/privacy.html` *(or your custom domain/Vercel URL)*
 
 ---
 
@@ -44,19 +46,58 @@ Key Features:
 
 ---
 
-## 🔒 Play Store Content & Policy Checklist
+## 📋 Complete Google Play Console Questionnaires & Answers
 
-### 1. Privacy Policy
-- Declare that document processing and scanning happen **100% locally on the device**.
-- No personal documents or files are uploaded to external servers.
+Use these exact answers when filling out the mandatory **"App Content"** section in your Google Play Console dashboard.
 
-### 2. Permissions Declarations
-- `READ_MEDIA_IMAGES` / `READ_MEDIA_DOCUMENTS` / `MANAGE_EXTERNAL_STORAGE`: Required to locate and open local documents on the device.
-- `CAMERA`: Required only for the document scanner feature.
+### 1. Privacy Policy Link
+- **URL Field**: `https://manish-sherawat.github.io/LiteView/privacy.html`
+- **Local File Reference**: [website/privacy.html](file:///d:/Kotlin/Dex%20Files/NexusDocsViewer/website/privacy.html)
 
-### 3. Data Safety Form Answers
-- **Data Collection**: No personal user data collected or shared with third parties.
-- **Data Encryption**: Local files are accessed securely via standard Android ContentProviders.
+### 2. App Access Questionnaire
+- **Question**: Does your app have restricted functionality based on login, credentials, or subscriptions?
+- **Answer**: **No, all functionality is available without restrictions.**
+
+### 3. Ads Questionnaire
+- **Question**: Does your app contain advertisements?
+- **Answer**: **No, my app does not contain ads.**
+
+### 4. Content Rating Questionnaire (IARC)
+- **Category**: Utility / Productivity / Tools
+- **Email Address**: `sherawat003@gmail.com`
+- **Questionnaire Answers**:
+  - Does the app contain violence? $\rightarrow$ **No**
+  - Does the app contain sexual content or nudity? $\rightarrow$ **No**
+  - Does the app contain profanity or crude humor? $\rightarrow$ **No**
+  - Does the app contain controlled substances/drugs? $\rightarrow$ **No**
+  - Does the app allow users to interact or exchange content online? $\rightarrow$ **No**
+  - Does the app share user physical location? $\rightarrow$ **No**
+  - Does the app allow purchasing digital goods? $\rightarrow$ **No**
+- **Expected Rating**: **PEGI 3 / Everyone (3+)**
+
+### 5. Target Audience & Content
+- **Target Age Groups**: **13+, 16-17, 18 and older**
+- **Could your store listing unintentionally appeal to children?**: **No**
+
+### 6. News App Questionnaire
+- **Question**: Is your app a news app?
+- **Answer**: **No**
+
+### 7. COVID-19 Contact Tracing & Status App
+- **Answer**: **My app is not a publicly available COVID-19 contact tracing or status app.**
+
+### 8. Data Safety Questionnaire (Detailed Answers)
+- **Data Collection & Sharing**:
+  - Does your app collect or share any of the required user data types? $\rightarrow$ **No**
+  - Is all user data collected processed locally on device? $\rightarrow$ **Yes**
+- **Security Practices**:
+  - Is user data encrypted in transit? $\rightarrow$ **N/A (No data transmitted over the internet)**
+  - Do you provide a way for users to request data deletion? $\rightarrow$ **Yes** *(Users can delete any local file, annotation, or app data anytime directly on their device settings or file manager; no server accounts exist)*
+
+### 9. Storage / All Files Access Permission (`MANAGE_EXTERNAL_STORAGE`)
+- **Core Functionality Declaration**: Document Reader, Manager & Camera Scanner.
+- **Justification Statement**: 
+  > "LiteView is a local document reader and scanner. Its core feature is allowing users to search, open, read, annotate, edit, and organize PDF, Word, Excel, PowerPoint, and Text files stored across local device storage and external SD cards."
 
 ---
 
@@ -72,10 +113,8 @@ Key Features:
    - Upload **App Icon**: 512 x 512 px PNG.
    - Upload **Feature Graphic**: 1024 x 500 px PNG.
    - Upload **Phone & Tablet Screenshots**: At least 2 screenshots showing PDF reader and Scanner screens.
-4. **Complete Policy Declarations**:
-   - Complete Content Rating Questionnaire.
-   - Fill Target Audience (13+ or General).
-   - Complete Data Safety Form.
+4. **Complete App Content Questionnaires**:
+   - Use the **Questionnaires & Answers** section above to complete all 9 policy declarations.
 5. **Create Production / Internal Release**:
    - Navigate to **Production** (or **Testing > Internal testing**).
    - Click **Create new release**.
@@ -83,9 +122,9 @@ Key Features:
    - Add Release Notes:
      ```text
      LiteView v2.5.2 Update:
-     - Improved PDF rendering performance and smooth zooming.
-     - Enhanced annotation tools and signature saving.
-     - Upgraded document scanner quality and export functionality.
-     - Bug fixes and UI polish.
+     - Improved PDF rendering performance and smooth vector zooming.
+     - Enhanced annotation tools, sticky notes, and digital signatures.
+     - Upgraded document scanner quality and multi-page export.
+     - Bug fixes, performance optimizations, and UI polish.
      ```
 6. **Submit for Review**: Click **Review release** and submit your app for Google Play review.
