@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="LiteView — Read PDFs, Office documents, spreadsheets, and scan paper documents with complete offline privacy.">
+    <title>LiteView — Fast Document Reader & Scanner for Android</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- CSS Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="light-theme">
+
+    <!-- Ambient Grid & Lighting Background -->
+    <div class="bg-grid-overlay"></div>
+    <div class="glow-sphere sphere-1"></div>
+    <div class="glow-sphere sphere-2"></div>
+
+    <!-- Navigation Header -->
+    <header class="navbar" id="navbar">
+        <div class="container nav-container">
+            <a href="index.html" class="brand-logo">
+                <img src="assets/app_icon.png" alt="LiteView Icon" class="real-app-icon">
+                <span class="brand-text">LiteView</span>
+            </a>
+
+            <nav class="nav-links">
+                <a href="#features" class="nav-link">Features</a>
+                <a href="#formats" class="nav-link">Formats</a>
+                <a href="#faq" class="nav-link">FAQ</a>
+                <a href="privacy.html" class="nav-link">Privacy</a>
+            </nav>
+
+            <div class="nav-cta">
+                <a href="#download" class="btn btn-primary btn-sm">Download App</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="container hero-layout">
+            <div class="hero-text text-center">
+                <div class="hero-pill">
+                    <span class="pill-dot"></span>
+                    <span>Free & 100% Offline Privacy</span>
+                </div>
+
+                <h1 class="hero-title">
+                    Read, Annotate & Scan Documents <span class="gradient-text">With Zero Friction</span>
+                </h1>
+
+                <p class="hero-description">
+                    LiteView is the fastest, most elegant document viewer for Android. Open PDFs, Word files, spreadsheets, and scan paper documents instantly without internet or tracking.
+                </p>
+
+                <div class="hero-buttons">
+                    <a href="#download" class="btn btn-primary btn-lg">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 0 1-.61-.92V2.734c0-.38.214-.725.609-.92zm11.605 11.605l2.482 2.482-11.8 6.78 9.318-9.262zm0-2.838L5.896 1.32l11.8 6.78-2.482 2.481zm1.414 1.419l3.525 2.025a1 1 0 0 1 0 1.74l-3.525 2.025-2.277-2.277 2.277-2.313z"/>
+                        </svg>
+                        <span>Get on Google Play</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Sleek App Hero Frame -->
+            <div class="hero-frame-container">
+                <div class="glass-widget widget-left">
+                    <img src="assets/ic_pdf.png" alt="PDF Icon" class="widget-app-icon">
+                    <div>
+                        <span class="widget-label">Smart PDF Annotator</span>
+                        <span class="widget-sub">Highlights & Signatures</span>
+                    </div>
+                </div>
+
+                <div class="glass-widget widget-right">
+                    <div class="widget-icon purple-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    </div>
+                    <div>
+                        <span class="widget-label">HD Camera Scanner</span>
+                        <span class="widget-sub">Auto Edge Alignment</span>
+                    </div>
+                </div>
+
+                <div class="phone-frame-wrapper">
+                    <div class="phone-frame">
+                        <div class="phone-screen">
+                            <div class="app-header">
+                                <div class="app-brand">
+                                    <img src="assets/app_icon.png" alt="App Icon" class="app-logo-mini-img">
+                                    <span>LiteView</span>
+                                </div>
+                                <span class="app-status">Offline</span>
+                            </div>
+
+                            <div class="app-search">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                <span>Search documents...</span>
+                            </div>
+
+                            <div class="app-card-list">
+                                <div class="app-item">
+                                    <div class="item-accent red"></div>
+                                    <img src="assets/ic_pdf.png" alt="PDF" class="item-icon-img">
+                                    <div class="item-text">
+                                        <span class="item-title">Project_Presentation.pdf</span>
+                                        <span class="item-date">Modified 5m ago</span>
+                                    </div>
+                                </div>
+
+                                <div class="app-item">
+                                    <div class="item-accent blue"></div>
+                                    <img src="assets/ic_word.png" alt="DOCX" class="item-icon-img">
+                                    <div class="item-text">
+                                        <span class="item-title">Service_Agreement.docx</span>
+                                        <span class="item-date">Modified 1h ago</span>
+                                    </div>
+                                </div>
+
+                                <div class="app-item">
+                                    <div class="item-accent green"></div>
+                                    <img src="assets/ic_excel.png" alt="XLSX" class="item-icon-img">
+                                    <div class="item-text">
+                                        <span class="item-title">Monthly_Budget.xlsx</span>
+                                        <span class="item-date">Modified Yesterday</span>
+                                    </div>
+                                </div>
+
+                                <div class="app-item">
+                                    <div class="item-accent purple"></div>
+                                    <img src="assets/ic_txt.png" alt="TXT" class="item-icon-img">
+                                    <div class="item-text">
+                                        <span class="item-title">Notes_Summary.txt</span>
+                                        <span class="item-date">Text Note</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Key Features Section -->
+    <section class="features-section" id="features">
+        <div class="container">
+            <div class="section-title-block text-center">
+                <span class="section-badge">Why Choose LiteView</span>
+                <h2 class="section-heading">Everything You Need to Read & Scan</h2>
+                <p class="section-subheading">Designed for maximum speed, security, and clean document management on your phone.</p>
+            </div>
+
+            <div class="features-grid">
+                <div class="feature-box">
+                    <div class="icon-wrap red-wrap">
+                        <img src="assets/ic_pdf.png" alt="PDF" class="feature-app-icon">
+                    </div>
+                    <h3>PDF Reader & Markup</h3>
+                    <p>Smooth multi-page scrolling, text selection, highlights, sticky notes, and digital signatures.</p>
+                </div>
+
+                <div class="feature-box">
+                    <div class="icon-wrap blue-wrap">
+                        <img src="assets/ic_word.png" alt="Word" class="feature-app-icon">
+                    </div>
+                    <h3>Universal Office Viewer</h3>
+                    <p>Open Word (.docx), Excel (.xlsx), and PowerPoint (.pptx) documents instantly without extra apps.</p>
+                </div>
+
+                <div class="feature-box">
+                    <div class="icon-wrap purple-wrap">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    </div>
+                    <h3>HD Document Scanner</h3>
+                    <p>Scan paper files, receipts, or notes into clean multi-page PDFs using your phone camera.</p>
+                </div>
+
+                <div class="feature-box">
+                    <div class="icon-wrap green-wrap">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    </div>
+                    <h3>100% Private & Offline</h3>
+                    <p>Your files never leave your phone. Zero cloud sync, zero tracking, and zero account sign-in required.</p>
+                </div>
+
+                <div class="feature-box">
+                    <div class="icon-wrap amber-wrap">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    </div>
+                    <h3>Instant Search</h3>
+                    <p>Find keywords quickly inside large multi-page documents with instant highlight search results.</p>
+                </div>
+
+                <div class="feature-box">
+                    <div class="icon-wrap teal-wrap">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    </div>
+                    <h3>Bookmarks & Starred</h3>
+                    <p>Keep your most important files starred for instant 1-tap access right from the home screen.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Supported Formats Section -->
+    <section class="formats-section" id="formats">
+        <div class="container">
+            <div class="section-title-block text-center">
+                <span class="section-badge">Wide Compatibility</span>
+                <h2 class="section-heading">Supported Formats</h2>
+            </div>
+
+            <div class="formats-grid">
+                <div class="format-card f-pdf">
+                    <img src="assets/ic_pdf.png" alt="PDF" class="format-real-img">
+                    <span class="f-name">PDF Documents</span>
+                </div>
+                <div class="format-card f-docx">
+                    <img src="assets/ic_word.png" alt="Word" class="format-real-img">
+                    <span class="f-name">Microsoft Word</span>
+                </div>
+                <div class="format-card f-xlsx">
+                    <img src="assets/ic_excel.png" alt="Excel" class="format-real-img">
+                    <span class="f-name">Microsoft Excel</span>
+                </div>
+                <div class="format-card f-txt">
+                    <img src="assets/ic_txt.png" alt="Text" class="format-real-img">
+                    <span class="f-name">Text & Code</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Consumer FAQ Section -->
+    <section class="faq-section" id="faq">
+        <div class="container">
+            <div class="section-title-block text-center">
+                <span class="section-badge">Got Questions?</span>
+                <h2 class="section-heading">Frequently Asked Questions</h2>
+            </div>
+
+            <div class="faq-list">
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>Is LiteView free to use?</span>
+                        <svg class="faq-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Yes, LiteView is completely free with no mandatory subscriptions or intrusive ads.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>Does LiteView require an internet connection?</span>
+                        <svg class="faq-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="faq-answer">
+                        <p>No! LiteView operates 100% offline. All document reading, searching, annotations, and camera scanning happen locally on your phone.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>Are my documents safe and private?</span>
+                        <svg class="faq-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Absolutely. LiteView contains zero tracking or cloud telemetry. Your files remain strictly stored on your phone device memory.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Download Section -->
+    <section class="download-section" id="download">
+        <div class="container">
+            <div class="download-banner text-center">
+                <img src="assets/app_icon.png" alt="LiteView Icon" class="banner-app-icon">
+                <h2>Get LiteView for Android</h2>
+                <p>Download LiteView and start reading and scanning your documents with complete privacy.</p>
+
+                <div class="download-actions">
+                    <a href="#" class="btn btn-primary btn-lg" onclick="alert('Play Store link will be active once published!')">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 0 1-.61-.92V2.734c0-.38.214-.725.609-.92zm11.605 11.605l2.482 2.482-11.8 6.78 9.318-9.262zm0-2.838L5.896 1.32l11.8 6.78-2.482 2.481zm1.414 1.419l3.525 2.025a1 1 0 0 1 0 1.74l-3.525 2.025-2.277-2.277 2.277-2.313z"/>
+                        </svg>
+                        <span>Download on Play Store</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        <div class="container footer-layout">
+            <div class="footer-left">
+                <div class="footer-brand-row">
+                    <img src="assets/app_icon.png" alt="LiteView Icon" class="footer-app-icon">
+                    <span class="footer-brand">LiteView</span>
+                </div>
+                <p>Private & Lightweight Android Document Reader</p>
+            </div>
+            <div class="footer-links">
+                <a href="index.html">Home</a>
+                <a href="privacy.html">Privacy Policy</a>
+            </div>
+            <p class="copyright">© 2026 LiteView. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Script -->
+    <script src="script.js"></script>
+</body>
+</html>

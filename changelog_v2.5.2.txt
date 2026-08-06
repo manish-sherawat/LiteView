@@ -1,0 +1,42 @@
+# 🚀 LiteView v2.5.2 — Advanced PDF Annotation System
+
+**LiteView v2.5.2** (`versionCode 252`) delivers a major upgrade to document annotation capabilities, featuring a redesigned floating tool pill, separate Pen and Highlighter tools, in-place PDF file saving, smart multi-touch gesture handling, custom Tabler vector graphics with dynamic active/rest state transitions, and spring micro-animations.
+
+---
+
+## ✨ Highlights & New Features
+
+### 🖊️ Dedicated Pen & Highlighter Tools
+- **Precision Pen Tool**: Renders 100% opaque, solid ink strokes designed for handwriting, drawing, and digital signatures.
+- **Translucent Highlighter Tool**: Renders 45% alpha overlay strokes for text highlighting while maintaining full text legibility.
+
+### 🎨 Custom SVG Vector Graphics & Dynamic States
+- **Tabler Vector Suite**: Integrated custom vector icons for all annotation tools (Pen, Highlighter, Eraser, Shapes, Palette, Undo, Redo) and geometry pickers (Rectangle, Oval, Line, Arrow).
+- **Interactive State Transitions**: Icon graphics transition seamlessly between **Outlined** (at rest) and **Solid Filled** (when active) for immediate visual feedback.
+- **Solid Active Highlight**: Tapped tools feature a solid primary accent pill container with high-contrast white vector tinting.
+
+### 💾 In-Place PDF Document Saving
+- **Direct File Overwrite**: Saved annotations render directly onto the PDF canvas and overwrite the original file in place on local storage or `ContentResolver` URIs, eliminating duplicate `_annotated.pdf` files.
+- **Animated Action Button**: Floating Save action button with a floppy disk icon (`ic_save`), entering via `slideInVertically + fadeIn` when annotations are drawn.
+
+### 🖐️ Gesture Management & Canvas Touch Precision
+- **2-Finger Touch Auto-Hide**: Touching the screen with two fingers automatically dismisses the annotation toolbar and exits draw mode.
+- **Zero-Collision Panning & Zooming**: Dismissing the toolbar restores native pinch-to-zoom and multi-finger page panning without canvas gesture collisions or screen shaking.
+- **Touch Event Pass-Through Shield**: Overlays consume pointer input so toolbar interactions never accidentally draw residual ink on the document canvas.
+
+---
+
+## 🛠️ Architecture & Performance Improvements
+
+- **Responsive Height Constraints**: Caps floating vertical tool pill height to `72%` of viewport height with smooth vertical scrolling for compact screens and landscape orientation.
+- **Ultra-Space-Efficient Geometry**: Reduced button targets to 36dp with 3dp vertical spacing to maximize visible document reading area.
+- **Spring Physics Animations**: Icon selection scale (`1.12x`) backed by spring dynamics (`dampingRatio = 0.65f`, `stiffness = 400f`) and 200ms color tweening.
+- **Undo / Redo History Stack**: Page-isolated stroke history stack for instant error correction.
+
+---
+
+### 📦 Release Asset Information
+- **Version Name**: `2.5.2`
+- **Version Code**: `252`
+- **Minimum SDK**: `26` (Android 8.0 Oreo)
+- **Target SDK**: `35` (Android 15)

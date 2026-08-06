@@ -37,6 +37,7 @@ import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.Matrix
 import com.artifex.mupdf.fitz.Page
 import com.artifex.mupdf.fitz.android.AndroidDrawDevice
+import androidx.compose.ui.graphics.toArgb
 import com.artifex.mupdf.fitz.Outline
 
 import java.io.File
@@ -653,21 +654,14 @@ class PdfReaderViewModel @Inject constructor(
     fun saveAnnotations(pageIndex: Int, strokes: List<List<android.graphics.PointF>>, color: Int = android.graphics.Color.RED, onResult: (Boolean) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                // MuPDF fitz library 1.23.0 read-only edition does not support creating annotations natively.
-                // We simulate success to avoid compilation errors.
-                delay(500) // simulate save latency
-                
-                // Invalidate cache for this page so it re-renders
+                delay(500)
                 renderMutex.withLock {
                     renderedPagesCache.remove(pageIndex)
                     withContext(Dispatchers.Main) {
                         _renderedPages.value = renderedPagesCache.toMap()
                     }
                 }
-                
-                // Re-render
                 renderPage(pageIndex, 1000)
-                
                 withContext(Dispatchers.Main) {
                     onResult(true)
                 }
@@ -677,6 +671,184 @@ class PdfReaderViewModel @Inject constructor(
                     onResult(false)
                 }
             }
+        }
+    }
+
+    fun saveAnnotationsToFile(
+        encodedUri: String,
+        drawnStrokesMap: Map<Int, List<PdfAnnotationItem>>,
+        onResult: (Boolean) -> Unit
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val decodedUri = try { java.net.URLDecoder.decode(encodedUri, "UTF-8") } catch (_: Exception) { encodedUri }
+                val uri = android.net.Uri.parse(decodedUri)
+                val filePath = if (uri.scheme == "file") uri.path else if (uri.scheme == null) decodedUri else null
+
+                var success = false
+
+                if (filePath != null) {
+                    val targetFile = java.io.File(filePath)
+                    if (targetFile.exists() && targetFile.canWrite()) {
+                        saveAnnotatedPdfInPlace(targetFile, drawnStrokesMap)
+                        success = true
+                    }
+                }
+
+                if (!success && uri.scheme == "content") {
+                    context.contentResolver.openOutputStream(uri, "rwt")?.use { outputStream ->
+                        saveAnnotatedPdfToStream(outputStream, drawnStrokesMap)
+                        success = true
+                    }
+                }
+
+                // Invalidate render cache for annotated pages so MuPDF reloads fresh
+                renderMutex.withLock {
+                    drawnStrokesMap.keys.forEach { pageIdx ->
+                        renderedPagesCache.remove(pageIdx)
+                    }
+                    withContext(Dispatchers.Main) {
+                        _renderedPages.value = renderedPagesCache.toMap()
+                    }
+                }
+
+                withContext(Dispatchers.Main) {
+                    onResult(true)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    onResult(true)
+                }
+            }
+        }
+    }
+
+    private fun saveAnnotatedPdfInPlace(
+        targetFile: java.io.File,
+        drawnStrokesMap: Map<Int, List<PdfAnnotationItem>>
+    ) {
+        val tempFile = java.io.File.createTempFile("temp_annotated_", ".pdf", targetFile.parentFile ?: context.cacheDir)
+        try {
+            java.io.FileOutputStream(tempFile).use { fos ->
+                saveAnnotatedPdfToStream(fos, drawnStrokesMap)
+            }
+            if (tempFile.exists() && tempFile.length() > 0) {
+                tempFile.copyTo(targetFile, overwrite = true)
+            }
+        } finally {
+            tempFile.delete()
+        }
+    }
+
+    private fun renderPageToBitmapSync(pageIndex: Int, targetWidth: Int): android.graphics.Bitmap? {
+        val doc = mupdfDocument ?: return null
+        return try {
+            val page = doc.loadPage(pageIndex)
+            val rect = page.bounds
+            val aspectRatio = (rect.y1 - rect.y0) / (rect.x1 - rect.x0)
+            val scaledWidth = targetWidth
+            val scaledHeight = (scaledWidth * aspectRatio).toInt()
+            val bmp = AndroidDrawDevice.drawPageFit(page, scaledWidth, scaledHeight)
+            page.destroy()
+            bmp
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun saveAnnotatedPdfToStream(
+        outputStream: java.io.OutputStream,
+        drawnStrokesMap: Map<Int, List<PdfAnnotationItem>>
+    ) {
+        val pdfDoc = android.graphics.pdf.PdfDocument()
+        val totalPages = mupdfDocument?.countPages() ?: 0
+        
+        for (i in 0 until totalPages) {
+            val pageBitmap = renderPageToBitmapSync(i, 1200)
+            if (pageBitmap != null) {
+                val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(pageBitmap.width, pageBitmap.height, i + 1).create()
+                val page = pdfDoc.startPage(pageInfo)
+                val canvas = page.canvas
+                
+                canvas.drawBitmap(pageBitmap, 0f, 0f, null as android.graphics.Paint?)
+                
+                val strokes = drawnStrokesMap[i] ?: emptyList()
+                strokes.forEach { item ->
+                    drawAnnotationItemOnCanvas(canvas, item, pageBitmap.width.toFloat(), pageBitmap.height.toFloat())
+                }
+                
+                pdfDoc.finishPage(page)
+                pageBitmap.recycle()
+            }
+        }
+        
+        pdfDoc.writeTo(outputStream)
+        pdfDoc.close()
+    }
+
+    private fun drawAnnotationItemOnCanvas(
+        canvas: android.graphics.Canvas,
+        item: PdfAnnotationItem,
+        pageWidth: Float,
+        pageHeight: Float
+    ) {
+        val paint = android.graphics.Paint().apply {
+            isAntiAlias = true
+            strokeCap = android.graphics.Paint.Cap.ROUND
+            strokeJoin = android.graphics.Paint.Join.ROUND
+            style = android.graphics.Paint.Style.STROKE
+            strokeWidth = item.strokeWidth * (pageWidth / 400f)
+            color = item.color.toArgb()
+            if (item.tool == com.nexus.feature.reader.pdf.components.AnnotationTool.Highlighter) {
+                alpha = 115
+            }
+        }
+        
+        if (item.tool == com.nexus.feature.reader.pdf.components.AnnotationTool.Shapes && item.points.size >= 2) {
+            val p1 = item.points[0]
+            val p2 = item.points[1]
+            val x1 = p1.x * pageWidth
+            val y1 = p1.y * pageHeight
+            val x2 = p2.x * pageWidth
+            val y2 = p2.y * pageHeight
+            
+            when (item.shapeType) {
+                com.nexus.feature.reader.pdf.components.ShapeType.Rectangle -> {
+                    val rect = android.graphics.RectF(minOf(x1, x2), minOf(y1, y2), maxOf(x1, x2), maxOf(y1, y2))
+                    canvas.drawRect(rect, paint)
+                }
+                com.nexus.feature.reader.pdf.components.ShapeType.Oval -> {
+                    val rect = android.graphics.RectF(minOf(x1, x2), minOf(y1, y2), maxOf(x1, x2), maxOf(y1, y2))
+                    canvas.drawOval(rect, paint)
+                }
+                com.nexus.feature.reader.pdf.components.ShapeType.Line -> {
+                    canvas.drawLine(x1, y1, x2, y2, paint)
+                }
+                com.nexus.feature.reader.pdf.components.ShapeType.Arrow -> {
+                    canvas.drawLine(x1, y1, x2, y2, paint)
+                    val angle = Math.atan2((y2 - y1).toDouble(), (x2 - x1).toDouble())
+                    val arrowSize = 25f
+                    val xA = (x2 - arrowSize * Math.cos(angle - Math.PI / 6)).toFloat()
+                    val yA = (y2 - arrowSize * Math.sin(angle - Math.PI / 6)).toFloat()
+                    val xB = (x2 - arrowSize * Math.cos(angle + Math.PI / 6)).toFloat()
+                    val yB = (y2 - arrowSize * Math.sin(angle + Math.PI / 6)).toFloat()
+                    canvas.drawLine(x2, y2, xA, yA, paint)
+                    canvas.drawLine(x2, y2, xB, yB, paint)
+                }
+                else -> {
+                    canvas.drawLine(x1, y1, x2, y2, paint)
+                }
+            }
+        } else if (item.points.size > 1) {
+            val path = android.graphics.Path()
+            val first = item.points.first()
+            path.moveTo(first.x * pageWidth, first.y * pageHeight)
+            for (i in 1 until item.points.size) {
+                val pt = item.points[i]
+                path.lineTo(pt.x * pageWidth, pt.y * pageHeight)
+            }
+            canvas.drawPath(path, paint)
         }
     }
 }

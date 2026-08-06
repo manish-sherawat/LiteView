@@ -11,8 +11,11 @@ import androidx.compose.foundation.layout.padding
 import kotlinx.coroutines.launch
 
 import androidx.compose.runtime.LaunchedEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.Modifier
@@ -127,11 +130,12 @@ class MainActivity : ComponentActivity() {
 
                 val dashboardUiState by dashboardViewModel.uiState.collectAsStateWithLifecycle()
                 val isSelectionMode = dashboardUiState.isSelectionMode
+                var isChangelogVisible by remember { mutableStateOf(false) }
 
-                // Bottom nav is only shown on the home screen (Dashboard or Settings)
-                val showBottomNav = (currentRoute == NexusRoute.Dashboard.route || currentRoute == NexusRoute.Settings.route) && !isSelectionMode
-
-
+                // Bottom nav is only shown on the home screen (Dashboard or Settings) when not in selection mode or changelog
+                val showBottomNav = (currentRoute == NexusRoute.Dashboard.route || currentRoute == NexusRoute.Settings.route)
+                        && !isSelectionMode
+                        && !isChangelogVisible
 
                 val navItems = listOf(
                     NexusNavItem(
@@ -175,6 +179,7 @@ class MainActivity : ComponentActivity() {
                                     preferencesRepository.completeFirstLaunch()
                                 }
                             },
+                            onChangelogVisibilityChanged = { isChangelogVisible = it },
                             modifier = Modifier.fillMaxSize()
                         )
                     }

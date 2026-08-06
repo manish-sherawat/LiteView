@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.Crossfade
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -192,7 +193,8 @@ fun NexusButton(
     contentColor: Color = NexusTheme.colors.onPrimary,
     shape: androidx.compose.ui.graphics.Shape = NexusTheme.shapes.pill,
     contentDescription: String = text,
-    isLoading: Boolean = false
+    isLoading: Boolean = false,
+    leadingIcon: ImageVector? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -261,7 +263,20 @@ fun NexusButton(
                     strokeWidth = 2.5.dp
                 )
             } else {
-                NexusText(text = text, color = finalContentColor, style = NexusTheme.typography.buttonLabel)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (leadingIcon != null) {
+                        Icon(
+                            imageVector = leadingIcon,
+                            contentDescription = null,
+                            tint = finalContentColor,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    NexusText(text = text, color = finalContentColor, style = NexusTheme.typography.buttonLabel)
+                }
             }
         }
     }

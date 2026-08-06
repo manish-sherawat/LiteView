@@ -438,9 +438,15 @@ private fun AnimatedVisibilityScope.DashboardRoute(router: DocumentReaderRouter)
 }
 
 @Composable
-private fun AnimatedVisibilityScope.SettingsRoute(router: DocumentReaderRouter) {
+private fun AnimatedVisibilityScope.SettingsRoute(
+    router: DocumentReaderRouter,
+    onChangelogVisibilityChanged: (Boolean) -> Unit = {}
+) {
     AnimatedScreen {
-        SettingsScreen(onBack = { router.navigateBack() })
+        SettingsScreen(
+            onBack = { router.navigateBack() },
+            onChangelogVisibilityChanged = onChangelogVisibilityChanged
+        )
     }
 }
 
@@ -561,6 +567,7 @@ fun NexusNavHost(
     router: DocumentReaderRouter,
     startDestination: String,
     onFirstLaunchComplete: () -> Unit = {},
+    onChangelogVisibilityChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     SharedTransitionLayout {
@@ -618,7 +625,7 @@ fun NexusNavHost(
                     popEnterTransition = { settingsBackEnterTransition() },
                     popExitTransition = { settingsBackExitTransition() }
                 ) {
-                    SettingsRoute(router)
+                    SettingsRoute(router, onChangelogVisibilityChanged)
                 }
 
                 // ─── Scanner Screen ──────────────────────────────────────

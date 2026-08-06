@@ -79,6 +79,7 @@ import com.nexus.core.ui.animations.EaseInOutSine
 fun SettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onChangelogVisibilityChanged: (Boolean) -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState        by viewModel.uiState.collectAsStateWithLifecycle()
@@ -89,6 +90,10 @@ fun SettingsScreen(
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var showChangelogDialog  by remember { mutableStateOf(false) }
     var showThemeDialog      by remember { mutableStateOf(false) }
+
+    LaunchedEffect(showChangelogDialog) {
+        onChangelogVisibilityChanged(showChangelogDialog)
+    }
 
     // ── Storage permission helpers ────────────────────────────────────────────
     val checkStoragePermission = {
@@ -184,83 +189,6 @@ fun SettingsScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-
-            // ── Hero Banner Header ───────────────────────────────────────────
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .fadeSlideIn(delay = 0, offsetY = 16.dp)
-                        .clip(NexusTheme.shapes.large)
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    NexusTheme.colors.primary.copy(alpha = 0.12f),
-                                    NexusTheme.colors.surfaceVariant.copy(alpha = 0.40f),
-                                    NexusTheme.colors.primary.copy(alpha = 0.04f)
-                                )
-                            )
-                        )
-                        .border(
-                            width = 0.8.dp,
-                            color = NexusTheme.colors.primary.copy(alpha = 0.20f),
-                            shape = NexusTheme.shapes.large
-                        )
-                        .padding(18.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(NexusTheme.colors.primary),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                painter            = painterResource(id = R.drawable.ic_settings),
-                                contentDescription = null,
-                                modifier           = Modifier.size(24.dp),
-                                colorFilter        = ColorFilter.tint(Color.White)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                NexusText(
-                                    text  = "LiteView Settings",
-                                    style = NexusTheme.typography.title.copy(fontWeight = FontWeight.Bold),
-                                    color = NexusTheme.colors.textPrimary
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(NexusTheme.colors.primary.copy(alpha = 0.15f))
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)
-                                ) {
-                                    NexusText(
-                                        text  = uiState.appVersion,
-                                        style = NexusTheme.typography.caption.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize   = 11.sp
-                                        ),
-                                        color = NexusTheme.colors.primary
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            NexusText(
-                                text  = "Customize layout, themes & app preferences",
-                                style = NexusTheme.typography.caption,
-                                color = NexusTheme.colors.textSecondary
-                            )
-                        }
-                    }
-                }
-            }
 
             // ── Appearance ───────────────────────────────────────────────────
             item {

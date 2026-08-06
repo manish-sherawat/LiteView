@@ -20,3 +20,4 @@ local.properties
 temp_apk_unzip/
 test_mupdf/
 needed_icons.txt
+.kotlin/
