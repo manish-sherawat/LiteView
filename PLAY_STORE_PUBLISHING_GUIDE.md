@@ -57,9 +57,14 @@ Key Features:
 ```
 
 ### Store Graphic Asset Requirements
-- **App Icon**: `512 x 512 px` (PNG format, 32-bit with alpha, max 1MB)
-- **Feature Graphic**: `1024 x 500 px` (JPEG or 24-bit PNG)
-- **Phone Screenshots**: Minimum 2 screenshots (Ratio 16:9 or 9:16)
+| Graphic Asset | Specification | Requirement | Asset Reference |
+| :--- | :--- | :--- | :--- |
+| **App Icon** | `512 x 512 px` (PNG 32-bit with alpha) | **MANDATORY** | [app_icon.png](file:///d:/Kotlin/Dex%20Files/NexusDocsViewer/website/assets/app_icon.png) |
+| **Feature Graphic Banner** | `1024 x 500 px` (JPEG or 24-bit PNG) | **MANDATORY** | [playstore_feature_graphic.png](file:///d:/Kotlin/Dex%20Files/NexusDocsViewer/website/assets/playstore_feature_graphic.png) |
+| **Phone Screenshots** | Minimum 2 screenshots (16:9 or 9:16) | **MANDATORY** | PDF Reader & Scanner App Screenshots |
+
+> [!IMPORTANT]
+> **Yes, a 1024x500 Feature Graphic Banner is 100% MANDATORY for Google Play Store publishing.** Google Play Console will NOT allow you to publish your app without uploading this feature graphic banner. We have generated and included a custom 1024x500 banner ready for upload at `website/assets/playstore_feature_graphic.png`.
 
 ---
 
