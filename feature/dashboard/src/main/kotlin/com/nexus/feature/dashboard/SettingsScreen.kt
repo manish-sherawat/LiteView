@@ -257,15 +257,6 @@ fun SettingsScreen(
                     )
                     SettingsDivider()
                     SettingsSwitchRow(
-                        iconRes         = R.drawable.ic_startup,
-                        iconTint        = Color(0xFF8B5CF6),
-                        title           = "Startup to Picker",
-                        subtitle        = "Bypass Home screen and open file picker\n(Long-press app icon to access Settings)",
-                        checked         = uiState.startupToPicker,
-                        onCheckedChange = { viewModel.setStartupToPicker(it) }
-                    )
-                    SettingsDivider()
-                    SettingsSwitchRow(
                         iconRes         = R.drawable.ic_view_grid,
                         iconTint        = Color(0xFF0EA5E9),
                         title           = "Default to Grid View",
@@ -1078,7 +1069,7 @@ private fun TimelineItem(
 // ─── Update dialog ────────────────────────────────────────────────────────────
 
 @Composable
-private fun UpdateDialog(
+internal fun UpdateDialog(
     updateState: UpdateState,
     onDismiss:   () -> Unit,
     onDownload:  (String, String) -> Unit,

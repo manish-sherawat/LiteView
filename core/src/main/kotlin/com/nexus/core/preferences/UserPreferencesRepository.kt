@@ -40,7 +40,6 @@ class UserPreferencesRepository @Inject constructor(
         val DEFAULT_FONT_SIZE = floatPreferencesKey("default_font_size")
         val KEEP_SCREEN_AWAKE = booleanPreferencesKey("keep_screen_awake")
         val REMEMBER_POSITION = booleanPreferencesKey("remember_position")
-        val STARTUP_TO_PICKER = booleanPreferencesKey("startup_to_picker")
         val DEFAULT_IS_GRID_VIEW = booleanPreferencesKey("default_is_grid_view")
         val HOME_STYLE = stringPreferencesKey("home_style")
         val SORT_ASCENDING = booleanPreferencesKey("sort_ascending")
@@ -106,9 +105,6 @@ class UserPreferencesRepository @Inject constructor(
     val rememberReadingPosition: Flow<Boolean> = context.dataStore.data.map { prefs -> prefs[Keys.REMEMBER_POSITION] ?: true }
     suspend fun setRememberReadingPosition(value: Boolean) { context.dataStore.edit { prefs -> prefs[Keys.REMEMBER_POSITION] = value } }
 
-    val startupToPicker: Flow<Boolean> = context.dataStore.data.map { prefs -> prefs[Keys.STARTUP_TO_PICKER] ?: false }
-    suspend fun setStartupToPicker(value: Boolean) { context.dataStore.edit { prefs -> prefs[Keys.STARTUP_TO_PICKER] = value } }
-
     val defaultIsGridView: Flow<Boolean> = context.dataStore.data.map { prefs -> prefs[Keys.DEFAULT_IS_GRID_VIEW] ?: false }
     suspend fun setDefaultIsGridView(value: Boolean) { context.dataStore.edit { prefs -> prefs[Keys.DEFAULT_IS_GRID_VIEW] = value } }
 
@@ -123,6 +119,20 @@ class UserPreferencesRepository @Inject constructor(
 
     val starredUris: Flow<Set<String>> = context.dataStore.data.map { prefs -> prefs[Keys.STARRED_URIS] ?: emptySet() }
     suspend fun setStarredUris(uris: Set<String>) { context.dataStore.edit { prefs -> prefs[Keys.STARRED_URIS] = uris } }
+    suspend fun toggleStarredUri(uri: String): Boolean {
+        var isStarred = false
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.STARRED_URIS] ?: emptySet()
+            if (current.contains(uri)) {
+                prefs[Keys.STARRED_URIS] = current - uri
+                isStarred = false
+            } else {
+                prefs[Keys.STARRED_URIS] = current + uri
+                isStarred = true
+            }
+        }
+        return isStarred
+    }
 
     val readerTheme: Flow<String> = context.dataStore.data.map { prefs -> prefs[Keys.READER_THEME] ?: "LIGHT" }
     suspend fun setReaderTheme(theme: String) { context.dataStore.edit { prefs -> prefs[Keys.READER_THEME] = theme } }
@@ -143,7 +153,6 @@ class UserPreferencesRepository @Inject constructor(
             prefs.remove(Keys.DEFAULT_FONT_SIZE)
             prefs.remove(Keys.KEEP_SCREEN_AWAKE)
             prefs.remove(Keys.REMEMBER_POSITION)
-            prefs.remove(Keys.STARTUP_TO_PICKER)
             prefs.remove(Keys.DEFAULT_IS_GRID_VIEW)
             prefs.remove(Keys.HOME_STYLE)
             prefs.remove(Keys.SORT_ASCENDING)

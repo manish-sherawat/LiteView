@@ -158,9 +158,7 @@ class AppUpdater @Inject constructor(
                 .setMimeType("application/vnd.android.package-archive")
             
             downloadManager.enqueue(request)
-            
-            // The user will tap the completed download notification to install the app.
-            
+            _updateState.value = UpdateState.Idle
         } catch (e: Exception) {
             e.printStackTrace()
             _updateState.value = UpdateState.Error("Failed to start download: ${e.localizedMessage}")

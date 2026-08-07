@@ -1,0 +1,79 @@
+# 🚀 LiteView v2.5.3 — Edge Drag-Docking, New Annotation Suite & System Polish
+
+**LiteView v2.5.3** (`versionCode 253`) introduces a major feature update and UX optimization package, featuring a modular edge-docking PDF annotation toolbar with Free Text, Business Stamps, and Distance Measurement Ruler tools, 8 critical annotation gesture & math bug fixes, target-filtered eraser modes, instant home screen list synchronization on file deletion, a custom floating glassmorphic Snackbar with Undo restoration, universal Favorites starring, and a unified in-app update engine.
+
+---
+
+## ✨ Highlights & New Features
+
+### 🧲 Modular Floating Toolbar & Smart Edge Drag-Docking
+- **Cumulative Displacement Drag Engine**: Smooth real-time drag handle gesture with intelligent 4-edge snapping (**Left**, **Right**, **Top**, **Bottom**).
+- **Compact Collapsible Avatar Mode**: Minimizes into a floating avatar bubble displaying the active tool icon and color dot, adhering tightly to active screen edges.
+- **Dynamic Orientation Adaptation**: Automatically switches between vertical pill and horizontal ribbon layouts based on docking position and screen width (`>= 600dp`).
+
+### ✍️ New Annotation Tools: Free Text Box, Business Stamps & Ruler
+- **Free Text Box Tool**: Single-tap insertion of customizable text notes on PDF pages via a native Compose input dialog.
+- **Business Review Stamps**: 1-tap placement of official review badges (**APPROVED**, **CONFIDENTIAL**, **DRAFT**, **FINAL**, **REJECTED**, **SIGN HERE**) with custom color swatches.
+- **Distance Measurement Ruler**: Precision measurement ruler rendering perpendicular end ticks and calculating live distance in centimeters (`%.1f cm`).
+
+### 🧹 Advanced Eraser Engine & Target Filters
+- **Target Filter Popover**: Quick filter popover anchored above the Eraser tool item.
+- **Filter Modes**:
+  - **Erase All**: Clears any drawn stroke, text box, stamp, or shape.
+  - **Pen Only**: Selectively erases solid pen ink strokes.
+  - **Highlighter Only**: Erases translucent text highlights while preserving pen ink and shapes.
+  - **Shapes Only**: Clears geometric shapes (Rectangles, Ovals, Lines, Arrows).
+
+### ⚡ Real-Time File Deletion & Home Sync
+- **Immediate State Synchronization**: Deleting files instantly updates physical storage, Room database, and in-memory lists without requiring manual pull-to-refresh.
+- **Freeze-Free Swipe-to-Delete**: Resolved SwipeToDismissBox state stuck issue during single or batch file deletions.
+
+### 🎨 Custom Floating Glassmorphic Snackbar & Undo Action
+- **Redesigned Floating Snackbar**: Premium dark-glass pill notification container with glowing accent borders and contextual icon badges (Red trash badge for deletions, primary checkmark badge for restorations).
+- **One-Tap Undo Action**: Includes a spring-animated **Undo** button allowing immediate restoration of deleted files to recent records.
+
+### ⭐ Universal Favorites (Starring) Across All Viewers
+- **Filled Gold Star Indicator**: Updated bottom toolbars across PDF, Text, and Office Viewers to display a solid gold filled star (`ic_star_filled`) when favorited.
+- **DataStore Sync**: Star state toggles instantly and synchronizes persistently across the entire app.
+
+### 📂 Recent Tab Auto-Recording
+- **Intent Auto-Registration**: Opening any document from external file managers, SAF pickers, or intents automatically records it into the Room database (`recent_documents`), displaying it immediately in the Recent tab.
+
+### 🔄 Unified Glassmorphic Update Engine
+- **Shared Glassmorphic Modal**: Replaced unstyled `AlertDialog` on Home Screen with the shared, animated `UpdateDialog` styled with `NexusTheme` glassmorphism.
+- **Session-Level Dismissal Memory**: Remembers "Later" choices during active sessions to avoid repeated update prompts on screen navigation.
+- **Silent Background Error Handling**: Suppressed intrusive startup error toasts on automatic background update checks.
+- **Download Feedback & State Cleanup**: Added download toast notifications (`"Downloading update vX.Y.Z..."`) and fixed state locks in `AppUpdater`.
+
+### ⚙️ Settings Streamlining
+- **Obsolete Option Removal**: Removed unused "Startup to Picker" toggle switch and preference key from Settings.
+
+---
+
+## 🐛 Resolved Bug Fixes & Stability
+
+- **Multi-Touch Zoom Retention**: Retained tool pill visibility and drawing state during 2-finger pinch zoom gestures.
+- **Brush Cursor Ring Fade**: Translucent active brush cursor ring now vanishes immediately on touch release (`activePointerOffset = null`).
+- **Page Rotation Alignment**: Synced Canvas rotation (`rotationZ = pageRotation.toFloat()`) so hand-drawn notes, highlights, and shapes rotate accurately with PDF page rotations (90°, 180°, 270°).
+- **Single-Tap Dots & Periods**: Single tap gestures now draw clean solid dots (`drawCircle`) in preview, saved annotations, and exported PDFs.
+- **Perimeter Line Eraser Projection**: Erasing lines, arrows, rectangles, and ovals calculates perpendicular segment projection distance (`distanceToSegment()`).
+- **Zoom Scale Eraser Threshold**: Standardized eraser touch detection in layout coordinates (`24.dp.toPx()`).
+- **ViewModel Rotation Persistence**: Backed drawn strokes with `drawnStrokesState` StateFlow in `PdfReaderViewModel` to preserve annotations across screen rotations.
+- **Standardized Highlighter Alpha**: Fixed highlighter rendering at `0.45f` translucency without corrupting pen color integrity.
+
+---
+
+## 🛠️ Performance & UX Polish
+
+- **Auto-Dismissing Popovers**: Open tool popovers automatically close the instant a touch drawing gesture starts on the document canvas.
+- **Translucent Highlighter Indicator**: Color selector swatch displays translucent alpha previews (`0.4f` / `0.55f`) when Highlighter mode is active.
+- **Landscape Height Bounding**: Capped color popover height with vertical scrolling to eliminate layout clipping in landscape orientation.
+- **Instant Vector Repaints**: Optimized Undo/Redo history stack snapshotting for instant vector canvas repaints.
+
+---
+
+### 📦 Release Asset Information
+- **Version Name**: `2.5.3`
+- **Version Code**: `253`
+- **Minimum SDK**: `26` (Android 8.0 Oreo)
+- **Target SDK**: `35` (Android 15)

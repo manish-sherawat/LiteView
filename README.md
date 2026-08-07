@@ -3,7 +3,7 @@
 <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" />
 <img src="https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" />
 <img src="https://img.shields.io/badge/Jetpack%20Compose-2024.12-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" />
-<img src="https://img.shields.io/badge/Version-2.3.5-orange?style=for-the-badge" />
+<img src="https://img.shields.io/badge/Version-2.5.3-orange?style=for-the-badge" />
 <img src="https://img.shields.io/badge/Min%20SDK-26%20(Android%208.0)-blue?style=for-the-badge" />
 <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" />
 
@@ -15,10 +15,10 @@
 
 <img src="assets/logo/android/playstore-icon.png" width="96" alt="LiteView Logo" />
 
-# LiteView — Document Viewer & Scanner
+# LiteView — Document Viewer, Scanner & Annotation Suite
 
-**A fast, elegant, and feature-rich Android document reader.**
-View PDFs, Office files, and text documents. Scan physical documents directly with your camera.
+**A fast, elegant, and feature-rich Android document reader & annotation workspace.**
+View PDFs, Office files, and text documents. Annotate PDFs with stamps, text boxes, and precision measurement rulers. Scan physical documents directly with your camera.
 
 </div>
 
@@ -28,16 +28,23 @@ View PDFs, Office files, and text documents. Scan physical documents directly wi
 
 | Feature | Description |
 |---|---|
-| 📑 **PDF Reader** | High-fidelity PDF rendering powered by **MuPDF 1.23** |
-| 📊 **Office Support** | View `.docx`, `.xlsx`, and `.pptx` files via **Apache POI** |
-| 📝 **Text Viewer** | Clean and readable plain text file support |
+| 📑 **PDF Reader & Viewer** | High-fidelity PDF rendering powered by **MuPDF 1.23** with page rotation, night modes, and search |
+| 🧲 **Edge-Docking Toolbar** | Modular floating PDF toolbar with 4-edge smart snapping (**Left**, **Right**, **Top**, **Bottom**) and avatar mode |
+| ✍️ **PDF Annotation Suite** | Rich annotation tools including Pen, Translucent Highlighter, Shapes (Rectangles, Ovals, Lines, Arrows) |
+| 📝 **Free Text & Stamps** | Single-tap Free Text box insertion and 1-tap Business Stamps (**APPROVED**, **CONFIDENTIAL**, **DRAFT**, **FINAL**, **REJECTED**, **SIGN HERE**) |
+| 📏 **Distance Measurement** | Precision blueprint ruler rendering end ticks and calculating live distance in centimeters (`%.1f cm`) |
+| 🧹 **Target-Filtered Eraser** | Intelligent eraser engine supporting `Erase All`, `Pen Only`, `Highlighter Only`, and `Shapes Only` filter modes |
+| 📊 **Office Suite Support** | View `.docx`, `.xlsx`, and `.pptx` documents via **Apache POI** |
+| 📝 **Text Viewer** | Clean and readable plain text file reader with word wrap toggles |
 | 📸 **Document Scanner** | Scan physical pages to PDF or JPEG via **ML Kit Document Scanner** |
 | 🔍 **OCR (Text Recognition)** | Extract text from scanned images using **ML Kit Text Recognition** |
-| ⭐ **Starred Files** | Pin your most-used documents for quick access |
-| 🗂️ **Smart Dashboard** | View All, Recent, and Starred files with sort & search |
+| ⭐ **Universal Favorites** | Pin your most-used documents with instant gold star indicators across all reader toolbars |
+| 📂 **Auto-Recording Recents** | Opening documents via SAF pickers or external intents auto-registers them in the Recent tab |
+| 🎨 **Glassmorphic Snackbar** | Custom floating dark-glass notification container with 1-tap spring-animated **Undo** restoration |
+| 🗂️ **Smart Dashboard** | View All, Recent, and Starred files with real-time list sync, sorting, and search |
 | 🔲 **Multi-Select Actions** | Long-press to select multiple files, then share or delete them in bulk |
-| 🌓 **Dark & Light Mode** | Full system theme support with a sleek custom design system |
-| 🔄 **In-App Updates** | Checks for new versions automatically via the GitHub Releases API |
+| 🌓 **Dark & Light Mode** | Full system theme support, AMOLED Deep Black, and reader background modes |
+| 🔄 **Glassmorphic Updater** | Checks for new releases via GitHub REST API with session dismissal memory & in-app APK installer |
 | 🔃 **Pull to Refresh** | Swipe down to re-scan the file system for new documents |
 
 ---
@@ -69,11 +76,11 @@ LiteView is built with a clean, scalable, multi-module architecture following **
 ```
 NexusDocsViewer/
 ├── app/                  # Application entry point, DI graph, Navigation
-├── core/                 # Shared UI components, theme, navigation contracts
+├── core/                 # Shared UI components, theme, navigation contracts, updater
 └── feature/
     ├── dashboard/        # Home screen, Recent/Starred/All file lists, Settings
-    ├── reader-pdf/       # MuPDF-powered PDF reading experience
-    ├── reader-office/    # Apache POI-powered Office document viewer
+    ├── reader-pdf/       # MuPDF PDF experience, annotation engine, edge-docking toolbar
+    ├── reader-office/    # Apache POI Office document viewer
     ├── reader-text/      # Plain text file reader
     └── scanner/          # ML Kit document scanning & OCR
 ```
@@ -145,14 +152,14 @@ The foundation of the app. Contains:
 - **`NexusTopBar`** — Adaptive top app bar
 - **`navigation/`** — Navigation contracts, `DocumentReaderRouter`, `DocumentType` enum
 - **`preferences/`** — `UserPreferencesRepository` (DataStore-backed user settings)
-- **`updater/`** — `AppUpdater` service for checking GitHub Releases
+- **`updater/`** — `AppUpdater` service for checking GitHub Releases and triggering APK downloads
 
 ### `feature/dashboard` Module
 
 The main home screen. Contains:
 - **`DashboardScreen`** — File list (All / Recent / Starred tabs), search, sort, pull-to-refresh
 - **`DashboardViewModel`** — Manages UI state, file scanning, multi-select mode
-- **`FileListItem` & `FileGridItem`** — Animated file card components
+- **`FileListItem` & `FileGridItem`** — Animated file card components with high-res thumbnails
 - **`FileOptionsDialog`** — Per-file contextual action sheet (Share, Rename, Star, Details, Delete)
 - **`SettingsScreen`** — App settings, cache management, AMOLED mode, changelog viewer
 - **`RecentDocumentRepository`** — Room-backed persistent recent documents list
@@ -160,21 +167,24 @@ The main home screen. Contains:
 ### `feature/reader-pdf` Module
 
 Full-featured PDF reader powered by **MuPDF**:
-- Pinch-to-zoom, page-by-page navigation
-- Scroll position persistence (remembers last read page)
-- PDF thumbnail generation with caching
-- Shared element hero transition from dashboard thumbnail
+- **Smart Edge Drag-Docking Toolbar** (`PdfAnnotationPill`) — Snap to 4 screen edges with avatar collapse mode
+- **Annotation Canvas Overlay** — Pen, Translucent Highlighter, Shapes (Rectangles, Ovals, Lines, Arrows)
+- **Free Text Box & Business Stamps** — Interactive text dialogs and 1-tap review badges
+- **Distance Measurement Ruler** — Real-time blueprint scale calculation in centimeters (`%.1f cm`)
+- **Target-Filtered Eraser** — Filter modes (`Erase All`, `Pen Only`, `Highlighter Only`, `Shapes Only`)
+- Page rotation synchronization (90°, 180°, 270°) and single-tap dot rendering
+- Scroll position persistence and PDF thumbnail caching
 
 ### `feature/reader-office` Module
 
 Office document reader using **Apache POI**:
 - Supports `.docx`, `.xlsx`, `.pptx` formats
-- Renders content in a clean, readable Compose layout
+- Renders content in a clean, readable Compose layout with sheet tabs and slide previews
 
 ### `feature/scanner` Module
 
 Physical document scanning powered by **Google ML Kit**:
-- Uses the built-in `GmsDocumentScanner` for automatic edge detection, cropping, and perspective correction
+- Uses `GmsDocumentScanner` for automatic edge detection, cropping, and perspective correction
 - Saves output as **PDF** or **JPEG**
 - OCR text extraction from scanned images using `TextRecognition`
 
@@ -184,10 +194,10 @@ Physical document scanning powered by **Google ML Kit**:
 
 LiteView uses a bespoke design language called **Nexus Design System**, implemented entirely in Jetpack Compose:
 
-- **Glassmorphism** — Frosted glass effect on floating UI surfaces (multi-select action bar, dialogs)
+- **Glassmorphism** — Frosted glass effect on floating UI surfaces (multi-select action bar, update dialogs, floating snackbars)
 - **Shared Element Transitions** — Hero animations from file card thumbnail to full reader
 - **Staggered Animations** — Progressive fade-and-slide for file list items
-- **Spring-Based Micro-Interactions** — Bouncy, responsive press animations on every interactive element
+- **Spring-Based Micro-Interactions** — Bouncy, responsive press animations (`springBounceClick`) on interactive elements
 - **AMOLED Dark Mode** — Optional pitch-black dark mode for OLED displays
 - **Document Accent Colors** — Each file type (PDF, DOCX, XLSX, TXT) has its own curated accent color
 
@@ -219,20 +229,6 @@ See [`future_enhancements.txt`](future_enhancements.txt) for the full list. Key 
 - [ ] **Comprehensive Onboarding** (3-step first-launch carousel)
 - [ ] **PDF Bookmarks & Outline** (table of contents navigation)
 - [ ] **Material You Dynamic Colors** (Android 12+ wallpaper-based theming)
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a new feature branch: `git checkout -b feature/your-feature-name`
-3. Commit your changes: `git commit -m 'feat: add some amazing feature'`
-4. Push to the branch: `git push origin feature/your-feature-name`
-5. Open a Pull Request
-
-Please ensure your code follows the existing architecture and code style.
 
 ---
 

@@ -32,15 +32,26 @@ import com.nexus.core.ui.animations.springBounceClick
 import com.nexus.core.ui.utils.glassBackground
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+
+enum class ToolbarDockPosition {
+    Left, Right, Top, Bottom
+}
 
 enum class AnnotationTool(val label: String) {
     Pen("Pen"),
     Highlighter("Highlighter"),
     Eraser("Eraser"),
-    Shapes("Shapes")
+    Shapes("Shapes"),
+    Text("Text"),
+    Stamp("Stamp"),
+    Ruler("Ruler")
 }
 
 enum class ShapeType(val label: String) {
@@ -48,6 +59,22 @@ enum class ShapeType(val label: String) {
     Oval("Oval"),
     Line("Line"),
     Arrow("Arrow")
+}
+
+enum class StampType(val label: String, val colorHex: Long) {
+    APPROVED("APPROVED", 0xFF4CAF50),
+    CONFIDENTIAL("CONFIDENTIAL", 0xFFF44336),
+    DRAFT("DRAFT", 0xFFFF9800),
+    FINAL("FINAL", 0xFF2196F3),
+    REJECTED("REJECTED", 0xFFE91E63),
+    SIGN_HERE("SIGN HERE", 0xFF9C27B0)
+}
+
+enum class EraserTargetFilter(val label: String) {
+    All("Erase All"),
+    PenOnly("Pen Only"),
+    HighlighterOnly("Highlighter Only"),
+    ShapesOnly("Shapes Only")
 }
 
 @Composable
@@ -61,6 +88,14 @@ fun PdfAnnotationPill(
     onColorSelect: (Color) -> Unit,
     strokeWidth: Float,
     onStrokeWidthSelect: (Float) -> Unit,
+    selectedEraserFilter: EraserTargetFilter = EraserTargetFilter.All,
+    onEraserFilterSelect: (EraserTargetFilter) -> Unit = {},
+    selectedStamp: StampType = StampType.APPROVED,
+    onStampSelect: (StampType) -> Unit = {},
+    dockPosition: ToolbarDockPosition = ToolbarDockPosition.Left,
+    onDockPositionChange: (ToolbarDockPosition) -> Unit = {},
+    isCollapsed: Boolean = false,
+    onToggleCollapse: () -> Unit = {},
     canUndo: Boolean = false,
     onUndo: () -> Unit = {},
     canRedo: Boolean = false,
@@ -69,205 +104,541 @@ fun PdfAnnotationPill(
 ) {
     var showShapesPopover by remember { mutableStateOf(false) }
     var showColorControls by remember { mutableStateOf(false) }
+    var showEraserPopover by remember { mutableStateOf(false) }
+    var showStampsPopover by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
+
+    fun performHaptic() {
+        try {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        } catch (_: Exception) {}
+    }
+
+    fun dismissAllPopovers() {
+        showShapesPopover = false
+        showColorControls = false
+        showEraserPopover = false
+        showStampsPopover = false
+    }
 
     LaunchedEffect(isVisible) {
         if (!isVisible) {
-            showShapesPopover = false
-            showColorControls = false
+            dismissAllPopovers()
         }
     }
 
     val configuration = LocalConfiguration.current
-    val maxPillHeight = (configuration.screenHeightDp * 0.72f).dp
+    val isWideScreen = configuration.screenWidthDp >= 600
+    val isHorizontalRibbon = isWideScreen || dockPosition == ToolbarDockPosition.Top || dockPosition == ToolbarDockPosition.Bottom
+    val maxPillHeight = (configuration.screenHeightDp * 0.72f).toInt().dp
 
     AnimatedVisibility(
         visible = isVisible,
-        enter = slideInHorizontally(animationSpec = tween(200)) { -it } + fadeIn(animationSpec = tween(200)),
-        exit = slideOutHorizontally(animationSpec = tween(200)) { -it } + fadeOut(animationSpec = tween(200)),
+        enter = slideInHorizontally(animationSpec = spring(dampingRatio = 0.75f, stiffness = 350f)) { if (dockPosition == ToolbarDockPosition.Right) it else -it } + fadeIn(),
+        exit = slideOutHorizontally(animationSpec = spring(dampingRatio = 0.75f, stiffness = 350f)) { if (dockPosition == ToolbarDockPosition.Right) it else -it } + fadeOut(),
         modifier = modifier
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.pointerInput(Unit) {
-                detectTapGestures { }
-            }
-        ) {
-            // ── Main Vertical Tool Pill ──
-            NexusSurface(
-                shape = NexusTheme.shapes.pill,
-                elevation = 8.dp,
-                color = Color.Transparent,
+        if (isCollapsed) {
+            // ── Compact Collapsible Avatar Bubble ──
+            Box(
                 modifier = Modifier
-                    .clip(NexusTheme.shapes.pill)
-                    .glassBackground(blurRadius = 30f, alpha = 0.85f, fallbackColor = NexusTheme.colors.surfaceVariant)
-                    .border(0.8.dp, NexusTheme.colors.divider.copy(alpha = 0.5f), NexusTheme.shapes.pill)
-                    .padding(vertical = 6.dp, horizontal = 5.dp)
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .glassBackground(blurRadius = 30f, alpha = 0.90f, fallbackColor = NexusTheme.colors.surfaceVariant)
+                    .border(1.5.dp, NexusTheme.colors.primary.copy(alpha = 0.7f), CircleShape)
+                    .springBounceClick {
+                        performHaptic()
+                        onToggleCollapse()
+                    },
+                contentAlignment = Alignment.Center
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                Icon(
+                    imageVector = when (activeTool) {
+                        AnnotationTool.Pen -> rememberPenIcon(true)
+                        AnnotationTool.Highlighter -> rememberHighlighterIcon(true)
+                        AnnotationTool.Eraser -> rememberEraserIcon(true)
+                        AnnotationTool.Shapes -> rememberShapesIcon(true)
+                        AnnotationTool.Text -> rememberTextIcon(true)
+                        AnnotationTool.Stamp -> rememberStampIcon(true)
+                        AnnotationTool.Ruler -> rememberRulerIcon(true)
+                        null -> rememberPenIcon(false)
+                    },
+                    contentDescription = "Active Tool Avatar",
+                    tint = if (activeTool != null) NexusTheme.colors.primary else NexusTheme.colors.textSecondary,
+                    modifier = Modifier.size(24.dp)
+                )
+                // Color Dot Indicator anchored cleanly
+                Box(
                     modifier = Modifier
-                        .heightIn(max = maxPillHeight)
-                        .verticalScroll(rememberScrollState())
+                        .align(Alignment.TopEnd)
+                        .padding(3.dp)
+                        .size(13.dp)
+                        .clip(CircleShape)
+                        .background(selectedColor)
+                        .border(1.5.dp, NexusTheme.colors.surface, CircleShape)
+                )
+            }
+        } else {
+            val dragHandleContent: @Composable () -> Unit = {
+                var totalDragOffset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(NexusTheme.colors.primary.copy(alpha = 0.15f))
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = { totalDragOffset = androidx.compose.ui.geometry.Offset.Zero },
+                                onDragEnd = {
+                                    val (dx, dy) = totalDragOffset
+                                    val distance = totalDragOffset.getDistance()
+                                    if (distance < 15f) {
+                                        performHaptic()
+                                        onToggleCollapse()
+                                    } else {
+                                        performHaptic()
+                                        if (kotlin.math.abs(dx) > kotlin.math.abs(dy)) {
+                                            if (dx > 40f) onDockPositionChange(ToolbarDockPosition.Right)
+                                            else if (dx < -40f) onDockPositionChange(ToolbarDockPosition.Left)
+                                        } else {
+                                            if (dy > 40f) onDockPositionChange(ToolbarDockPosition.Bottom)
+                                            else if (dy < -40f) onDockPositionChange(ToolbarDockPosition.Top)
+                                        }
+                                    }
+                                },
+                                onDragCancel = { totalDragOffset = androidx.compose.ui.geometry.Offset.Zero },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    totalDragOffset += dragAmount
+                                }
+                            )
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
-                    // 1. Pen Tool (Solid Ink)
-                    ToolIconButton(
-                        isSelected = activeTool == AnnotationTool.Pen,
-                        onClick = {
-                            showShapesPopover = false
-                            showColorControls = false
-                            onToolSelect(AnnotationTool.Pen)
-                        },
-                        icon = rememberPenIcon(isFilled = activeTool == AnnotationTool.Pen),
-                        contentDescription = "Pen"
-                    )
-
-                    // 2. Highlighter Tool (Translucent Overlay)
-                    ToolIconButton(
-                        isSelected = activeTool == AnnotationTool.Highlighter,
-                        onClick = {
-                            showShapesPopover = false
-                            showColorControls = false
-                            onToolSelect(AnnotationTool.Highlighter)
-                        },
-                        icon = rememberHighlighterIcon(isFilled = activeTool == AnnotationTool.Highlighter),
-                        contentDescription = "Highlighter"
-                    )
-
-                    // 3. Eraser
-                    ToolIconButton(
-                        isSelected = activeTool == AnnotationTool.Eraser,
-                        onClick = {
-                            showShapesPopover = false
-                            showColorControls = false
-                            onToolSelect(AnnotationTool.Eraser)
-                        },
-                        icon = rememberEraserIcon(isFilled = activeTool == AnnotationTool.Eraser),
-                        contentDescription = "Eraser"
-                    )
-
-                    // 4. Shapes
-                    ToolIconButton(
-                        isSelected = activeTool == AnnotationTool.Shapes,
-                        onClick = {
-                            onToolSelect(AnnotationTool.Shapes)
-                            showColorControls = false
-                            showShapesPopover = !showShapesPopover
-                        },
-                        icon = rememberShapesIcon(isFilled = activeTool == AnnotationTool.Shapes),
-                        contentDescription = "Shapes"
-                    )
-
-                    // 5. Color Palette Toggle
-                    ColorIconButton(
-                        isSelected = showColorControls,
-                        currentColor = selectedColor,
-                        onClick = {
-                            showShapesPopover = false
-                            showColorControls = !showColorControls
-                        }
-                    )
-
-                    // Divider line
-                    Box(
-                        modifier = Modifier
-                            .width(20.dp)
-                            .height(1.dp)
-                            .background(NexusTheme.colors.divider.copy(alpha = 0.5f))
-                    )
-
-                    // 5. Undo
-                    ToolIconButton(
-                        isSelected = false,
-                        onClick = onUndo,
-                        icon = rememberUndoIcon(),
-                        contentDescription = "Undo",
-                        enabled = canUndo
-                    )
-
-                    // 6. Redo
-                    ToolIconButton(
-                        isSelected = false,
-                        onClick = onRedo,
-                        icon = rememberRedoIcon(),
-                        contentDescription = "Redo",
-                        enabled = canRedo
+                    Icon(
+                        imageVector = rememberDragHandleIcon(),
+                        contentDescription = "Dock Drag Handle",
+                        tint = NexusTheme.colors.primary,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
 
-            // ── Anchored Shapes Secondary Popover ──
-            AnimatedVisibility(
-                visible = showShapesPopover && activeTool == AnnotationTool.Shapes,
-                enter = slideInHorizontally(tween(180)) { -it / 2 } + fadeIn(tween(180)),
-                exit = slideOutHorizontally(tween(180)) { -it / 2 } + fadeOut(tween(180))
-            ) {
-                NexusSurface(
-                    shape = NexusTheme.shapes.medium,
-                    elevation = 6.dp,
-                    color = Color.Transparent,
+            val toolButtonsContent: @Composable () -> Unit = {
+                // 1. Pen Tool
+                ToolIconButton(
+                    isSelected = activeTool == AnnotationTool.Pen,
+                    onClick = {
+                        performHaptic()
+                        dismissAllPopovers()
+                        onToolSelect(AnnotationTool.Pen)
+                    },
+                    icon = rememberPenIcon(isFilled = activeTool == AnnotationTool.Pen),
+                    contentDescription = "Pen"
+                )
+
+                // 2. Highlighter Tool
+                ToolIconButton(
+                    isSelected = activeTool == AnnotationTool.Highlighter,
+                    onClick = {
+                        performHaptic()
+                        dismissAllPopovers()
+                        onToolSelect(AnnotationTool.Highlighter)
+                    },
+                    icon = rememberHighlighterIcon(isFilled = activeTool == AnnotationTool.Highlighter),
+                    contentDescription = "Highlighter"
+                )
+
+                // 3. Eraser Tool
+                ToolIconButton(
+                    isSelected = activeTool == AnnotationTool.Eraser,
+                    onClick = {
+                        performHaptic()
+                        if (activeTool == AnnotationTool.Eraser) {
+                            showEraserPopover = !showEraserPopover
+                        } else {
+                            onToolSelect(AnnotationTool.Eraser)
+                            showEraserPopover = true
+                        }
+                        showShapesPopover = false
+                        showColorControls = false
+                    },
+                    icon = rememberEraserIcon(isFilled = activeTool == AnnotationTool.Eraser),
+                    contentDescription = "Eraser"
+                )
+
+                // 4. Shapes Tool
+                ToolIconButton(
+                    isSelected = activeTool == AnnotationTool.Shapes,
+                    onClick = {
+                        performHaptic()
+                        onToolSelect(AnnotationTool.Shapes)
+                        showColorControls = false
+                        showEraserPopover = false
+                        showStampsPopover = false
+                        showShapesPopover = !showShapesPopover
+                    },
+                    icon = rememberShapesIcon(isFilled = activeTool == AnnotationTool.Shapes),
+                    contentDescription = "Shapes"
+                )
+
+                // 5. Text Box Tool
+                ToolIconButton(
+                    isSelected = activeTool == AnnotationTool.Text,
+                    onClick = {
+                        performHaptic()
+                        dismissAllPopovers()
+                        onToolSelect(AnnotationTool.Text)
+                    },
+                    icon = rememberTextIcon(isFilled = activeTool == AnnotationTool.Text),
+                    contentDescription = "Text Box"
+                )
+
+                // 6. Stamp Tool
+                ToolIconButton(
+                    isSelected = activeTool == AnnotationTool.Stamp,
+                    onClick = {
+                        performHaptic()
+                        onToolSelect(AnnotationTool.Stamp)
+                        showColorControls = false
+                        showEraserPopover = false
+                        showShapesPopover = false
+                        showStampsPopover = !showStampsPopover
+                    },
+                    icon = rememberStampIcon(isFilled = activeTool == AnnotationTool.Stamp),
+                    contentDescription = "Stamps"
+                )
+
+                // 7. Distance Ruler Tool
+                ToolIconButton(
+                    isSelected = activeTool == AnnotationTool.Ruler,
+                    onClick = {
+                        performHaptic()
+                        dismissAllPopovers()
+                        onToolSelect(AnnotationTool.Ruler)
+                    },
+                    icon = rememberRulerIcon(isFilled = activeTool == AnnotationTool.Ruler),
+                    contentDescription = "Ruler"
+                )
+
+                // 8. Color Palette Toggle
+                ColorIconButton(
+                    isSelected = showColorControls,
+                    currentColor = selectedColor,
+                    isHighlighter = activeTool == AnnotationTool.Highlighter,
+                    onClick = {
+                        performHaptic()
+                        showShapesPopover = false
+                        showEraserPopover = false
+                        showStampsPopover = false
+                        showColorControls = !showColorControls
+                    }
+                )
+
+                // Divider line
+                Box(
                     modifier = Modifier
-                        .clip(NexusTheme.shapes.medium)
-                        .glassBackground(blurRadius = 30f, alpha = 0.90f, fallbackColor = NexusTheme.colors.surfaceVariant)
-                        .border(0.8.dp, NexusTheme.colors.divider.copy(alpha = 0.5f), NexusTheme.shapes.medium)
-                        .padding(8.dp)
+                        .size(if (isHorizontalRibbon) 1.dp else 20.dp, if (isHorizontalRibbon) 20.dp else 1.dp)
+                        .background(NexusTheme.colors.divider.copy(alpha = 0.5f))
+                )
+
+                // 6. Undo
+                ToolIconButton(
+                    isSelected = false,
+                    onClick = {
+                        performHaptic()
+                        onUndo()
+                    },
+                    icon = rememberUndoIcon(),
+                    contentDescription = "Undo",
+                    enabled = canUndo
+                )
+
+                // 7. Redo
+                ToolIconButton(
+                    isSelected = false,
+                    onClick = {
+                        performHaptic()
+                        onRedo()
+                    },
+                    icon = rememberRedoIcon(),
+                    contentDescription = "Redo",
+                    enabled = canRedo
+                )
+            }
+
+            // ── Popovers Composables ──
+            val shapesPopoverContent: @Composable () -> Unit = {
+                AnimatedVisibility(
+                    visible = showShapesPopover && activeTool == AnnotationTool.Shapes,
+                    enter = scaleIn(spring(dampingRatio = 0.7f, stiffness = 350f)) + fadeIn(tween(180)),
+                    exit = scaleOut(spring(dampingRatio = 0.8f, stiffness = 350f)) + fadeOut(tween(180))
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.Start,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    NexusSurface(
+                        shape = NexusTheme.shapes.medium,
+                        elevation = 8.dp,
+                        color = Color.Transparent,
+                        modifier = Modifier
+                            .clip(NexusTheme.shapes.medium)
+                            .glassBackground(blurRadius = 30f, alpha = 0.92f, fallbackColor = NexusTheme.colors.surfaceVariant)
+                            .border(0.8.dp, NexusTheme.colors.divider.copy(alpha = 0.6f), NexusTheme.shapes.medium)
+                            .pointerInput(Unit) { detectTapGestures { } }
+                            .padding(8.dp)
                     ) {
-                        ShapeType.values().forEach { shape ->
-                            val isSelected = selectedShape == shape
+                        if (isHorizontalRibbon) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (isSelected) NexusTheme.colors.primary.copy(alpha = 0.18f)
-                                        else Color.Transparent
-                                    )
-                                    .springBounceClick {
-                                        onShapeSelect(shape)
-                                        showShapesPopover = false
-                                    }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(
-                                    imageVector = when (shape) {
-                                        ShapeType.Rectangle -> rememberSquareIcon(isFilled = isSelected)
-                                        ShapeType.Oval -> rememberCircleIcon(isFilled = isSelected)
-                                        ShapeType.Line -> rememberLineIcon(isFilled = isSelected)
-                                        ShapeType.Arrow -> rememberArrowIcon(isFilled = isSelected)
-                                    },
-                                    contentDescription = shape.label,
-                                    tint = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textPrimary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                NexusText(
-                                    text = shape.label,
-                                    style = NexusTheme.typography.caption,
-                                    color = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textPrimary
-                                )
+                                ShapeType.values().forEach { shape ->
+                                    val isSelected = selectedShape == shape
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (isSelected) NexusTheme.colors.primary.copy(alpha = 0.18f)
+                                                else Color.Transparent
+                                            )
+                                            .springBounceClick {
+                                                performHaptic()
+                                                onShapeSelect(shape)
+                                                showShapesPopover = false
+                                            }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = when (shape) {
+                                                ShapeType.Rectangle -> rememberSquareIcon(isFilled = isSelected)
+                                                ShapeType.Oval -> rememberCircleIcon(isFilled = isSelected)
+                                                ShapeType.Line -> rememberLineIcon(isFilled = isSelected)
+                                                ShapeType.Arrow -> rememberArrowIcon(isFilled = isSelected)
+                                            },
+                                            contentDescription = shape.label,
+                                            tint = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        NexusText(
+                                            text = shape.label,
+                                            style = NexusTheme.typography.caption,
+                                            color = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textPrimary
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Column(
+                                horizontalAlignment = Alignment.Start,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                ShapeType.values().forEach { shape ->
+                                    val isSelected = selectedShape == shape
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (isSelected) NexusTheme.colors.primary.copy(alpha = 0.18f)
+                                                else Color.Transparent
+                                            )
+                                            .springBounceClick {
+                                                performHaptic()
+                                                onShapeSelect(shape)
+                                                showShapesPopover = false
+                                            }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = when (shape) {
+                                                ShapeType.Rectangle -> rememberSquareIcon(isFilled = isSelected)
+                                                ShapeType.Oval -> rememberCircleIcon(isFilled = isSelected)
+                                                ShapeType.Line -> rememberLineIcon(isFilled = isSelected)
+                                                ShapeType.Arrow -> rememberArrowIcon(isFilled = isSelected)
+                                            },
+                                            contentDescription = shape.label,
+                                            tint = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        NexusText(
+                                            text = shape.label,
+                                            style = NexusTheme.typography.caption,
+                                            color = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textPrimary
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // ── Anchored Vertical Color Popover (Opens Next to Main Tool Pill) ──
-            AnimatedVisibility(
-                visible = showColorControls,
-                enter = slideInHorizontally(tween(180)) { -it / 2 } + fadeIn(tween(180)),
-                exit = slideOutHorizontally(tween(180)) { -it / 2 } + fadeOut(tween(180))
+            val eraserPopoverContent: @Composable () -> Unit = {
+                AnimatedVisibility(
+                    visible = showEraserPopover && activeTool == AnnotationTool.Eraser,
+                    enter = scaleIn(spring(dampingRatio = 0.7f, stiffness = 350f)) + fadeIn(tween(180)),
+                    exit = scaleOut(spring(dampingRatio = 0.8f, stiffness = 350f)) + fadeOut(tween(180))
+                ) {
+                    Box(modifier = Modifier.pointerInput(Unit) { detectTapGestures { } }) {
+                        PdfAnnotationEraserOptionsPopover(
+                            selectedEraserFilter = selectedEraserFilter,
+                            onEraserFilterSelect = {
+                                performHaptic()
+                                onEraserFilterSelect(it)
+                                showEraserPopover = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            val colorPopoverContent: @Composable () -> Unit = {
+                AnimatedVisibility(
+                    visible = showColorControls,
+                    enter = scaleIn(spring(dampingRatio = 0.7f, stiffness = 350f)) + fadeIn(tween(180)),
+                    exit = scaleOut(spring(dampingRatio = 0.8f, stiffness = 350f)) + fadeOut(tween(180))
+                ) {
+                    Box(modifier = Modifier.pointerInput(Unit) { detectTapGestures { } }) {
+                        PdfAnnotationColorVerticalPopover(
+                            selectedColor = selectedColor,
+                            onColorSelect = {
+                                performHaptic()
+                                onColorSelect(it)
+                            },
+                            strokeWidth = strokeWidth,
+                            onStrokeWidthSelect = {
+                                performHaptic()
+                                onStrokeWidthSelect(it)
+                            }
+                        )
+                    }
+                }
+            }
+
+            val stampsPopoverContent: @Composable () -> Unit = {
+                AnimatedVisibility(
+                    visible = showStampsPopover && activeTool == AnnotationTool.Stamp,
+                    enter = scaleIn(spring(dampingRatio = 0.7f, stiffness = 350f)) + fadeIn(tween(180)),
+                    exit = scaleOut(spring(dampingRatio = 0.8f, stiffness = 350f)) + fadeOut(tween(180))
+                ) {
+                    PdfAnnotationStampsPopover(
+                        selectedStamp = selectedStamp,
+                        onStampSelect = { stamp ->
+                            performHaptic()
+                            onStampSelect(stamp)
+                            showStampsPopover = false
+                        },
+                        modifier = Modifier.pointerInput(Unit) { detectTapGestures { } }
+                    )
+                }
+            }
+
+            // ── Floating Anchored Container depending on Dock Position ──
+            val mainPillContent: @Composable () -> Unit = {
+                NexusSurface(
+                    shape = NexusTheme.shapes.pill,
+                    elevation = 8.dp,
+                    color = Color.Transparent,
+                    modifier = Modifier
+                        .clip(NexusTheme.shapes.pill)
+                        .glassBackground(blurRadius = 30f, alpha = 0.88f, fallbackColor = NexusTheme.colors.surfaceVariant)
+                        .border(1.dp, NexusTheme.colors.primary.copy(alpha = 0.45f), NexusTheme.shapes.pill)
+                        .pointerInput(Unit) { detectTapGestures { } }
+                        .padding(if (isHorizontalRibbon) PaddingValues(horizontal = 8.dp, vertical = 5.dp) else PaddingValues(vertical = 6.dp, horizontal = 5.dp))
+                ) {
+                    if (isHorizontalRibbon) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            dragHandleContent()
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.horizontalScroll(rememberScrollState())
+                            ) {
+                                toolButtonsContent()
+                            }
+                        }
+                    } else {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            dragHandleContent()
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(3.dp),
+                                modifier = Modifier
+                                    .heightIn(max = maxPillHeight)
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                toolButtonsContent()
+                            }
+                        }
+                    }
+                }
+            }
+
+            Box(
+                contentAlignment = when (dockPosition) {
+                    ToolbarDockPosition.Left -> Alignment.CenterStart
+                    ToolbarDockPosition.Right -> Alignment.CenterEnd
+                    ToolbarDockPosition.Top -> Alignment.TopCenter
+                    ToolbarDockPosition.Bottom -> Alignment.BottomCenter
+                }
             ) {
-                PdfAnnotationColorVerticalPopover(
-                    selectedColor = selectedColor,
-                    onColorSelect = onColorSelect,
-                    strokeWidth = strokeWidth,
-                    onStrokeWidthSelect = onStrokeWidthSelect
-                )
+                when (dockPosition) {
+                    ToolbarDockPosition.Left -> {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            mainPillContent()
+                            shapesPopoverContent()
+                            stampsPopoverContent()
+                            eraserPopoverContent()
+                            colorPopoverContent()
+                        }
+                    }
+                    ToolbarDockPosition.Right -> {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            shapesPopoverContent()
+                            stampsPopoverContent()
+                            eraserPopoverContent()
+                            colorPopoverContent()
+                            mainPillContent()
+                        }
+                    }
+                    ToolbarDockPosition.Top -> {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            mainPillContent()
+                            shapesPopoverContent()
+                            stampsPopoverContent()
+                            eraserPopoverContent()
+                            colorPopoverContent()
+                        }
+                    }
+                    ToolbarDockPosition.Bottom -> {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            shapesPopoverContent()
+                            stampsPopoverContent()
+                            eraserPopoverContent()
+                            colorPopoverContent()
+                            mainPillContent()
+                        }
+                    }
+                }
             }
         }
     }
@@ -332,13 +703,20 @@ private fun ToolIconButton(
 private fun ColorIconButton(
     isSelected: Boolean,
     currentColor: Color,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    isHighlighter: Boolean = false
 ) {
     val animatedScale by animateFloatAsState(
-        targetValue = if (isSelected) 1.12f else 1.0f,
-        animationSpec = spring(dampingRatio = 0.65f, stiffness = 400f),
+        targetValue = if (isSelected) 1.15f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 400f),
         label = "colorScale"
     )
+
+    val displayColor = if (isHighlighter) currentColor.copy(alpha = 0.55f) else currentColor
+
+    // Dynamic contrast luminance calculation
+    val luminance = (currentColor.red * 0.299f + currentColor.green * 0.587f + currentColor.blue * 0.114f)
+    val iconTint = if (luminance < 0.55f) Color.White else Color(0xFF1E1E1E)
 
     Box(
         contentAlignment = Alignment.Center,
@@ -363,14 +741,18 @@ private fun ColorIconButton(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(CircleShape)
-                .background(currentColor)
-                .border(1.2.dp, Color.White, CircleShape)
+                .background(displayColor)
+                .border(
+                    width = 1.2.dp,
+                    color = if (isHighlighter) NexusTheme.colors.primary.copy(alpha = 0.8f) else Color.White,
+                    shape = CircleShape
+                )
         ) {
             Icon(
                 imageVector = rememberPaletteIcon(isFilled = isSelected),
                 contentDescription = "Colors",
-                tint = if (currentColor == Color.Black || currentColor == Color(0xFF000000)) Color.White else Color.Black.copy(alpha = 0.85f),
-                modifier = Modifier.size(13.dp)
+                tint = iconTint,
+                modifier = Modifier.size(14.dp)
             )
         }
     }
@@ -395,20 +777,25 @@ fun PdfAnnotationColorVerticalPopover(
     )
 
     val strokeWidths = listOf(2f, 4f, 8f, 12f)
+    val configuration = LocalConfiguration.current
+    val maxPopoverHeight = (configuration.screenHeightDp * 0.50f).toInt().dp
 
     NexusSurface(
         shape = NexusTheme.shapes.medium,
-        elevation = 6.dp,
+        elevation = 8.dp,
         color = Color.Transparent,
         modifier = modifier
             .clip(NexusTheme.shapes.medium)
-            .glassBackground(blurRadius = 30f, alpha = 0.90f, fallbackColor = NexusTheme.colors.surfaceVariant)
-            .border(0.8.dp, NexusTheme.colors.divider.copy(alpha = 0.5f), NexusTheme.shapes.medium)
+            .glassBackground(blurRadius = 30f, alpha = 0.92f, fallbackColor = NexusTheme.colors.surfaceVariant)
+            .border(0.8.dp, NexusTheme.colors.divider.copy(alpha = 0.6f), NexusTheme.shapes.medium)
             .padding(vertical = 12.dp, horizontal = 10.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .heightIn(max = maxPopoverHeight)
+                .verticalScroll(rememberScrollState())
         ) {
             // Vertical Column of Color Swatches
             Column(
@@ -417,13 +804,19 @@ fun PdfAnnotationColorVerticalPopover(
             ) {
                 colors.forEach { color ->
                     val isSelected = selectedColor == color
+                    val scale by animateFloatAsState(
+                        targetValue = if (isSelected) 1.15f else 1.0f,
+                        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
+                        label = "swatchScale"
+                    )
                     Box(
                         modifier = Modifier
                             .size(24.dp)
+                            .scale(scale)
                             .clip(CircleShape)
                             .background(color)
                             .border(
-                                width = if (isSelected) 2.dp else 0.5.dp,
+                                width = if (isSelected) 2.5.dp else 0.5.dp,
                                 color = if (isSelected) NexusTheme.colors.primary else Color.Gray.copy(alpha = 0.4f),
                                 shape = CircleShape
                             )
@@ -432,32 +825,40 @@ fun PdfAnnotationColorVerticalPopover(
                 }
             }
 
-            // Divider line between colors and stroke thickness
+            // Dynamic Height Divider line
             Box(
                 modifier = Modifier
                     .width(1.dp)
-                    .height(180.dp)
+                    .height(190.dp)
                     .background(NexusTheme.colors.divider.copy(alpha = 0.5f))
             )
 
             // Vertical Column of Stroke Width Options
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 strokeWidths.forEach { width ->
                     val isSelected = strokeWidth == width
+                    val scale by animateFloatAsState(
+                        targetValue = if (isSelected) 1.15f else 1.0f,
+                        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
+                        label = "strokeScale"
+                    )
+                    val dotSize = (width.coerceIn(2f, 12f) * 1.3f).coerceIn(5f, 16f).dp
+
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .size(26.dp)
+                            .size(28.dp)
+                            .scale(scale)
                             .clip(CircleShape)
                             .background(
                                 if (isSelected) NexusTheme.colors.primary.copy(alpha = 0.20f)
                                 else Color.Transparent
                             )
                             .border(
-                                width = if (isSelected) 1.dp else 0.dp,
+                                width = if (isSelected) 1.5.dp else 0.dp,
                                 color = if (isSelected) NexusTheme.colors.primary else Color.Transparent,
                                 shape = CircleShape
                             )
@@ -465,7 +866,7 @@ fun PdfAnnotationColorVerticalPopover(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size((width.coerceIn(2f, 12f)).dp)
+                                .size(dotSize)
                                 .clip(CircleShape)
                                 .background(if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textSecondary)
                         )
@@ -741,3 +1142,223 @@ fun rememberRedoIcon(): ImageVector = remember {
         )
     }.build()
 }
+
+@Composable
+fun rememberEraseAllIcon(isFilled: Boolean = false): ImageVector = remember(isFilled) {
+    ImageVector.Builder(
+        name = "eraseAll",
+        defaultWidth = 24.dp, defaultHeight = 24.dp,
+        viewportWidth = 24f, viewportHeight = 24f
+    ).apply {
+        val stroke = SolidColor(Color.Black)
+        val fill = if (isFilled) SolidColor(Color.Black) else null
+        addPath(
+            pathData = PathParser().parsePathString("M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3").toNodes(),
+            fill = fill, stroke = stroke, strokeLineWidth = if (isFilled) 2.2f else 1.8f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round
+        )
+    }.build()
+}
+
+@Composable
+fun PdfAnnotationEraserOptionsPopover(
+    selectedEraserFilter: EraserTargetFilter,
+    onEraserFilterSelect: (EraserTargetFilter) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    NexusSurface(
+        shape = NexusTheme.shapes.medium,
+        elevation = 8.dp,
+        color = Color.Transparent,
+        modifier = modifier
+            .widthIn(min = 160.dp, max = 190.dp)
+            .clip(NexusTheme.shapes.medium)
+            .glassBackground(blurRadius = 35f, alpha = 0.92f, fallbackColor = NexusTheme.colors.surfaceVariant)
+            .border(0.8.dp, NexusTheme.colors.divider.copy(alpha = 0.6f), NexusTheme.shapes.medium)
+            .padding(vertical = 8.dp, horizontal = 10.dp)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            NexusText(
+                text = "ERASE TARGET",
+                style = NexusTheme.typography.caption.copy(
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    fontSize = 10.sp,
+                    letterSpacing = 0.8.sp
+                ),
+                color = NexusTheme.colors.primary,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+            )
+
+            EraserTargetFilter.values().forEach { filter ->
+                val isSelected = selectedEraserFilter == filter
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            if (isSelected) NexusTheme.colors.primary.copy(alpha = 0.15f)
+                            else Color.Transparent
+                        )
+                        .springBounceClick { onEraserFilterSelect(filter) }
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Icon(
+                        imageVector = when (filter) {
+                            EraserTargetFilter.All -> rememberEraseAllIcon(isFilled = isSelected)
+                            EraserTargetFilter.PenOnly -> rememberPenIcon(isFilled = isSelected)
+                            EraserTargetFilter.HighlighterOnly -> rememberHighlighterIcon(isFilled = isSelected)
+                            EraserTargetFilter.ShapesOnly -> rememberShapesIcon(isFilled = isSelected)
+                        },
+                        contentDescription = filter.label,
+                        tint = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    NexusText(
+                        text = filter.label,
+                        style = NexusTheme.typography.caption.copy(
+                            fontWeight = if (isSelected) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal
+                        ),
+                        color = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textPrimary,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun rememberDragHandleIcon(): ImageVector = remember {
+    ImageVector.Builder(
+        name = "dragHandle",
+        defaultWidth = 24.dp, defaultHeight = 24.dp,
+        viewportWidth = 24f, viewportHeight = 24f
+    ).apply {
+        val stroke = SolidColor(Color.Black)
+        addPath(
+            pathData = PathParser().parsePathString("M9 6h6M9 12h6M9 18h6").toNodes(),
+            stroke = stroke, strokeLineWidth = 2.2f, strokeLineCap = StrokeCap.Round
+        )
+    }.build()
+}
+
+@Composable
+fun rememberTextIcon(isFilled: Boolean = false): ImageVector = remember(isFilled) {
+    ImageVector.Builder(
+        name = "text",
+        defaultWidth = 24.dp, defaultHeight = 24.dp,
+        viewportWidth = 24f, viewportHeight = 24f
+    ).apply {
+        val stroke = SolidColor(Color.Black)
+        addPath(
+            pathData = PathParser().parsePathString("M4 7V4h16v3M12 4v16M9 20h6").toNodes(),
+            stroke = stroke, strokeLineWidth = if (isFilled) 2.4f else 1.8f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round
+        )
+    }.build()
+}
+
+@Composable
+fun rememberStampIcon(isFilled: Boolean = false): ImageVector = remember(isFilled) {
+    ImageVector.Builder(
+        name = "stamp",
+        defaultWidth = 24.dp, defaultHeight = 24.dp,
+        viewportWidth = 24f, viewportHeight = 24f
+    ).apply {
+        val stroke = SolidColor(Color.Black)
+        val fill = if (isFilled) SolidColor(Color.Black) else null
+        addPath(
+            pathData = PathParser().parsePathString("M4 17h16M4 21h16M9 17V8a3 3 0 0 1 6 0v9").toNodes(),
+            fill = fill, stroke = stroke, strokeLineWidth = if (isFilled) 2.2f else 1.8f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round
+        )
+    }.build()
+}
+
+@Composable
+fun rememberRulerIcon(isFilled: Boolean = false): ImageVector = remember(isFilled) {
+    ImageVector.Builder(
+        name = "ruler",
+        defaultWidth = 24.dp, defaultHeight = 24.dp,
+        viewportWidth = 24f, viewportHeight = 24f
+    ).apply {
+        val stroke = SolidColor(Color.Black)
+        addPath(
+            pathData = PathParser().parsePathString("M4 19L19 4M7 16l2-2M10 13l2-2M13 10l2-2M16 7l2-2").toNodes(),
+            stroke = stroke, strokeLineWidth = if (isFilled) 2.4f else 1.8f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round
+        )
+    }.build()
+}
+
+@Composable
+fun PdfAnnotationStampsPopover(
+    selectedStamp: StampType,
+    onStampSelect: (StampType) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    NexusSurface(
+        shape = NexusTheme.shapes.medium,
+        elevation = 8.dp,
+        color = Color.Transparent,
+        modifier = modifier
+            .widthIn(min = 175.dp, max = 205.dp)
+            .clip(NexusTheme.shapes.medium)
+            .glassBackground(blurRadius = 35f, alpha = 0.92f, fallbackColor = NexusTheme.colors.surfaceVariant)
+            .border(0.8.dp, NexusTheme.colors.divider.copy(alpha = 0.6f), NexusTheme.shapes.medium)
+            .padding(vertical = 8.dp, horizontal = 10.dp)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            NexusText(
+                text = "BUSINESS STAMPS",
+                style = NexusTheme.typography.caption.copy(
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    fontSize = 10.sp,
+                    letterSpacing = 0.8.sp
+                ),
+                color = NexusTheme.colors.primary,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+            )
+
+            StampType.values().forEach { stamp ->
+                val isSelected = selectedStamp == stamp
+                val badgeColor = Color(stamp.colorHex)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            if (isSelected) badgeColor.copy(alpha = 0.20f)
+                            else Color.Transparent
+                        )
+                        .springBounceClick { onStampSelect(stamp) }
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(badgeColor)
+                    )
+                    NexusText(
+                        text = stamp.label,
+                        style = NexusTheme.typography.caption.copy(
+                            fontWeight = if (isSelected) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Medium
+                        ),
+                        color = if (isSelected) badgeColor else NexusTheme.colors.textPrimary,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+

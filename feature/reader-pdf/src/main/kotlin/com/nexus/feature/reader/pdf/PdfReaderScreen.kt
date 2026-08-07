@@ -55,6 +55,8 @@ import com.nexus.core.ui.animations.springBounceClick
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.ColorMatrix
@@ -101,7 +103,9 @@ data class PdfAnnotationItem(
     val color: Color,
     val strokeWidth: Float,
     val tool: com.nexus.feature.reader.pdf.components.AnnotationTool,
-    val shapeType: com.nexus.feature.reader.pdf.components.ShapeType? = null
+    val shapeType: com.nexus.feature.reader.pdf.components.ShapeType? = null,
+    val stampType: com.nexus.feature.reader.pdf.components.StampType? = null,
+    val text: String? = null
 )
 
 @androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -148,9 +152,17 @@ fun PdfReaderScreen(
     var selectedShape by remember { mutableStateOf(com.nexus.feature.reader.pdf.components.ShapeType.Rectangle) }
     var selectedAnnotationColor by remember { mutableStateOf(Color(0xFFFFEB3B)) }
     var selectedStrokeWidth by remember { mutableFloatStateOf(4f) }
+    var selectedEraserFilter by remember { mutableStateOf(com.nexus.feature.reader.pdf.components.EraserTargetFilter.All) }
+    var selectedStamp by remember { mutableStateOf(com.nexus.feature.reader.pdf.components.StampType.APPROVED) }
+    var pendingTextPoint by remember { mutableStateOf<Pair<Int, Offset>?>(null) }
+    var textEntryInput by remember { mutableStateOf("") }
+    var toolbarDockPosition by remember { mutableStateOf(com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Left) }
+    var isToolbarCollapsed by remember { mutableStateOf(false) }
+    var activePointerOffset by remember { mutableStateOf<Offset?>(null) }
 
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
+    val isStarred by viewModel.isStarred.collectAsStateWithLifecycle()
     val keepScreenAwake by viewModel.keepScreenAwake.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -170,7 +182,13 @@ fun PdfReaderScreen(
     
     var isDrawMode by remember { mutableStateOf(false) }
     var currentDrawPage by remember { mutableIntStateOf(-1) }
+    val drawnStrokesState by viewModel.drawnStrokesState.collectAsStateWithLifecycle()
     val drawnStrokes = remember { androidx.compose.runtime.mutableStateMapOf<Int, List<PdfAnnotationItem>>() }
+    LaunchedEffect(drawnStrokesState) {
+        drawnStrokesState.forEach { (page, list) ->
+            drawnStrokes[page] = list
+        }
+    }
     val redoStrokesMap = remember { androidx.compose.runtime.mutableStateMapOf<Int, List<PdfAnnotationItem>>() }
     var showOutlineSheet by remember { mutableStateOf(false) }
     var isSavingAnnotations by remember { mutableStateOf(false) }
@@ -425,7 +443,11 @@ fun PdfReaderScreen(
                                             color = pageContainerColor,
                                             modifier = Modifier.width(screenWidthDp - 32.dp)
                                         ) {
-                                            Box {
+                                            Box(
+                                                modifier = Modifier.graphicsLayer {
+                                                    rotationZ = pageRotation.toFloat()
+                                                }
+                                            ) {
                                                 if (bitmap != null) {
                                                     val isLandscape = pageRotation % 180 != 0
                                                     Image(
@@ -439,9 +461,6 @@ fun PdfReaderScreen(
                                                                 if (isLandscape) bitmap.height.toFloat() / bitmap.width.toFloat()
                                                                 else bitmap.width.toFloat() / bitmap.height.toFloat()
                                                             )
-                                                            .graphicsLayer {
-                                                                rotationZ = pageRotation.toFloat()
-                                                            }
                                                             .drawWithContent {
                                                                 drawContent()
                                                                 val highlights = searchHighlights[pageIndex]
@@ -479,17 +498,16 @@ fun PdfReaderScreen(
                                                     }
                                                  }
                                                  
-                                                 // Canvas Overlay for Drawing & Annotations
-                                                 if (isDrawMode && (currentDrawPage == -1 || currentDrawPage == pageIndex) && bitmap != null) {
-                                                     var currentPath by remember { mutableStateOf<List<Offset>>(emptyList()) }
+                                                  // Canvas Overlay for Drawing & Annotations
+                                                  if (isDrawMode && (currentDrawPage == -1 || currentDrawPage == pageIndex) && bitmap != null) {
+                                                      var currentPath by remember { mutableStateOf<List<Offset>>(emptyList()) }
                                                       androidx.compose.foundation.Canvas(
                                                           modifier = Modifier
                                                               .matchParentSize()
-                                                              .pointerInput(isDrawMode, activeAnnotationTool, selectedShape, selectedAnnotationColor, selectedStrokeWidth) {
+                                                              .pointerInput(isDrawMode, activeAnnotationTool, selectedShape, selectedAnnotationColor, selectedStrokeWidth, selectedEraserFilter) {
                                                                   if (!isDrawMode) return@pointerInput
                                                                   awaitEachGesture {
                                                                       awaitFirstDown(requireUnconsumed = false)
-                                                                      var isTwoFingerGesture = false
                                                                       var maxPointers = 0
                                                                       
                                                                       do {
@@ -498,26 +516,89 @@ fun PdfReaderScreen(
                                                                           maxPointers = maxOf(maxPointers, pressed.size)
                                                                           
                                                                           if (maxPointers >= 2 || pressed.size >= 2) {
-                                                                              isAnnotationPillVisible = false
-                                                                              isDrawMode = false
+                                                                              // Retain toolbar visibility and draw mode during multi-touch pinch zoom
                                                                               currentPath = emptyList()
                                                                               currentDrawPage = -1
+                                                                              activePointerOffset = null
                                                                               return@awaitEachGesture
                                                                           } else if (pressed.size == 1) {
                                                                               val change = pressed.first()
+                                                                              activePointerOffset = change.position
                                                                               if (activeAnnotationTool == com.nexus.feature.reader.pdf.components.AnnotationTool.Eraser) {
                                                                                   val pos = change.position
                                                                                   val currentStrokes = drawnStrokes[pageIndex] ?: emptyList()
+                                                                                  val targetFilter = selectedEraserFilter
+                                                                                  
+                                                                                  fun matchesFilter(item: PdfAnnotationItem): Boolean = when (targetFilter) {
+                                                                                      com.nexus.feature.reader.pdf.components.EraserTargetFilter.All -> true
+                                                                                      com.nexus.feature.reader.pdf.components.EraserTargetFilter.PenOnly -> item.tool == com.nexus.feature.reader.pdf.components.AnnotationTool.Pen
+                                                                                      com.nexus.feature.reader.pdf.components.EraserTargetFilter.HighlighterOnly -> item.tool == com.nexus.feature.reader.pdf.components.AnnotationTool.Highlighter
+                                                                                      com.nexus.feature.reader.pdf.components.EraserTargetFilter.ShapesOnly -> item.tool == com.nexus.feature.reader.pdf.components.AnnotationTool.Shapes
+                                                                                  }
+
+                                                                                  fun distanceToSegment(p: Offset, a: Offset, b: Offset): Float {
+                                                                                      val l2 = (b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y)
+                                                                                      if (l2 == 0f) return (p - a).getDistance()
+                                                                                      val t = (((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / l2).coerceIn(0f, 1f)
+                                                                                      val projection = Offset(a.x + t * (b.x - a.x), a.y + t * (b.y - a.y))
+                                                                                      return (p - projection).getDistance()
+                                                                                  }
+
+                                                                                  val threshold = 24.dp.toPx()
                                                                                   val updated = currentStrokes.filterNot { item ->
-                                                                                      item.points.any { p ->
-                                                                                          val px = p.x * size.width
-                                                                                          val py = p.y * size.height
-                                                                                          val distSq = (px - pos.x) * (px - pos.x) + (py - pos.y) * (py - pos.y)
-                                                                                          distSq < 1600f
+                                                                                      if (!matchesFilter(item)) false
+                                                                                      else {
+                                                                                          val pts = item.points.map { Offset(it.x * size.width, it.y * size.height) }
+                                                                                          if (item.tool == com.nexus.feature.reader.pdf.components.AnnotationTool.Shapes && pts.size >= 2) {
+                                                                                              val start = pts.first()
+                                                                                              val end = pts.last()
+                                                                                              when (item.shapeType) {
+                                                                                                  com.nexus.feature.reader.pdf.components.ShapeType.Rectangle -> {
+                                                                                                      val left = kotlin.math.min(start.x, end.x)
+                                                                                                      val top = kotlin.math.min(start.y, end.y)
+                                                                                                      val right = kotlin.math.max(start.x, end.x)
+                                                                                                      val bottom = kotlin.math.max(start.y, end.y)
+                                                                                                      val d1 = distanceToSegment(pos, Offset(left, top), Offset(right, top))
+                                                                                                      val d2 = distanceToSegment(pos, Offset(right, top), Offset(right, bottom))
+                                                                                                      val d3 = distanceToSegment(pos, Offset(right, bottom), Offset(left, bottom))
+                                                                                                      val d4 = distanceToSegment(pos, Offset(left, bottom), Offset(left, top))
+                                                                                                      minOf(d1, d2, d3, d4) < threshold
+                                                                                                  }
+                                                                                                  com.nexus.feature.reader.pdf.components.ShapeType.Oval -> {
+                                                                                                      val left = kotlin.math.min(start.x, end.x)
+                                                                                                      val top = kotlin.math.min(start.y, end.y)
+                                                                                                      val right = kotlin.math.max(start.x, end.x)
+                                                                                                      val bottom = kotlin.math.max(start.y, end.y)
+                                                                                                      val cx = (left + right) / 2f
+                                                                                                      val cy = (top + bottom) / 2f
+                                                                                                      val rx = kotlin.math.abs(right - left) / 2f
+                                                                                                      val ry = kotlin.math.abs(bottom - top) / 2f
+                                                                                                      if (rx == 0f || ry == 0f) (pos - Offset(cx, cy)).getDistance() < threshold
+                                                                                                      else {
+                                                                                                          val dx = (pos.x - cx) / rx
+                                                                                                          val dy = (pos.y - cy) / ry
+                                                                                                          val norm = kotlin.math.sqrt(dx * dx + dy * dy)
+                                                                                                          kotlin.math.abs(norm - 1f) * minOf(rx, ry) < threshold
+                                                                                                      }
+                                                                                                  }
+                                                                                                  com.nexus.feature.reader.pdf.components.ShapeType.Line, com.nexus.feature.reader.pdf.components.ShapeType.Arrow, null -> {
+                                                                                                      distanceToSegment(pos, start, end) < threshold
+                                                                                                  }
+                                                                                              }
+                                                                                          } else {
+                                                                                              if (pts.size == 1) {
+                                                                                                  (pts.first() - pos).getDistance() < threshold
+                                                                                              } else {
+                                                                                                  pts.indices.drop(1).any { i ->
+                                                                                                      distanceToSegment(pos, pts[i - 1], pts[i]) < threshold
+                                                                                                  }
+                                                                                              }
+                                                                                          }
                                                                                       }
                                                                                   }
                                                                                   if (updated.size != currentStrokes.size) {
                                                                                       drawnStrokes[pageIndex] = updated
+                                                                                      viewModel.updateDrawnStrokes(pageIndex, updated)
                                                                                   }
                                                                               } else {
                                                                                   if (currentPath.isEmpty()) {
@@ -527,151 +608,307 @@ fun PdfReaderScreen(
                                                                                       currentPath = currentPath + change.position
                                                                                   }
                                                                               }
-                                                                              change.consume()
+                                                                          change.consume()
                                                                           }
                                                                       } while (event.changes.any { it.pressed })
-                                                                      
-                                                                      if (maxPointers < 2 && currentPath.isNotEmpty() && activeAnnotationTool != com.nexus.feature.reader.pdf.components.AnnotationTool.Eraser) {
-                                                                         val strokes = drawnStrokes[pageIndex]?.toMutableList() ?: mutableListOf()
-                                                                         val newItem = if (activeAnnotationTool == com.nexus.feature.reader.pdf.components.AnnotationTool.Shapes) {
-                                                                             val start = currentPath.first()
-                                                                             val end = currentPath.last()
-                                                                             val normalized = listOf(
-                                                                                 Offset(start.x / size.width, start.y / size.height),
-                                                                                 Offset(end.x / size.width, end.y / size.height)
-                                                                             )
-                                                                             PdfAnnotationItem(
-                                                                                 points = normalized,
-                                                                                 color = selectedAnnotationColor,
-                                                                                 strokeWidth = selectedStrokeWidth,
-                                                                                 tool = com.nexus.feature.reader.pdf.components.AnnotationTool.Shapes,
-                                                                                 shapeType = selectedShape
-                                                                             )
-                                                                         } else {
-                                                                             val normalized = currentPath.map { Offset(it.x / size.width, it.y / size.height) }
-                                                                             PdfAnnotationItem(
-                                                                                 points = normalized,
-                                                                                 color = selectedAnnotationColor,
-                                                                                 strokeWidth = selectedStrokeWidth,
-                                                                                 tool = activeAnnotationTool ?: com.nexus.feature.reader.pdf.components.AnnotationTool.Highlighter
-                                                                             )
-                                                                         }
-                                                                         strokes.add(newItem)
-                                                                         drawnStrokes[pageIndex] = strokes
-                                                                         redoStrokesMap.remove(pageIndex)
-                                                                     }
-                                                                     currentPath = emptyList()
-                                                                     currentDrawPage = -1
-                                                                 }
-                                                             }
-                                                     ) {
-                                                         // ── Render Saved Annotations ──
-                                                         drawnStrokes[pageIndex]?.forEach { item ->
-                                                             val denormalized = item.points.map { Offset(it.x * size.width, it.y * size.height) }
-                                                             val strokeStyle = androidx.compose.ui.graphics.drawscope.Stroke(
-                                                                 width = item.strokeWidth.dp.toPx(),
-                                                                 cap = StrokeCap.Round,
-                                                                 join = StrokeJoin.Round
-                                                             )
-                                                             val drawColor = if (item.tool == com.nexus.feature.reader.pdf.components.AnnotationTool.Highlighter) item.color.copy(alpha = 0.45f) else item.color
+                                                                       
+                                                                       if (maxPointers < 2 && currentPath.isNotEmpty() && activeAnnotationTool != com.nexus.feature.reader.pdf.components.AnnotationTool.Eraser) {
+                                                                           val strokes = drawnStrokes[pageIndex]?.toMutableList() ?: mutableListOf()
+                                                                           val startPt = currentPath.first()
+                                                                           val endPt = currentPath.last()
+                                                                           val normStart = Offset(startPt.x / size.width, startPt.y / size.height)
+                                                                           val normEnd = Offset(endPt.x / size.width, endPt.y / size.height)
 
-                                                             if (item.tool == com.nexus.feature.reader.pdf.components.AnnotationTool.Shapes && denormalized.size >= 2) {
-                                                                 val start = denormalized.first()
-                                                                 val end = denormalized.last()
-                                                                 val left = kotlin.math.min(start.x, end.x)
-                                                                 val top = kotlin.math.min(start.y, end.y)
-                                                                 val w = kotlin.math.abs(end.x - start.x)
-                                                                 val h = kotlin.math.abs(end.y - start.y)
+                                                                           val newItem = when (activeAnnotationTool) {
+                                                                               com.nexus.feature.reader.pdf.components.AnnotationTool.Shapes -> {
+                                                                                   PdfAnnotationItem(
+                                                                                       points = listOf(normStart, normEnd),
+                                                                                       color = selectedAnnotationColor,
+                                                                                       strokeWidth = selectedStrokeWidth,
+                                                                                       tool = com.nexus.feature.reader.pdf.components.AnnotationTool.Shapes,
+                                                                                       shapeType = selectedShape
+                                                                                   )
+                                                                               }
+                                                                               com.nexus.feature.reader.pdf.components.AnnotationTool.Text -> {
+                                                                                   pendingTextPoint = Pair(pageIndex, normStart)
+                                                                                   null
+                                                                               }
+                                                                               com.nexus.feature.reader.pdf.components.AnnotationTool.Stamp -> {
+                                                                                   PdfAnnotationItem(
+                                                                                       points = listOf(normStart),
+                                                                                       color = Color(selectedStamp.colorHex),
+                                                                                       strokeWidth = selectedStrokeWidth,
+                                                                                       tool = com.nexus.feature.reader.pdf.components.AnnotationTool.Stamp,
+                                                                                       stampType = selectedStamp
+                                                                                   )
+                                                                               }
+                                                                               com.nexus.feature.reader.pdf.components.AnnotationTool.Ruler -> {
+                                                                                   PdfAnnotationItem(
+                                                                                       points = listOf(normStart, normEnd),
+                                                                                       color = selectedAnnotationColor,
+                                                                                       strokeWidth = selectedStrokeWidth,
+                                                                                       tool = com.nexus.feature.reader.pdf.components.AnnotationTool.Ruler
+                                                                                   )
+                                                                               }
+                                                                               else -> {
+                                                                                   val normalized = currentPath.map { Offset(it.x / size.width, it.y / size.height) }
+                                                                                   PdfAnnotationItem(
+                                                                                       points = normalized,
+                                                                                       color = selectedAnnotationColor,
+                                                                                       strokeWidth = selectedStrokeWidth,
+                                                                                       tool = activeAnnotationTool ?: com.nexus.feature.reader.pdf.components.AnnotationTool.Pen
+                                                                                   )
+                                                                               }
+                                                                           }
+                                                                           if (newItem != null) {
+                                                                               strokes.add(newItem)
+                                                                               drawnStrokes[pageIndex] = strokes
+                                                                               viewModel.updateDrawnStrokes(pageIndex, strokes)
+                                                                               redoStrokesMap.remove(pageIndex)
+                                                                           }
+                                                                       }
+                                                                       currentPath = emptyList()
+                                                                       currentDrawPage = -1
+                                                                       activePointerOffset = null
+                                                                   }
+                                                               }
+                                                       ) {
+                                                          // ── Render Saved Annotations ──
+                                                          drawnStrokes[pageIndex]?.forEach { item ->
+                                                              val denormalized = item.points.map { Offset(it.x * size.width, it.y * size.height) }
+                                                              val strokeStyle = androidx.compose.ui.graphics.drawscope.Stroke(
+                                                                  width = item.strokeWidth.dp.toPx(),
+                                                                  cap = StrokeCap.Round,
+                                                                  join = StrokeJoin.Round
+                                                              )
+                                                              val drawColor = if (item.tool == com.nexus.feature.reader.pdf.components.AnnotationTool.Highlighter) item.color.copy(alpha = 0.45f) else item.color
 
-                                                                 when (item.shapeType) {
-                                                                     com.nexus.feature.reader.pdf.components.ShapeType.Rectangle -> {
-                                                                         drawRect(color = drawColor, topLeft = Offset(left, top), size = Size(w, h), style = strokeStyle)
-                                                                     }
-                                                                     com.nexus.feature.reader.pdf.components.ShapeType.Oval -> {
-                                                                         drawOval(color = drawColor, topLeft = Offset(left, top), size = Size(w, h), style = strokeStyle)
-                                                                     }
-                                                                     com.nexus.feature.reader.pdf.components.ShapeType.Line -> {
-                                                                         drawLine(color = drawColor, start = start, end = end, strokeWidth = strokeStyle.width, cap = StrokeCap.Round)
-                                                                     }
-                                                                     com.nexus.feature.reader.pdf.components.ShapeType.Arrow, null -> {
-                                                                         drawLine(color = drawColor, start = start, end = end, strokeWidth = strokeStyle.width, cap = StrokeCap.Round)
-                                                                         val angle = kotlin.math.atan2((end.y - start.y).toDouble(), (end.x - start.x).toDouble())
-                                                                         val arrowLen = 30f
-                                                                         val arrowAngle = Math.toRadians(25.0)
-                                                                         val p1 = Offset((end.x - arrowLen * kotlin.math.cos(angle - arrowAngle)).toFloat(), (end.y - arrowLen * kotlin.math.sin(angle - arrowAngle)).toFloat())
-                                                                         val p2 = Offset((end.x - arrowLen * kotlin.math.cos(angle + arrowAngle)).toFloat(), (end.y - arrowLen * kotlin.math.sin(angle + arrowAngle)).toFloat())
-                                                                         drawLine(color = drawColor, start = end, end = p1, strokeWidth = strokeStyle.width, cap = StrokeCap.Round)
-                                                                         drawLine(color = drawColor, start = end, end = p2, strokeWidth = strokeStyle.width, cap = StrokeCap.Round)
-                                                                     }
-                                                                 }
-                                                             } else {
-                                                                 drawPath(
-                                                                     path = androidx.compose.ui.graphics.Path().apply {
-                                                                         if (denormalized.isNotEmpty()) {
-                                                                             moveTo(denormalized.first().x, denormalized.first().y)
-                                                                             for (i in 1 until denormalized.size) lineTo(denormalized[i].x, denormalized[i].y)
-                                                                         }
-                                                                     },
-                                                                     color = drawColor,
-                                                                     style = strokeStyle
-                                                                 )
-                                                             }
-                                                         }
+                                                              when (item.tool) {
+                                                                  com.nexus.feature.reader.pdf.components.AnnotationTool.Shapes -> {
+                                                                      if (denormalized.size >= 2) {
+                                                                          val start = denormalized.first()
+                                                                          val end = denormalized.last()
+                                                                          val left = kotlin.math.min(start.x, end.x)
+                                                                          val top = kotlin.math.min(start.y, end.y)
+                                                                          val w = kotlin.math.abs(end.x - start.x)
+                                                                          val h = kotlin.math.abs(end.y - start.y)
 
-                                                         // ── Render Active Live Preview ──
-                                                         if (currentPath.isNotEmpty() && activeAnnotationTool != com.nexus.feature.reader.pdf.components.AnnotationTool.Eraser) {
-                                                             val liveStrokeStyle = androidx.compose.ui.graphics.drawscope.Stroke(
-                                                                 width = selectedStrokeWidth.dp.toPx(),
-                                                                 cap = StrokeCap.Round,
-                                                                 join = StrokeJoin.Round
-                                                             )
-                                                             val liveColor = if (activeAnnotationTool == com.nexus.feature.reader.pdf.components.AnnotationTool.Highlighter) selectedAnnotationColor.copy(alpha = 0.45f) else selectedAnnotationColor
+                                                                          when (item.shapeType) {
+                                                                              com.nexus.feature.reader.pdf.components.ShapeType.Rectangle -> {
+                                                                                  drawRect(color = drawColor, topLeft = Offset(left, top), size = Size(w, h), style = strokeStyle)
+                                                                              }
+                                                                              com.nexus.feature.reader.pdf.components.ShapeType.Oval -> {
+                                                                                  drawOval(color = drawColor, topLeft = Offset(left, top), size = Size(w, h), style = strokeStyle)
+                                                                              }
+                                                                              com.nexus.feature.reader.pdf.components.ShapeType.Line -> {
+                                                                                  drawLine(color = drawColor, start = start, end = end, strokeWidth = strokeStyle.width, cap = StrokeCap.Round)
+                                                                              }
+                                                                              com.nexus.feature.reader.pdf.components.ShapeType.Arrow, null -> {
+                                                                                  drawLine(color = drawColor, start = start, end = end, strokeWidth = strokeStyle.width, cap = StrokeCap.Round)
+                                                                                  val angle = kotlin.math.atan2((end.y - start.y).toDouble(), (end.x - start.x).toDouble())
+                                                                                  val arrowLen = 30f
+                                                                                  val arrowAngle = Math.toRadians(25.0)
+                                                                                  val p1 = Offset((end.x - arrowLen * kotlin.math.cos(angle - arrowAngle)).toFloat(), (end.y - arrowLen * kotlin.math.sin(angle - arrowAngle)).toFloat())
+                                                                                  val p2 = Offset((end.x - arrowLen * kotlin.math.cos(angle + arrowAngle)).toFloat(), (end.y - arrowLen * kotlin.math.sin(angle + arrowAngle)).toFloat())
+                                                                                  drawLine(color = drawColor, start = end, end = p1, strokeWidth = strokeStyle.width, cap = StrokeCap.Round)
+                                                                                  drawLine(color = drawColor, start = end, end = p2, strokeWidth = strokeStyle.width, cap = StrokeCap.Round)
+                                                                              }
+                                                                          }
+                                                                      }
+                                                                  }
+                                                                  com.nexus.feature.reader.pdf.components.AnnotationTool.Text -> {
+                                                                      val textStr = item.text ?: ""
+                                                                      if (denormalized.isNotEmpty() && textStr.isNotEmpty()) {
+                                                                          val pt = denormalized.first()
+                                                                          drawContext.canvas.nativeCanvas.drawText(
+                                                                              textStr,
+                                                                              pt.x,
+                                                                              pt.y,
+                                                                              android.graphics.Paint().apply {
+                                                                                  color = item.color.toArgb()
+                                                                                  textSize = (item.strokeWidth * 4f).coerceIn(24f, 64f)
+                                                                                  isAntiAlias = true
+                                                                                  typeface = android.graphics.Typeface.DEFAULT_BOLD
+                                                                              }
+                                                                          )
+                                                                      }
+                                                                  }
+                                                                  com.nexus.feature.reader.pdf.components.AnnotationTool.Stamp -> {
+                                                                      if (denormalized.isNotEmpty()) {
+                                                                          val center = denormalized.first()
+                                                                          val stamp = item.stampType ?: com.nexus.feature.reader.pdf.components.StampType.APPROVED
+                                                                          val stampColor = Color(stamp.colorHex)
+                                                                          val badgeW = 150f
+                                                                          val badgeH = 46f
+                                                                          val left = center.x - badgeW / 2f
+                                                                          val top = center.y - badgeH / 2f
 
-                                                             if (activeAnnotationTool == com.nexus.feature.reader.pdf.components.AnnotationTool.Shapes && currentPath.size >= 2) {
-                                                                 val start = currentPath.first()
-                                                                 val end = currentPath.last()
-                                                                 val left = kotlin.math.min(start.x, end.x)
-                                                                 val top = kotlin.math.min(start.y, end.y)
-                                                                 val w = kotlin.math.abs(end.x - start.x)
-                                                                 val h = kotlin.math.abs(end.y - start.y)
+                                                                          drawRoundRect(
+                                                                              color = stampColor.copy(alpha = 0.16f),
+                                                                              topLeft = Offset(left, top),
+                                                                              size = Size(badgeW, badgeH),
+                                                                              cornerRadius = androidx.compose.ui.geometry.CornerRadius(10f)
+                                                                          )
+                                                                          drawRoundRect(
+                                                                              color = stampColor,
+                                                                              topLeft = Offset(left, top),
+                                                                              size = Size(badgeW, badgeH),
+                                                                              cornerRadius = androidx.compose.ui.geometry.CornerRadius(10f),
+                                                                              style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.5f)
+                                                                          )
+                                                                          val stampPaint = android.graphics.Paint().apply {
+                                                                              color = stampColor.toArgb()
+                                                                              textSize = 18f
+                                                                              isAntiAlias = true
+                                                                              typeface = android.graphics.Typeface.DEFAULT_BOLD
+                                                                              textAlign = android.graphics.Paint.Align.CENTER
+                                                                          }
+                                                                          drawContext.canvas.nativeCanvas.drawText(stamp.label, center.x, center.y + 6f, stampPaint)
+                                                                      }
+                                                                  }
+                                                                  com.nexus.feature.reader.pdf.components.AnnotationTool.Ruler -> {
+                                                                      if (denormalized.size >= 2) {
+                                                                          val start = denormalized.first()
+                                                                          val end = denormalized.last()
+                                                                          drawLine(color = item.color, start = start, end = end, strokeWidth = strokeStyle.width, cap = StrokeCap.Round)
+                                                                          
+                                                                          val angle = kotlin.math.atan2((end.y - start.y).toDouble(), (end.x - start.x).toDouble())
+                                                                          val perpAngle = angle + Math.PI / 2
+                                                                          val tickLen = 14f
+                                                                          val p1 = Offset((start.x + tickLen * kotlin.math.cos(perpAngle)).toFloat(), (start.y + tickLen * kotlin.math.sin(perpAngle)).toFloat())
+                                                                          val p2 = Offset((start.x - tickLen * kotlin.math.cos(perpAngle)).toFloat(), (start.y - tickLen * kotlin.math.sin(perpAngle)).toFloat())
+                                                                          val p3 = Offset((end.x + tickLen * kotlin.math.cos(perpAngle)).toFloat(), (end.y + tickLen * kotlin.math.sin(perpAngle)).toFloat())
+                                                                          val p4 = Offset((end.x - tickLen * kotlin.math.cos(perpAngle)).toFloat(), (end.y - tickLen * kotlin.math.sin(perpAngle)).toFloat())
+                                                                          drawLine(color = item.color, start = p1, end = p2, strokeWidth = strokeStyle.width)
+                                                                          drawLine(color = item.color, start = p3, end = p4, strokeWidth = strokeStyle.width)
 
-                                                                 when (selectedShape) {
-                                                                     com.nexus.feature.reader.pdf.components.ShapeType.Rectangle -> {
-                                                                         drawRect(color = liveColor, topLeft = Offset(left, top), size = Size(w, h), style = liveStrokeStyle)
-                                                                     }
-                                                                     com.nexus.feature.reader.pdf.components.ShapeType.Oval -> {
-                                                                         drawOval(color = liveColor, topLeft = Offset(left, top), size = Size(w, h), style = liveStrokeStyle)
-                                                                     }
-                                                                     com.nexus.feature.reader.pdf.components.ShapeType.Line -> {
-                                                                         drawLine(color = liveColor, start = start, end = end, strokeWidth = liveStrokeStyle.width, cap = StrokeCap.Round)
-                                                                     }
-                                                                     com.nexus.feature.reader.pdf.components.ShapeType.Arrow -> {
-                                                                         drawLine(color = liveColor, start = start, end = end, strokeWidth = liveStrokeStyle.width, cap = StrokeCap.Round)
-                                                                         val angle = kotlin.math.atan2((end.y - start.y).toDouble(), (end.x - start.x).toDouble())
-                                                                         val arrowLen = 30f
-                                                                         val arrowAngle = Math.toRadians(25.0)
-                                                                         val p1 = Offset((end.x - arrowLen * kotlin.math.cos(angle - arrowAngle)).toFloat(), (end.y - arrowLen * kotlin.math.sin(angle - arrowAngle)).toFloat())
-                                                                         val p2 = Offset((end.x - arrowLen * kotlin.math.cos(angle + arrowAngle)).toFloat(), (end.y - arrowLen * kotlin.math.sin(angle + arrowAngle)).toFloat())
-                                                                         drawLine(color = liveColor, start = end, end = p1, strokeWidth = liveStrokeStyle.width, cap = StrokeCap.Round)
-                                                                         drawLine(color = liveColor, start = end, end = p2, strokeWidth = liveStrokeStyle.width, cap = StrokeCap.Round)
-                                                                     }
-                                                                 }
-                                                             } else {
-                                                                 drawPath(
-                                                                     path = androidx.compose.ui.graphics.Path().apply {
-                                                                         moveTo(currentPath.first().x, currentPath.first().y)
-                                                                         for (i in 1 until currentPath.size) lineTo(currentPath[i].x, currentPath[i].y)
-                                                                     },
-                                                                     color = liveColor,
-                                                                     style = liveStrokeStyle
-                                                                 )
-                                                             }
-                                                         }
-                                                     }
-                                                 }
-                                            }
-                                        }
-                                    }
+                                                                          val lengthPx = (end - start).getDistance()
+                                                                          val cm = lengthPx / (density.density * 160f / 2.54f)
+                                                                          val mid = Offset((start.x + end.x) / 2f, (start.y + end.y) / 2f - 10f)
+                                                                          val labelPaint = android.graphics.Paint().apply {
+                                                                              color = item.color.toArgb()
+                                                                              textSize = 22f
+                                                                              isAntiAlias = true
+                                                                              typeface = android.graphics.Typeface.DEFAULT_BOLD
+                                                                              textAlign = android.graphics.Paint.Align.CENTER
+                                                                          }
+                                                                          drawContext.canvas.nativeCanvas.drawText(String.format(java.util.Locale.US, "%.1f cm", cm), mid.x, mid.y, labelPaint)
+                                                                      }
+                                                                  }
+                                                                  else -> {
+                                                                      if (denormalized.size == 1) {
+                                                                          drawCircle(
+                                                                              color = drawColor,
+                                                                              radius = (strokeStyle.width / 2f).coerceAtLeast(3f),
+                                                                              center = denormalized.first()
+                                                                          )
+                                                                      } else if (denormalized.size > 1) {
+                                                                          drawPath(
+                                                                              path = androidx.compose.ui.graphics.Path().apply {
+                                                                                  moveTo(denormalized.first().x, denormalized.first().y)
+                                                                                  for (i in 1 until denormalized.size) lineTo(denormalized[i].x, denormalized[i].y)
+                                                                              },
+                                                                              color = drawColor,
+                                                                              style = strokeStyle
+                                                                          )
+                                                                      }
+                                                                  }
+                                                              }
+                                                          }
+
+                                                          // ── Render Active Live Preview ──
+                                                          if (currentPath.isNotEmpty() && activeAnnotationTool != com.nexus.feature.reader.pdf.components.AnnotationTool.Eraser) {
+                                                              val liveStrokeStyle = androidx.compose.ui.graphics.drawscope.Stroke(
+                                                                  width = selectedStrokeWidth.dp.toPx(),
+                                                                  cap = StrokeCap.Round,
+                                                                  join = StrokeJoin.Round
+                                                              )
+                                                              val liveColor = if (activeAnnotationTool == com.nexus.feature.reader.pdf.components.AnnotationTool.Highlighter) selectedAnnotationColor.copy(alpha = 0.45f) else selectedAnnotationColor
+
+                                                              if (activeAnnotationTool == com.nexus.feature.reader.pdf.components.AnnotationTool.Ruler && currentPath.size >= 2) {
+                                                                  val start = currentPath.first()
+                                                                  val end = currentPath.last()
+                                                                  drawLine(color = liveColor, start = start, end = end, strokeWidth = liveStrokeStyle.width, cap = StrokeCap.Round)
+                                                                  val lengthPx = (end - start).getDistance()
+                                                                  val cm = lengthPx / (density.density * 160f / 2.54f)
+                                                                  val mid = Offset((start.x + end.x) / 2f, (start.y + end.y) / 2f - 10f)
+                                                                  val labelPaint = android.graphics.Paint().apply {
+                                                                      color = liveColor.toArgb()
+                                                                      textSize = 22f
+                                                                      isAntiAlias = true
+                                                                      typeface = android.graphics.Typeface.DEFAULT_BOLD
+                                                                      textAlign = android.graphics.Paint.Align.CENTER
+                                                                  }
+                                                                  drawContext.canvas.nativeCanvas.drawText(String.format(java.util.Locale.US, "%.1f cm", cm), mid.x, mid.y, labelPaint)
+                                                              } else if (activeAnnotationTool == com.nexus.feature.reader.pdf.components.AnnotationTool.Shapes && currentPath.size >= 2) {
+                                                                  val start = currentPath.first()
+                                                                  val end = currentPath.last()
+                                                                  val left = kotlin.math.min(start.x, end.x)
+                                                                  val top = kotlin.math.min(start.y, end.y)
+                                                                  val w = kotlin.math.abs(end.x - start.x)
+                                                                  val h = kotlin.math.abs(end.y - start.y)
+
+                                                                  when (selectedShape) {
+                                                                      com.nexus.feature.reader.pdf.components.ShapeType.Rectangle -> {
+                                                                          drawRect(color = liveColor, topLeft = Offset(left, top), size = Size(w, h), style = liveStrokeStyle)
+                                                                      }
+                                                                      com.nexus.feature.reader.pdf.components.ShapeType.Oval -> {
+                                                                          drawOval(color = liveColor, topLeft = Offset(left, top), size = Size(w, h), style = liveStrokeStyle)
+                                                                      }
+                                                                      com.nexus.feature.reader.pdf.components.ShapeType.Line -> {
+                                                                          drawLine(color = liveColor, start = start, end = end, strokeWidth = liveStrokeStyle.width, cap = StrokeCap.Round)
+                                                                      }
+                                                                      com.nexus.feature.reader.pdf.components.ShapeType.Arrow -> {
+                                                                          drawLine(color = liveColor, start = start, end = end, strokeWidth = liveStrokeStyle.width, cap = StrokeCap.Round)
+                                                                          val angle = kotlin.math.atan2((end.y - start.y).toDouble(), (end.x - start.x).toDouble())
+                                                                          val arrowLen = 30f
+                                                                          val arrowAngle = Math.toRadians(25.0)
+                                                                          val p1 = Offset((end.x - arrowLen * kotlin.math.cos(angle - arrowAngle)).toFloat(), (end.y - arrowLen * kotlin.math.sin(angle - arrowAngle)).toFloat())
+                                                                          val p2 = Offset((end.x - arrowLen * kotlin.math.cos(angle + arrowAngle)).toFloat(), (end.y - arrowLen * kotlin.math.sin(angle + arrowAngle)).toFloat())
+                                                                          drawLine(color = liveColor, start = end, end = p1, strokeWidth = liveStrokeStyle.width, cap = StrokeCap.Round)
+                                                                          drawLine(color = liveColor, start = end, end = p2, strokeWidth = liveStrokeStyle.width, cap = StrokeCap.Round)
+                                                                      }
+                                                                  }
+                                                              } else {
+                                                                  if (currentPath.size == 1) {
+                                                                      drawCircle(
+                                                                          color = liveColor,
+                                                                          radius = (liveStrokeStyle.width / 2f).coerceAtLeast(3f),
+                                                                          center = currentPath.first()
+                                                                      )
+                                                                  } else if (currentPath.size > 1) {
+                                                                      drawPath(
+                                                                          path = androidx.compose.ui.graphics.Path().apply {
+                                                                              moveTo(currentPath.first().x, currentPath.first().y)
+                                                                              for (i in 1 until currentPath.size) lineTo(currentPath[i].x, currentPath[i].y)
+                                                                          },
+                                                                          color = liveColor,
+                                                                          style = liveStrokeStyle
+                                                                      )
+                                                                  }
+                                                              }
+                                                          }
+
+                                                          // ── Render Active Tool Real-Time Brush Ring Cursor ──
+                                                          activePointerOffset?.let { pos ->
+                                                              val ringRadius = (selectedStrokeWidth.dp.toPx() / 2f).coerceAtLeast(8f)
+                                                              drawCircle(
+                                                                  color = selectedAnnotationColor.copy(alpha = 0.30f),
+                                                                  radius = ringRadius + 4f,
+                                                                  center = pos
+                                                              )
+                                                              drawCircle(
+                                                                  color = selectedAnnotationColor,
+                                                                  radius = ringRadius,
+                                                                  center = pos,
+                                                                  style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f)
+                                                              )
+                                                          }
+                                                      }
+                                                  }
+                                             }
+                                         }
+                                     }
                                 }
 
                                 if (isHorizontalLayout) {
@@ -754,7 +991,7 @@ fun PdfReaderScreen(
                              val pageStrokes = drawnStrokes[pageIdx] ?: emptyList()
                              val redoStrokes = redoStrokesMap[pageIdx] ?: emptyList()
 
-                             // Left Edge Fixed Annotation Tool Pill
+                             // Dockable & Modular PDF Annotation Tool Pill
                              com.nexus.feature.reader.pdf.components.PdfAnnotationPill(
                                  isVisible = isAnnotationPillVisible && !isImmersiveMode,
                                  activeTool = activeAnnotationTool,
@@ -767,15 +1004,23 @@ fun PdfReaderScreen(
                                  onColorSelect = { color -> selectedAnnotationColor = color },
                                  strokeWidth = selectedStrokeWidth,
                                  onStrokeWidthSelect = { width -> selectedStrokeWidth = width },
+                                 selectedEraserFilter = selectedEraserFilter,
+                                 onEraserFilterSelect = { filter -> selectedEraserFilter = filter },
+                                 selectedStamp = selectedStamp,
+                                 onStampSelect = { stamp -> selectedStamp = stamp },
+                                 dockPosition = toolbarDockPosition,
+                                 onDockPositionChange = { toolbarDockPosition = it },
+                                 isCollapsed = isToolbarCollapsed,
+                                 onToggleCollapse = { isToolbarCollapsed = !isToolbarCollapsed },
                                  canUndo = pageStrokes.isNotEmpty(),
                                  onUndo = {
                                      val current = pageStrokes.toMutableList()
                                      if (current.isNotEmpty()) {
                                          val removed = current.removeAt(current.size - 1)
-                                         drawnStrokes[pageIdx] = current
+                                         drawnStrokes[pageIdx] = current.toList()
                                          val rList = redoStrokes.toMutableList()
                                          rList.add(removed)
-                                         redoStrokesMap[pageIdx] = rList
+                                         redoStrokesMap[pageIdx] = rList.toList()
                                      }
                                  },
                                  canRedo = redoStrokes.isNotEmpty(),
@@ -783,16 +1028,80 @@ fun PdfReaderScreen(
                                      val rList = redoStrokes.toMutableList()
                                      if (rList.isNotEmpty()) {
                                          val restored = rList.removeAt(rList.size - 1)
-                                         redoStrokesMap[pageIdx] = rList
+                                         redoStrokesMap[pageIdx] = rList.toList()
                                          val current = pageStrokes.toMutableList()
                                          current.add(restored)
-                                         drawnStrokes[pageIdx] = current
+                                         drawnStrokes[pageIdx] = current.toList()
                                      }
                                  },
                                  modifier = Modifier
-                                     .align(Alignment.CenterStart)
-                                     .padding(start = 16.dp)
+                                     .align(
+                                         when (toolbarDockPosition) {
+                                             com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Left -> Alignment.CenterStart
+                                             com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Right -> Alignment.CenterEnd
+                                             com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Top -> Alignment.TopCenter
+                                             com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Bottom -> Alignment.BottomCenter
+                                         }
+                                     )
+                                     .padding(
+                                          when (toolbarDockPosition) {
+                                              com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Left -> PaddingValues(start = 12.dp)
+                                              com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Right -> PaddingValues(end = 12.dp)
+                                              com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Top -> PaddingValues(top = if (isSearchMode) 175.dp else 76.dp)
+                                              com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Bottom -> PaddingValues(bottom = 155.dp)
+                                          }
+                                      )
                              )
+
+                              if (pendingTextPoint != null) {
+                                  androidx.compose.material3.AlertDialog(
+                                      onDismissRequest = { pendingTextPoint = null },
+                                      title = { NexusText("Insert Text Box", style = NexusTheme.typography.title) },
+                                      text = {
+                                          androidx.compose.material3.OutlinedTextField(
+                                              value = textEntryInput,
+                                              onValueChange = { textEntryInput = it },
+                                              label = { NexusText("Enter annotation text") },
+                                              singleLine = true,
+                                              modifier = Modifier.fillMaxWidth()
+                                          )
+                                      },
+                                      confirmButton = {
+                                           NexusButton(
+                                               text = "Insert",
+                                               onClick = {
+                                                   val target = pendingTextPoint
+                                                   if (target != null && textEntryInput.isNotBlank()) {
+                                                       val (pIdx, normPt) = target
+                                                       val list = drawnStrokes[pIdx]?.toMutableList() ?: mutableListOf()
+                                                       list.add(
+                                                           PdfAnnotationItem(
+                                                               points = listOf(normPt),
+                                                               color = selectedAnnotationColor,
+                                                               strokeWidth = selectedStrokeWidth,
+                                                               tool = com.nexus.feature.reader.pdf.components.AnnotationTool.Text,
+                                                               text = textEntryInput
+                                                           )
+                                                       )
+                                                       drawnStrokes[pIdx] = list
+                                                       viewModel.updateDrawnStrokes(pIdx, list)
+                                                   }
+                                                   textEntryInput = ""
+                                                   pendingTextPoint = null
+                                               }
+                                           )
+                                       },
+                                       dismissButton = {
+                                           NexusButton(
+                                               text = "Cancel",
+                                               onClick = {
+                                                   textEntryInput = ""
+                                                   pendingTextPoint = null
+                                               }
+                                           )
+                                       }
+                                  )
+                              }
 
                              // Bottom UI Container
                             AnimatedVisibility(
@@ -887,13 +1196,20 @@ fun PdfReaderScreen(
                                                     .padding(12.dp)
                                             )
                                             Image(
-                                                painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_star),
-                                                contentDescription = "Bookmark",
-                                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(if (bookmarks.any { it.pageIndex == (currentPage - 1) }) NexusTheme.colors.primary else NexusTheme.colors.textPrimary),
+                                                painter = androidx.compose.ui.res.painterResource(
+                                                    id = if (isStarred) com.nexus.core.R.drawable.ic_star_filled else com.nexus.core.R.drawable.ic_star
+                                                ),
+                                                contentDescription = "Favorite",
+                                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(if (isStarred) Color(0xFFFFB300) else NexusTheme.colors.textPrimary),
                                                 modifier = Modifier
                                                     .size(48.dp)
                                                     .clip(CircleShape)
-                                                    .springBounceClick { viewModel.toggleBookmark(currentPage - 1) }
+                                                    .springBounceClick {
+                                                        viewModel.toggleFavorite { nowStarred ->
+                                                            val msg = if (nowStarred) "Added to Favorites" else "Removed from Favorites"
+                                                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    }
                                                     .padding(12.dp)
                                             )
                                             val context = androidx.compose.ui.platform.LocalContext.current
@@ -1415,6 +1731,7 @@ fun PdfReaderScreen(
             
             if (showMenu) {
                 PdfOptionsBottomSheet(
+                    isStarred = isStarred,
                     onDismiss = { showMenu = false },
                     onRename = {
                         showMenu = false
@@ -1423,8 +1740,10 @@ fun PdfReaderScreen(
                     },
                     onFavorite = {
                         showMenu = false
-                        viewModel.toggleBookmark(0, "Favorite Document")
-                        android.widget.Toast.makeText(context, "Added to Favorites", android.widget.Toast.LENGTH_SHORT).show()
+                        viewModel.toggleFavorite { nowStarred ->
+                            val msg = if (nowStarred) "Added to Favorites" else "Removed from Favorites"
+                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                        }
                     },
                     onPrint = {
                         showMenu = false
@@ -1452,6 +1771,7 @@ fun PdfReaderScreen(
 @androidx.compose.material3.ExperimentalMaterial3Api
 @Composable
 private fun PdfOptionsBottomSheet(
+    isStarred: Boolean,
     onDismiss: () -> Unit,
     onRename: () -> Unit,
     onFavorite: () -> Unit,
@@ -1482,7 +1802,7 @@ private fun PdfOptionsBottomSheet(
             val options = listOf(
                 MenuOption("File Info", "View document properties", com.nexus.core.R.drawable.ic_info, onInfo),
                 MenuOption("Rename", "Rename this file", com.nexus.core.R.drawable.ic_rename, onRename),
-                MenuOption("Favorite", "Add to bookmarks", com.nexus.core.R.drawable.ic_star, onFavorite),
+                MenuOption(if (isStarred) "Unstar file" else "Star file", "Add or remove bookmark", if (isStarred) com.nexus.core.R.drawable.ic_star_filled else com.nexus.core.R.drawable.ic_star, onFavorite),
                 MenuOption("Print", "Print or save as PDF", com.nexus.core.R.drawable.ic_printer, onPrint)
             )
 

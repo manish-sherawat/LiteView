@@ -79,13 +79,6 @@ class DashboardViewModel @Inject constructor(
         )
     private val _sortAscending = MutableStateFlow(false)
 
-    val startupToPicker: StateFlow<Boolean?> = prefsRepository.startupToPicker
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.Eagerly,
-            initialValue = null
-        )
-
     val updateState: StateFlow<UpdateState> = appUpdater.updateState
     
     private val _uiEvents = kotlinx.coroutines.flow.MutableSharedFlow<String>()
@@ -378,17 +371,46 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
+    var lastDeletedDocument: RecentDocument? = null
+        private set
+
+    private val processingUris = mutableSetOf<String>()
+
     /** Remove one document from the recent list and delete physically. */
     fun removeDocument(uri: String) {
+        if (processingUris.contains(uri)) return
+        processingUris.add(uri)
         viewModelScope.launch {
-            deletePhysicalFile(uri)
-            repository.removeDocument(uri)
+            try {
+                val docToRemove = repository.observeRecentDocuments().first().find { it.uri == uri }
+                    ?: _scannedDocuments.value.find { it.uri == uri }
+                if (docToRemove != null) {
+                    lastDeletedDocument = docToRemove
+                }
+                deletePhysicalFile(uri)
+                repository.removeDocument(uri)
+                _scannedDocuments.value = _scannedDocuments.value.filter { it.uri != uri }
+                val updatedSelection = _selectedUris.value - uri
+                _selectedUris.value = updatedSelection
+                if (updatedSelection.isEmpty()) _isSelectionMode.value = false
+                _uiEvents.emit("File deleted successfully")
+            } finally {
+                processingUris.remove(uri)
+            }
         }
     }
 
     /** Restore a removed document to the recent list. */
     fun restoreDocument(doc: RecentDocument) {
-        viewModelScope.launch { repository.recordOpen(doc) }
+        viewModelScope.launch {
+            repository.recordOpen(doc)
+            val currentScanned = _scannedDocuments.value.toMutableList()
+            if (!currentScanned.any { it.uri == doc.uri }) {
+                currentScanned.add(0, doc)
+                _scannedDocuments.value = currentScanned
+            }
+            _uiEvents.emit("File restored")
+        }
     }
 
     /** Toggle the sort direction between ascending and descending. */
@@ -426,13 +448,17 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun deleteSelected() {
-        val selected = _selectedUris.value
+        val selected = _selectedUris.value.toList()
+        if (selected.isEmpty()) return
         viewModelScope.launch {
+            val count = selected.size
             selected.forEach { uri ->
                 deletePhysicalFile(uri)
                 repository.removeDocument(uri)
             }
+            _scannedDocuments.value = _scannedDocuments.value.filter { !selected.contains(it.uri) }
             clearSelection()
+            _uiEvents.emit("$count file${if (count > 1) "s" else ""} deleted successfully")
         }
     }
 

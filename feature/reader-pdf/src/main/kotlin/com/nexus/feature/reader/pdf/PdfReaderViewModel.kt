@@ -37,6 +37,9 @@ import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.Matrix
 import com.artifex.mupdf.fitz.Page
 import com.artifex.mupdf.fitz.android.AndroidDrawDevice
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import androidx.compose.ui.graphics.toArgb
 import com.artifex.mupdf.fitz.Outline
 
@@ -121,6 +124,32 @@ class PdfReaderViewModel @Inject constructor(
     val outline: StateFlow<List<PdfOutlineItem>> = _outline.asStateFlow()
 
     private var currentUri: String? = null
+    private val _currentUriFlow = MutableStateFlow<String?>(null)
+
+    private val _drawnStrokesState = MutableStateFlow<Map<Int, List<PdfAnnotationItem>>>(emptyMap())
+    val drawnStrokesState: StateFlow<Map<Int, List<PdfAnnotationItem>>> = _drawnStrokesState.asStateFlow()
+
+    fun updateDrawnStrokes(pageIndex: Int, strokes: List<PdfAnnotationItem>) {
+        val current = _drawnStrokesState.value.toMutableMap()
+        current[pageIndex] = strokes
+        _drawnStrokesState.value = current
+    }
+
+    fun setAllDrawnStrokes(map: Map<Int, List<PdfAnnotationItem>>) {
+        _drawnStrokesState.value = map
+    }
+
+    val isStarred: StateFlow<Boolean> = combine(prefsRepository.starredUris, _currentUriFlow) { starredSet, uri ->
+        uri?.let { starredSet.contains(it) } ?: false
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun toggleFavorite(onResult: (Boolean) -> Unit) {
+        val uri = currentUri ?: return
+        viewModelScope.launch {
+            val isNowStarred = prefsRepository.toggleStarredUri(uri)
+            onResult(isNowStarred)
+        }
+    }
 
     private val _isHorizontalLayout = MutableStateFlow(false)
     val isHorizontalLayout: StateFlow<Boolean> = _isHorizontalLayout.asStateFlow()
@@ -182,6 +211,7 @@ class PdfReaderViewModel @Inject constructor(
             
             renderedPagesCache.values.forEach { if (!it.isRecycled) it.recycle() }
             currentUri = uriStrDecoded
+            _currentUriFlow.value = uriStrDecoded
 
             viewModelScope.launch {
                 documentBookmarkDao.getBookmarksForDocument(uriStrDecoded).collect {
@@ -295,6 +325,22 @@ class PdfReaderViewModel @Inject constructor(
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
+
+                    try {
+                        val existing = recentDocumentDao.findByUri(uriStrDecoded)
+                        recentDocumentDao.upsert(
+                            com.nexus.feature.dashboard.data.RecentDocument(
+                                uri = uriStrDecoded,
+                                fileName = decodedName,
+                                mimeType = "application/pdf",
+                                fileSizeBytes = fileSize,
+                                lastOpenedAt = System.currentTimeMillis(),
+                                documentType = "PDF",
+                                lastScrollIndex = existing?.lastScrollIndex ?: 0,
+                                lastScrollOffset = existing?.lastScrollOffset ?: 0
+                            )
+                        )
+                    } catch (_: Exception) {}
 
                     withContext(Dispatchers.Main) {
                         _uiState.value = PdfReaderUiState.Success(
@@ -840,15 +886,22 @@ class PdfReaderViewModel @Inject constructor(
                     canvas.drawLine(x1, y1, x2, y2, paint)
                 }
             }
-        } else if (item.points.size > 1) {
-            val path = android.graphics.Path()
-            val first = item.points.first()
-            path.moveTo(first.x * pageWidth, first.y * pageHeight)
-            for (i in 1 until item.points.size) {
-                val pt = item.points[i]
-                path.lineTo(pt.x * pageWidth, pt.y * pageHeight)
+        } else if (item.points.isNotEmpty()) {
+            if (item.points.size == 1) {
+                val pt = item.points.first()
+                val dotRadius = (paint.strokeWidth / 2f).coerceAtLeast(3f)
+                val fillPaint = android.graphics.Paint(paint).apply { style = android.graphics.Paint.Style.FILL }
+                canvas.drawCircle(pt.x * pageWidth, pt.y * pageHeight, dotRadius, fillPaint)
+            } else {
+                val path = android.graphics.Path()
+                val first = item.points.first()
+                path.moveTo(first.x * pageWidth, first.y * pageHeight)
+                for (i in 1 until item.points.size) {
+                    val pt = item.points[i]
+                    path.lineTo(pt.x * pageWidth, pt.y * pageHeight)
+                }
+                canvas.drawPath(path, paint)
             }
-            canvas.drawPath(path, paint)
         }
     }
 }

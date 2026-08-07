@@ -71,52 +71,36 @@ fun DashboardScreen(
     val context = LocalContext.current
     
     val snackbarHostState = remember { SnackbarHostState() }
-    LaunchedEffect(updateState) {
-        if (updateState is UpdateState.Error) {
-            val error = updateState as UpdateState.Error
-            snackbarHostState.showSnackbar(
-                message = "Update check failed: ${error.message}",
-                actionLabel = "Dismiss",
-                duration = SnackbarDuration.Short
-            )
-            viewModel.resetUpdateState()
-        }
-    }
-    
+    var dismissedUpdateInSession by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         viewModel.uiEvents.collect { message ->
-            snackbarHostState.showSnackbar(
+            val result = snackbarHostState.showSnackbar(
                 message = message,
+                actionLabel = if (viewModel.lastDeletedDocument != null && message.contains("deleted", ignoreCase = true)) "Undo" else null,
                 duration = SnackbarDuration.Short
             )
+            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                viewModel.lastDeletedDocument?.let { doc ->
+                    viewModel.restoreDocument(doc)
+                }
+            }
         }
     }
     
-    if (updateState is UpdateState.Available) {
-        val available = updateState as UpdateState.Available
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissUpdate() },
-            title = { NexusText(text = "Update Available", style = NexusTheme.typography.title, color = NexusTheme.colors.textPrimary) },
-            text = { 
-                Column {
-                    NexusText(text = "Version ${available.version} is available.", style = NexusTheme.typography.body, color = NexusTheme.colors.textPrimary)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    NexusText(text = available.releaseNotes, style = NexusTheme.typography.body, color = NexusTheme.colors.textSecondary)
-                }
+    if (updateState is UpdateState.Available && !dismissedUpdateInSession) {
+        UpdateDialog(
+            updateState = updateState,
+            onDismiss   = {
+                dismissedUpdateInSession = true
+                viewModel.dismissUpdate()
             },
-            confirmButton = {
-                androidx.compose.material3.Button(
-                    onClick = { viewModel.downloadUpdate(available.downloadUrl, available.version) }
-                ) {
-                    NexusText(text = "Update Now", style = NexusTheme.typography.label, color = Color.White)
-                }
+            onDownload  = { downloadUrl, version ->
+                android.widget.Toast.makeText(context, "Downloading update v$version...", android.widget.Toast.LENGTH_LONG).show()
+                viewModel.downloadUpdate(downloadUrl, version)
+                viewModel.resetUpdateState()
             },
-            dismissButton = {
-                TextButton(onClick = { viewModel.dismissUpdate() }) {
-                    NexusText(text = "Later", style = NexusTheme.typography.label, color = NexusTheme.colors.primary)
-                }
-            },
-            containerColor = NexusTheme.colors.surface
+            onRetry     = { viewModel.resetUpdateState() }
         )
     }
 
@@ -528,7 +512,6 @@ fun DashboardScreen(
                             },
                             onRemove = { 
                                 viewModel.removeDocument(uiModel.doc.uri)
-                                android.widget.Toast.makeText(context, "File deleted successfully", android.widget.Toast.LENGTH_SHORT).show()
                             },
                             onShowDetails = { detailsDialogDoc = uiModel.doc },
                             onShare = { viewModel.shareDocument(uiModel.doc.uri) },
@@ -558,7 +541,6 @@ fun DashboardScreen(
                             },
                             onRemove = { 
                                 viewModel.removeDocument(uiModel.doc.uri)
-                                android.widget.Toast.makeText(context, "File deleted successfully", android.widget.Toast.LENGTH_SHORT).show()
                             },
                             onShowDetails = { detailsDialogDoc = uiModel.doc },
                             onShare = { viewModel.shareDocument(uiModel.doc.uri) },
@@ -687,6 +669,89 @@ fun DashboardScreen(
                 }
             }
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = if (uiState.isSelectionMode) 120.dp else 24.dp, start = 16.dp, end = 16.dp),
+            snackbar = { snackbarData ->
+                val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+                val isUndo = snackbarData.visuals.actionLabel == "Undo"
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(NexusTheme.shapes.pill)
+                        .background(
+                            if (isDark) Color(0xF21A1C29) else Color(0xF22D3142)
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = (if (isUndo) NexusTheme.colors.error else NexusTheme.colors.primary).copy(alpha = 0.5f),
+                            shape = NexusTheme.shapes.pill
+                        )
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(androidx.compose.foundation.shape.CircleShape)
+                                    .background(
+                                        if (isUndo) NexusTheme.colors.error.copy(alpha = 0.2f)
+                                        else NexusTheme.colors.primary.copy(alpha = 0.2f)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(
+                                        id = if (isUndo) R.drawable.ic_delete else com.nexus.core.R.drawable.ic_check
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    colorFilter = ColorFilter.tint(
+                                        if (isUndo) NexusTheme.colors.error else NexusTheme.colors.primary
+                                    )
+                                )
+                            }
+                            
+                            NexusText(
+                                text = snackbarData.visuals.message,
+                                style = NexusTheme.typography.body.copy(fontWeight = FontWeight.SemiBold),
+                                color = Color.White
+                            )
+                        }
+
+                        snackbarData.visuals.actionLabel?.let { actionText ->
+                            Box(
+                                modifier = Modifier
+                                    .clip(NexusTheme.shapes.pill)
+                                    .background(NexusTheme.colors.primary)
+                                    .springBounceClick { snackbarData.performAction() }
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
+                                NexusText(
+                                    text = actionText,
+                                    style = NexusTheme.typography.label.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        )
     }
 }
 

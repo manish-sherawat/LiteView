@@ -29,7 +29,6 @@ data class SettingsUiState(
     val cacheClearMessage: String? = null,
     val keepScreenAwake: Boolean = false,
     val rememberReadingPosition: Boolean = true,
-    val startupToPicker: Boolean = false,
     val defaultIsGridView: Boolean = false,
     val hapticFeedbackEnabled: Boolean = true,
     val isManualUpdateCheck: Boolean = false
@@ -65,27 +64,24 @@ class SettingsViewModel @Inject constructor(
         ),
         combine(
             prefsRepository.rememberReadingPosition,
-            prefsRepository.startupToPicker,
             prefsRepository.defaultIsGridView,
+            prefsRepository.hapticFeedbackEnabled,
             ::Triple
         ),
         combine(
-            prefsRepository.hapticFeedbackEnabled,
             _cacheSizeText,
             _cacheClearResult,
+            _isManualUpdateCheck,
             ::Triple
-        ),
-        _isManualUpdateCheck
+        )
     ) { (themeMode, defaultFontSize, keepScreenAwake),
-        (rememberReadingPosition, startupToPicker, defaultIsGridView),
-        (hapticFeedbackEnabled, cacheSizeText, cacheClearResult),
-        isManualUpdateCheck ->
+        (rememberReadingPosition, defaultIsGridView, hapticFeedbackEnabled),
+        (cacheSizeText, cacheClearResult, isManualUpdateCheck) ->
         SettingsUiState(
             themeMode = themeMode,
             defaultFontSize = defaultFontSize,
             keepScreenAwake = keepScreenAwake,
             rememberReadingPosition = rememberReadingPosition,
-            startupToPicker = startupToPicker,
             defaultIsGridView = defaultIsGridView,
             hapticFeedbackEnabled = hapticFeedbackEnabled,
             appVersion = getAppVersion(),
@@ -114,7 +110,6 @@ class SettingsViewModel @Inject constructor(
             recentDocumentDao.clearAllScrollPositions()
         }
     }
-    fun setStartupToPicker(value: Boolean) = viewModelScope.launch { prefsRepository.setStartupToPicker(value) }
     fun setDefaultIsGridView(value: Boolean) = viewModelScope.launch { prefsRepository.setDefaultIsGridView(value) }
     fun setHapticFeedbackEnabled(value: Boolean) = viewModelScope.launch { prefsRepository.setHapticFeedbackEnabled(value) }
 

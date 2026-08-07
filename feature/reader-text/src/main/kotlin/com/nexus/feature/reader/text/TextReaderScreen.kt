@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nexus.core.theme.NexusTheme
@@ -98,6 +99,7 @@ fun TextReaderScreen(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
     val currentSearchIndex by viewModel.currentSearchIndex.collectAsStateWithLifecycle()
+    val isStarred by viewModel.isStarred.collectAsStateWithLifecycle()
     
     var showSearchSheet by remember { mutableStateOf(false) }
     var showEncodingSheet by remember { mutableStateOf(false) }
@@ -371,6 +373,20 @@ fun TextReaderScreen(
                             )
                             
                             androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(
+                                    id = if (isStarred) com.nexus.core.R.drawable.ic_star_filled else com.nexus.core.R.drawable.ic_star
+                                ),
+                                contentDescription = "Favorite",
+                                colorFilter = ColorFilter.tint(if (isStarred) Color(0xFFFFB300) else NexusTheme.colors.textPrimary),
+                                modifier = Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).springBounceClick {
+                                    viewModel.toggleFavorite { nowStarred ->
+                                        val msg = if (nowStarred) "Added to Favorites" else "Removed from Favorites"
+                                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                }.padding(8.dp)
+                            )
+
+                            androidx.compose.foundation.Image(
                                 painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_share),
                                 contentDescription = "Share",
                                 colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary),
@@ -464,6 +480,7 @@ fun TextReaderScreen(
 
         if (showMenu) {
             TextOptionsBottomSheet(
+                isStarred = isStarred,
                 onDismiss = { showMenu = false },
                 onRename = {
                     showMenu = false
@@ -472,8 +489,10 @@ fun TextReaderScreen(
                 },
                 onFavorite = {
                     showMenu = false
-                    // Favorite logic not fully implemented for txt yet, show toast
-                    android.widget.Toast.makeText(context, "Added to Favorites", android.widget.Toast.LENGTH_SHORT).show()
+                    viewModel.toggleFavorite { nowStarred ->
+                        val msg = if (nowStarred) "Added to Favorites" else "Removed from Favorites"
+                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 },
                 onPrint = {
                     showMenu = false
@@ -509,6 +528,7 @@ fun TextReaderScreen(
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun TextOptionsBottomSheet(
+    isStarred: Boolean,
     onDismiss: () -> Unit,
     onRename: () -> Unit,
     onFavorite: () -> Unit,
@@ -538,7 +558,7 @@ private fun TextOptionsBottomSheet(
             val options = listOf(
                 Pair("File Info", "View document properties") to (com.nexus.core.R.drawable.ic_info to onInfo),
                 Pair("Rename", "Rename this file") to (com.nexus.core.R.drawable.ic_rename to onRename),
-                Pair("Favorite", "Add to bookmarks") to (com.nexus.core.R.drawable.ic_star to onFavorite),
+                Pair(if (isStarred) "Unstar file" else "Star file", "Add or remove bookmark") to ((if (isStarred) com.nexus.core.R.drawable.ic_star_filled else com.nexus.core.R.drawable.ic_star) to onFavorite),
                 Pair("Print", "Print or save as PDF") to (com.nexus.core.R.drawable.ic_printer to onPrint)
             )
 

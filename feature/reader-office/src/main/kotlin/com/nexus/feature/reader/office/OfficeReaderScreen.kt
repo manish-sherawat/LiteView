@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 import com.nexus.core.util.toUserFriendlyMessage
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -78,6 +79,7 @@ fun OfficeReaderScreen(
     val activity = context as? android.app.Activity
     
     val keepScreenAwake by viewModel.keepScreenAwake.collectAsStateWithLifecycle()
+    val isStarred by viewModel.isStarred.collectAsStateWithLifecycle()
 
     DisposableEffect(keepScreenAwake) {
         val window = activity?.window
@@ -530,6 +532,20 @@ fun OfficeReaderScreen(
                             Icon(painter = androidx.compose.ui.res.painterResource(id = if (isDark) com.nexus.core.R.drawable.ic_theme_light else com.nexus.core.R.drawable.ic_theme_dark), contentDescription = "Theme", tint = NexusTheme.colors.textPrimary)
                             NexusText("Theme", style = NexusTheme.typography.caption, color = NexusTheme.colors.textPrimary)
                         }
+                        // Star (Favorite)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable {
+                            viewModel.toggleFavorite { nowStarred ->
+                                val msg = if (nowStarred) "Added to Favorites" else "Removed from Favorites"
+                                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        }.padding(8.dp)) {
+                            Icon(
+                                painter = androidx.compose.ui.res.painterResource(id = if (isStarred) com.nexus.core.R.drawable.ic_star_filled else com.nexus.core.R.drawable.ic_star),
+                                contentDescription = "Favorite",
+                                tint = if (isStarred) Color(0xFFFFB300) else NexusTheme.colors.textPrimary
+                            )
+                            NexusText(if (isStarred) "Starred" else "Star", style = NexusTheme.typography.caption, color = if (isStarred) Color(0xFFFFB300) else NexusTheme.colors.textPrimary)
+                        }
                         // Share
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable {
                             var rawUriStr = URLDecoder.decode(encodedUri, "UTF-8")
@@ -698,6 +714,7 @@ fun OfficeReaderScreen(
 
         if (showMenu) {
             OfficeOptionsBottomSheet(
+                isStarred = isStarred,
                 onDismiss = { showMenu = false },
                 onRename = {
                     showMenu = false
@@ -706,7 +723,10 @@ fun OfficeReaderScreen(
                 },
                 onFavorite = {
                     showMenu = false
-                    android.widget.Toast.makeText(context, "Added to Favorites", android.widget.Toast.LENGTH_SHORT).show()
+                    viewModel.toggleFavorite { nowStarred ->
+                        val msg = if (nowStarred) "Added to Favorites" else "Removed from Favorites"
+                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 },
                 onPrint = {
                     showMenu = false
@@ -848,9 +868,10 @@ private class ImmersiveToggleInterface(private val onToggle: () -> Unit) {
     }
 }
 
-@androidx.compose.material3.ExperimentalMaterial3Api
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun OfficeOptionsBottomSheet(
+    isStarred: Boolean,
     onDismiss: () -> Unit,
     onRename: () -> Unit,
     onFavorite: () -> Unit,
@@ -881,7 +902,7 @@ private fun OfficeOptionsBottomSheet(
             val options = listOf(
                 MenuOption("File Info", "View document properties", com.nexus.core.R.drawable.ic_info, onInfo),
                 MenuOption("Rename", "Rename this file", com.nexus.core.R.drawable.ic_rename, onRename),
-                MenuOption("Favorite", "Add to bookmarks", com.nexus.core.R.drawable.ic_star, onFavorite),
+                MenuOption(if (isStarred) "Unstar file" else "Star file", "Add or remove bookmark", if (isStarred) com.nexus.core.R.drawable.ic_star_filled else com.nexus.core.R.drawable.ic_star, onFavorite),
                 MenuOption("Print", "Print or save as PDF", com.nexus.core.R.drawable.ic_printer, onPrint)
             )
 

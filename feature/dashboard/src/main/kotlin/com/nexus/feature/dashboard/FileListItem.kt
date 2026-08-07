@@ -146,16 +146,20 @@ fun FileListItem(
         label = "scale"
     )
 
+    var isDismissHandled by remember { mutableStateOf(false) }
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
                 SwipeToDismissBoxValue.EndToStart -> {
-                    onRemove()
-                    true // Confirm dismissal
+                    if (!isDismissHandled) {
+                        isDismissHandled = true
+                        onRemove()
+                        true
+                    } else true
                 }
                 SwipeToDismissBoxValue.StartToEnd -> {
                     onShare()
-                    false // Don't dismiss for share
+                    false
                 }
                 else -> false
             }

@@ -21,6 +21,9 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import com.nexus.feature.dashboard.data.RecentDocumentDao
 import com.nexus.core.preferences.UserPreferencesRepository
 import org.apache.poi.hwpf.HWPFDocument
@@ -147,7 +150,24 @@ class OfficeReaderViewModel @Inject constructor(
         }
     }
 
+    private var currentEncodedUri: String? = null
+    private val _currentUriFlow = MutableStateFlow<String?>(null)
+
+    val isStarred: StateFlow<Boolean> = combine(prefsRepository.starredUris, _currentUriFlow) { starredSet, uri ->
+        uri?.let { starredSet.contains(it) } ?: false
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun toggleFavorite(onResult: (Boolean) -> Unit) {
+        val uri = currentEncodedUri ?: return
+        viewModelScope.launch {
+            val isNowStarred = prefsRepository.toggleStarredUri(uri)
+            onResult(isNowStarred)
+        }
+    }
+
     fun loadDocument(encodedUri: String, docType: String, password: String? = null) {
+        currentEncodedUri = encodedUri
+        _currentUriFlow.value = encodedUri
         viewModelScope.launch {
             _uiState.value = OfficeReaderUiState.Loading()
             withContext(Dispatchers.IO) {
@@ -196,6 +216,34 @@ class OfficeReaderViewModel @Inject constructor(
                     if (count > 0) {
                         context.getSharedPreferences("nexus_page_counts", Context.MODE_PRIVATE)
                             .edit().putInt(uriStr, count).apply()
+                    }
+
+                    if (result is OfficeReaderUiState.DocxReady || result is OfficeReaderUiState.XlsxReady) {
+                        try {
+                            val name = try {
+                                if (uri.scheme == "file") java.io.File(uri.path ?: "").name
+                                else {
+                                    context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+                                        val idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                                        if (c.moveToFirst() && idx >= 0) c.getString(idx) else null
+                                    } ?: uri.lastPathSegment ?: "Office Document"
+                                }
+                            } catch (_: Exception) { "Office Document" }
+
+                            val recentDoc = recentDocumentDao.findByUri(uriStr)
+                            recentDocumentDao.upsert(
+                                com.nexus.feature.dashboard.data.RecentDocument(
+                                    uri = uriStr,
+                                    fileName = name,
+                                    mimeType = if (docType.equals("XLSX", ignoreCase = true)) "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    fileSizeBytes = fileSize,
+                                    lastOpenedAt = System.currentTimeMillis(),
+                                    documentType = docType.uppercase(),
+                                    lastScrollIndex = recentDoc?.lastScrollIndex ?: 0,
+                                    lastScrollOffset = recentDoc?.lastScrollOffset ?: 0
+                                )
+                            )
+                        } catch (_: Exception) {}
                     }
 
                     withContext(Dispatchers.Main) { 

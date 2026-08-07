@@ -1,6 +1,6 @@
 # 📱 Google Play Store Publishing Guide — LiteView
 
-Welcome to the official publishing guide for **LiteView** (`v2.5.2`). This guide provides all pre-configured metadata, store listing copy, policy questionnaire answers, and step-by-step submission steps to publish LiteView to the Google Play Console without friction.
+Welcome to the official publishing guide for **LiteView** (`v2.5.3`). This guide provides all pre-configured metadata, store listing copy, policy questionnaire answers, and step-by-step submission steps to publish LiteView to the Google Play Console without friction.
 
 ---
 
@@ -10,8 +10,8 @@ Welcome to the official publishing guide for **LiteView** (`v2.5.2`). This guide
 | :--- | :--- |
 | **App Name** | `LiteView` |
 | **Package Name** | `com.nexus.nexusdocs` |
-| **Version Name** | `2.5.2` |
-| **Version Code** | `252` |
+| **Version Name** | `2.5.3` |
+| **Version Code** | `253` |
 | **Target SDK** | `35` (Android 15) |
 | **Min SDK** | `26` (Android 8.0) |
 | **Primary Category** | `Tools` / `Productivity` |
