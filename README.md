@@ -225,10 +225,8 @@ See [`future_enhancements.txt`](future_enhancements.txt) for the full list. Key 
 - [ ] **AI — Chat with Document** (Gemini API integration)
 - [ ] **AI — Auto-Summarization** (TL;DR for long documents)
 - [ ] **Folder & Tag Management** (custom organization beyond Starred)
-- [ ] **Cloud Backup Hub** (Google Drive / Dropbox sync)
 - [ ] **Comprehensive Onboarding** (3-step first-launch carousel)
 - [ ] **PDF Bookmarks & Outline** (table of contents navigation)
-- [ ] **Material You Dynamic Colors** (Android 12+ wallpaper-based theming)
 
 ---
 
