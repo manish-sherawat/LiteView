@@ -13,7 +13,7 @@
 
 <div align="center">
 
-<img src="assets/logo/android/playstore-icon.png" width="96" alt="LiteView Logo" />
+<img src="app/src/main/ic_launcher-playstore.png" width="96" alt="LiteView Logo" />
 
 # LiteView — Document Viewer, Scanner & Annotation Suite
 
