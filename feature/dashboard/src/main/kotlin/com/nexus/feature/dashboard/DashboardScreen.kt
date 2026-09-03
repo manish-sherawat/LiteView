@@ -16,6 +16,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import com.nexus.core.ui.animations.springBounceClick
 import com.nexus.core.ui.animations.fadeSlideIn
 import androidx.compose.animation.core.animateFloat
@@ -34,6 +43,7 @@ import com.nexus.core.updater.UpdateState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -51,6 +61,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nexus.core.navigation.DocumentReaderRouter
 import com.nexus.core.theme.NexusTheme
 import com.nexus.core.ui.components.NexusButton
+import com.nexus.core.ui.components.NexusEmptyStateImage
+import com.nexus.core.ui.components.NexusEmptyStateType
 import com.nexus.core.ui.NexusSurface
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.NexusTextField
@@ -58,6 +70,7 @@ import com.nexus.core.R
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import android.graphics.RenderEffect
 import android.graphics.Shader
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,18 +85,37 @@ fun DashboardScreen(
     
     val snackbarHostState = remember { SnackbarHostState() }
     var dismissedUpdateInSession by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    val lazyGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    val searchFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
 
     LaunchedEffect(Unit) {
-        viewModel.uiEvents.collect { message ->
-            val result = snackbarHostState.showSnackbar(
-                message = message,
-                actionLabel = if (viewModel.lastDeletedDocument != null && message.contains("deleted", ignoreCase = true)) "Undo" else null,
-                duration = SnackbarDuration.Short
-            )
-            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-                viewModel.lastDeletedDocument?.let { doc ->
-                    viewModel.restoreDocument(doc)
+        launch {
+            viewModel.uiEvents.collect { message ->
+                val result = snackbarHostState.showSnackbar(
+                    message = message,
+                    actionLabel = if (viewModel.lastDeletedDocument != null && (message.contains("deleted", ignoreCase = true) || message.contains("removed", ignoreCase = true))) "Undo" else null,
+                    duration = SnackbarDuration.Short
+                )
+                if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                    viewModel.lastDeletedDocument?.let { doc ->
+                        viewModel.restoreDocument(doc)
+                    }
                 }
+            }
+        }
+        launch {
+            viewModel.searchFocusEvent.collect {
+                lazyGridState.animateScrollToItem(0)
+                try {
+                    searchFocusRequester.requestFocus()
+                    keyboardController?.show()
+                } catch (_: Exception) {}
+            }
+        }
+        launch {
+            viewModel.scrollToTopEvent.collect {
+                lazyGridState.animateScrollToItem(0)
             }
         }
     }
@@ -106,6 +138,7 @@ fun DashboardScreen(
 
     var isPermissionGranted by remember { mutableStateOf(viewModel.hasStoragePermission(context)) }
     var detailsDialogDoc by remember { mutableStateOf<com.nexus.feature.dashboard.data.RecentDocument?>(null) }
+    var showTagManagerScreen by remember { mutableStateOf(false) }
 
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -125,38 +158,63 @@ fun DashboardScreen(
         }
     }
 
-
+    if (showTagManagerScreen) {
+        TagManagerScreen(
+            tags = uiState.availableTags,
+            documents = uiState.documents,
+            onBack = { showTagManagerScreen = false },
+            onRenameTag = { oldName, newName, colorHex, emoji ->
+                viewModel.renameTagGlobally(oldName, newName, colorHex, emoji)
+            },
+            onUpsertTag = { name, colorHex, emoji ->
+                viewModel.upsertTagDefinition(name, colorHex, emoji)
+            },
+            onDeleteTag = { name ->
+                viewModel.deleteTagGlobally(name)
+            },
+            onOpenDocument = { doc ->
+                showTagManagerScreen = false
+                router.openDocument(
+                    uri = Uri.parse(doc.uri),
+                    mimeType = doc.mimeType,
+                    fileName = doc.fileName
+                )
+            }
+        )
+        return
+    }
 
     if (!isPermissionGranted && !uiState.permissionRationaleShown) {
         Box(
-            modifier = modifier.fillMaxSize().background(NexusTheme.colors.background),
+            modifier = modifier
+                .fillMaxSize()
+                .background(NexusTheme.colors.background)
+                .statusBarsPadding()
+                .navigationBarsPadding(),
             contentAlignment = Alignment.Center
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(32.dp)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp, vertical = 24.dp),
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_folder),
-                    contentDescription = "Permission needed",
-                    modifier = Modifier.size(80.dp),
-                    colorFilter = ColorFilter.tint(NexusTheme.colors.primary)
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                NexusText(
-                    text = "Storage Access Required",
-                    style = NexusTheme.typography.h2,
-                    color = NexusTheme.colors.textPrimary
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                NexusText(
-                    text = "LiteView needs storage access to scan and display your documents.",
-                    style = NexusTheme.typography.body,
-                    color = NexusTheme.colors.textSecondary,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(32.dp))
-                androidx.compose.material3.Button(
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    NexusEmptyStateImage(
+                        type = NexusEmptyStateType.STORAGE,
+                        contentDescription = "Permission needed",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                    )
+                }
+                NexusButton(
+                    text = "Grant Storage Access",
                     onClick = {
                         viewModel.setPermissionRationaleShown()
                         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
@@ -172,10 +230,8 @@ fun DashboardScreen(
                             requestPermissionLauncher.launch(android.Manifest.permission.READ_EXTERNAL_STORAGE)
                         }
                     },
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = NexusTheme.colors.primary)
-                ) {
-                    NexusText("Grant Access", style = NexusTheme.typography.label, color = Color.White)
-                }
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
         return
@@ -194,12 +250,13 @@ fun DashboardScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             LazyVerticalGrid(
-                columns = if (uiState.isGridView) GridCells.Fixed(2) else GridCells.Fixed(1),
+                state = lazyGridState,
+                columns = if (uiState.isGridView) GridCells.Adaptive(minSize = 135.dp) else GridCells.Fixed(1),
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(if (uiState.isGridView) 8.dp else 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(
                     top = 0.dp, 
                     bottom = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 100.dp
@@ -248,16 +305,17 @@ fun DashboardScreen(
                         }
                     }
                     
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
                     
                     com.nexus.core.ui.components.NexusSearchBar(
                         query = uiState.searchQuery,
                         onQueryChange = { viewModel.setSearchQuery(it) },
                         onClear = { viewModel.setSearchQuery("") },
-                        placeholderText = "Search files..."
+                        placeholderText = "Search files...",
+                        focusRequester = searchFocusRequester
                     )
                     
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
                     
                     com.nexus.core.ui.components.NexusTabRow(
                         options = listOf(DashboardTab.ALL, DashboardTab.RECENT, DashboardTab.STARRED),
@@ -272,7 +330,234 @@ fun DashboardScreen(
                         }
                     )
                     
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // ── Horizontal File Type Filter Chips ─────────────────────────
+                    androidx.compose.foundation.lazy.LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(vertical = 2.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(DocumentTypeFilter.entries.toTypedArray()) { filter ->
+                            val isSelected = uiState.selectedFilter == filter
+                            val count = uiState.filterCounts[filter] ?: 0
+                            val chipColor = when (filter) {
+                                DocumentTypeFilter.ALL -> NexusTheme.colors.primary
+                                DocumentTypeFilter.PDF -> Color(0xFFEF4444)
+                                DocumentTypeFilter.DOCX -> Color(0xFF2563EB)
+                                DocumentTypeFilter.XLSX -> Color(0xFF10B981)
+                                DocumentTypeFilter.TXT -> Color(0xFF8B5CF6)
+                            }
+
+                            val animatedBg by animateColorAsState(
+                                targetValue = if (isSelected) chipColor.copy(alpha = 0.16f) else NexusTheme.colors.surfaceVariant.copy(alpha = 0.55f),
+                                animationSpec = spring(),
+                                label = "formatBg"
+                            )
+                            val animatedBorderColor by animateColorAsState(
+                                targetValue = if (isSelected) chipColor.copy(alpha = 0.75f) else NexusTheme.colors.divider.copy(alpha = 0.25f),
+                                animationSpec = spring(),
+                                label = "formatBorder"
+                            )
+                            val animatedBorderWidth by animateDpAsState(
+                                targetValue = if (isSelected) 1.2.dp else 0.6.dp,
+                                animationSpec = spring(),
+                                label = "formatBorderWidth"
+                            )
+                            val animatedTextColor by animateColorAsState(
+                                targetValue = if (isSelected) chipColor else NexusTheme.colors.textPrimary,
+                                animationSpec = spring(),
+                                label = "formatTextColor"
+                            )
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(androidx.compose.foundation.shape.CircleShape)
+                                    .background(animatedBg)
+                                    .border(
+                                        width = animatedBorderWidth,
+                                        color = animatedBorderColor,
+                                        shape = androidx.compose.foundation.shape.CircleShape
+                                    )
+                                    .springBounceClick { viewModel.setSelectedFilter(filter) }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                if (filter != DocumentTypeFilter.ALL) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .clip(androidx.compose.foundation.shape.CircleShape)
+                                            .background(chipColor)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                }
+                                NexusText(
+                                    text = filter.title,
+                                    style = NexusTheme.typography.caption.copy(
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                    ),
+                                    color = animatedTextColor
+                                )
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = count > 0,
+                                    enter = fadeIn() + expandHorizontally(),
+                                    exit = fadeOut() + shrinkHorizontally()
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Spacer(modifier = Modifier.width(5.dp))
+                                        NexusText(
+                                            text = "$count",
+                                            style = NexusTheme.typography.caption.copy(
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            color = if (isSelected) chipColor.copy(alpha = 0.85f) else NexusTheme.colors.textSecondary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Dedicated Tags Filter Ribbon ──────────────────────────
+                    val visibleTags = remember(uiState.availableTags, uiState.selectedTag) {
+                        uiState.availableTags.filter { it.count > 0 || it.name == uiState.selectedTag }
+                    }
+
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = visibleTags.isNotEmpty() || uiState.availableTags.isNotEmpty(),
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        Column {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            androidx.compose.foundation.lazy.LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(vertical = 2.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                // ── Pinned Manage Tags Shortcut Button at the START ──────
+                                item(key = "manage_tags_btn") {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .clip(androidx.compose.foundation.shape.CircleShape)
+                                            .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.8f))
+                                            .border(
+                                                width = 0.8.dp,
+                                                color = NexusTheme.colors.primary.copy(alpha = 0.4f),
+                                                shape = androidx.compose.foundation.shape.CircleShape
+                                            )
+                                            .springBounceClick { showTagManagerScreen = true }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Image(
+                                            painter = painterResource(id = R.drawable.ic_tag),
+                                            contentDescription = "Manage Tags",
+                                            modifier = Modifier.size(13.dp),
+                                            colorFilter = ColorFilter.tint(NexusTheme.colors.primary)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        NexusText(
+                                            text = "Tags",
+                                            style = NexusTheme.typography.caption.copy(
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            ),
+                                            color = NexusTheme.colors.primary
+                                        )
+                                    }
+                                }
+
+                                // ── Custom User Tag Filter Chips ────────────────────────
+                                items(visibleTags, key = { it.name }) { tagModel ->
+                                    val isSelected = uiState.selectedTag == tagModel.name
+                                    val count = uiState.tagCounts[tagModel.name] ?: tagModel.count
+                                    val chipColor = tagModel.color
+
+                                    val animatedTagBg by animateColorAsState(
+                                        targetValue = if (isSelected) chipColor.copy(alpha = 0.18f) else NexusTheme.colors.surfaceVariant.copy(alpha = 0.55f),
+                                        animationSpec = spring(),
+                                        label = "tagBg"
+                                    )
+                                    val animatedTagBorderColor by animateColorAsState(
+                                        targetValue = if (isSelected) chipColor.copy(alpha = 0.8f) else NexusTheme.colors.divider.copy(alpha = 0.25f),
+                                        animationSpec = spring(),
+                                        label = "tagBorder"
+                                    )
+                                    val animatedTagBorderWidth by animateDpAsState(
+                                        targetValue = if (isSelected) 1.2.dp else 0.6.dp,
+                                        animationSpec = spring(),
+                                        label = "tagBorderWidth"
+                                    )
+                                    val animatedTagTextColor by animateColorAsState(
+                                        targetValue = if (isSelected) chipColor else NexusTheme.colors.textPrimary,
+                                        animationSpec = spring(),
+                                        label = "tagTextColor"
+                                    )
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .clip(androidx.compose.foundation.shape.CircleShape)
+                                            .background(animatedTagBg)
+                                            .border(
+                                                width = animatedTagBorderWidth,
+                                                color = animatedTagBorderColor,
+                                                shape = androidx.compose.foundation.shape.CircleShape
+                                            )
+                                            .springBounceClick { viewModel.selectTag(tagModel.name) }
+                                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        if (!tagModel.emoji.isNullOrBlank()) {
+                                            NexusText(
+                                                text = tagModel.emoji,
+                                                style = NexusTheme.typography.caption.copy(fontSize = 12.sp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                        } else {
+                                            Image(
+                                                painter = painterResource(id = if (isSelected) R.drawable.ic_tag_filled else R.drawable.ic_tag),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(13.dp),
+                                                colorFilter = ColorFilter.tint(if (isSelected) chipColor else NexusTheme.colors.textSecondary)
+                                            )
+                                            Spacer(modifier = Modifier.width(5.dp))
+                                        }
+                                        NexusText(
+                                            text = "#${tagModel.name}",
+                                            style = NexusTheme.typography.caption.copy(
+                                                fontSize = 12.sp,
+                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                            ),
+                                            color = animatedTagTextColor
+                                        )
+                                        androidx.compose.animation.AnimatedVisibility(
+                                            visible = count > 0,
+                                            enter = fadeIn() + expandHorizontally(),
+                                            exit = fadeOut() + shrinkHorizontally()
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Spacer(modifier = Modifier.width(5.dp))
+                                                NexusText(
+                                                    text = "$count",
+                                                    style = NexusTheme.typography.caption.copy(
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    ),
+                                                    color = if (isSelected) chipColor.copy(alpha = 0.85f) else NexusTheme.colors.textSecondary
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
                     
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -290,26 +575,118 @@ fun DashboardScreen(
                                         .springBounceClick { sortMenuExpanded = true }
                                         .padding(horizontal = 12.dp, vertical = 8.dp)
                                 ) {
+                                    val sortLabel = when (uiState.sortOrder) {
+                                        SortOrder.BY_DATE -> "Date"
+                                        SortOrder.BY_NAME -> "Name"
+                                        SortOrder.BY_TYPE -> "Type"
+                                        SortOrder.BY_SIZE -> "Size"
+                                    }
                                     NexusText(
-                                        text = "Sort: ${uiState.sortOrder.name.replace("BY_", "")}",
-                                        style = NexusTheme.typography.label,
-                                        color = NexusTheme.colors.textSecondary
+                                        text = "Sort: $sortLabel",
+                                        style = NexusTheme.typography.label.copy(fontWeight = FontWeight.Medium),
+                                        color = NexusTheme.colors.textPrimary
                                     )
-                                    androidx.compose.material3.DropdownMenu(
-                                        expanded = sortMenuExpanded,
-                                        onDismissRequest = { sortMenuExpanded = false }
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Image(
+                                        painter = painterResource(id = R.drawable.ic_arrow_right),
+                                        contentDescription = null,
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .graphicsLayer(rotationZ = if (sortMenuExpanded) -90f else 90f),
+                                        colorFilter = ColorFilter.tint(NexusTheme.colors.textSecondary)
+                                    )
+                                }
+
+                                if (sortMenuExpanded) {
+                                    androidx.compose.ui.window.Popup(
+                                        alignment = Alignment.TopStart,
+                                        offset = androidx.compose.ui.unit.IntOffset(0, 80),
+                                        onDismissRequest = { sortMenuExpanded = false },
+                                        properties = androidx.compose.ui.window.PopupProperties(
+                                            focusable = true,
+                                            dismissOnBackPress = true,
+                                            dismissOnClickOutside = true
+                                        )
                                     ) {
-                                        SortOrder.entries.forEach { order ->
-                                            androidx.compose.material3.DropdownMenuItem(
-                                                text = { NexusText(order.name.replace("BY_", "")) },
-                                                onClick = {
-                                                    viewModel.setSortOrder(order)
-                                                    sortMenuExpanded = false
-                                                },
-                                                colors = androidx.compose.material3.MenuDefaults.itemColors(
-                                                    textColor = if (uiState.sortOrder == order) NexusTheme.colors.primary else NexusTheme.colors.textPrimary
+                                        NexusSurface(
+                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                                            color = NexusTheme.colors.surface,
+                                            modifier = Modifier
+                                                .width(180.dp)
+                                                .border(
+                                                    width = 1.dp,
+                                                    color = NexusTheme.colors.divider.copy(alpha = 0.6f),
+                                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp)
                                                 )
-                                            )
+                                        ) {
+                                            Column(
+                                                modifier = Modifier
+                                                    .glassBackground(
+                                                        blurRadius = 24f,
+                                                        fallbackColor = NexusTheme.colors.surface,
+                                                        alpha = 0.9f,
+                                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp)
+                                                    )
+                                                    .padding(6.dp)
+                                            ) {
+                                                SortOrder.entries.forEach { order ->
+                                                    val isSelected = uiState.sortOrder == order
+                                                    val (title, iconRes) = when (order) {
+                                                        SortOrder.BY_DATE -> Pair("Date Modified", R.drawable.ic_startup)
+                                                        SortOrder.BY_NAME -> Pair("File Name", R.drawable.ic_rename)
+                                                        SortOrder.BY_TYPE -> Pair("File Type", R.drawable.ic_book)
+                                                        SortOrder.BY_SIZE -> Pair("File Size", R.drawable.ic_maximize)
+                                                    }
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                                                            .background(
+                                                                if (isSelected) NexusTheme.colors.primary.copy(alpha = 0.12f)
+                                                                else Color.Transparent
+                                                            )
+                                                            .springBounceClick {
+                                                                viewModel.setSortOrder(order)
+                                                                sortMenuExpanded = false
+                                                            }
+                                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.SpaceBetween
+                                                    ) {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            modifier = Modifier.weight(1f)
+                                                        ) {
+                                                            Image(
+                                                                painter = painterResource(id = iconRes),
+                                                                contentDescription = null,
+                                                                modifier = Modifier.size(16.dp),
+                                                                colorFilter = ColorFilter.tint(
+                                                                    if (isSelected) NexusTheme.colors.primary
+                                                                    else NexusTheme.colors.textSecondary
+                                                                )
+                                                            )
+                                                            Spacer(modifier = Modifier.width(10.dp))
+                                                            NexusText(
+                                                                text = title,
+                                                                style = NexusTheme.typography.body.copy(
+                                                                    fontSize = 13.sp,
+                                                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                                                ),
+                                                                color = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textPrimary
+                                                            )
+                                                        }
+                                                        if (isSelected) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .size(7.dp)
+                                                                    .clip(androidx.compose.foundation.shape.CircleShape)
+                                                                    .background(NexusTheme.colors.primary)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -379,90 +756,101 @@ fun DashboardScreen(
                 }
             } else if (!isPermissionGranted) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    Column(
+                    val config = androidx.compose.ui.platform.LocalConfiguration.current
+                    val isWide = config.screenWidthDp >= 600
+                    val isTall = config.screenHeightDp >= 800
+                    val emptyMinHeight = if (isTall) 480.dp else if (isWide) 420.dp else 340.dp
+                    val emptyMaxHeight = if (isTall) 700.dp else if (isWide) 580.dp else 560.dp
+                    val imgMaxHeight = if (isTall) 440.dp else if (isWide) 380.dp else 280.dp
+
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 64.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .heightIn(min = emptyMinHeight, max = emptyMaxHeight)
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
+                        NexusEmptyStateImage(
+                            type = NexusEmptyStateType.STORAGE,
+                            contentDescription = "Storage access needed",
                             modifier = Modifier
-                                .size(120.dp)
-                                .clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.ic_folder),
-                                contentDescription = "Empty",
-                                modifier = Modifier.size(56.dp),
-                                colorFilter = ColorFilter.tint(NexusTheme.colors.primary.copy(alpha = 0.8f))
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(24.dp))
-                        NexusText(
-                            text = "Storage access needed",
-                            style = NexusTheme.typography.title,
-                            color = NexusTheme.colors.textPrimary
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        NexusText(
-                            text = "Please grant storage permission in Settings to see your files.",
-                            style = NexusTheme.typography.body,
-                            color = NexusTheme.colors.textSecondary,
-                            textAlign = TextAlign.Center
+                                .fillMaxWidth(if (isWide) 0.70f else 0.95f)
+                                .heightIn(max = imgMaxHeight),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Fit
                         )
                     }
                 }
             } else if (uiState.documents.isEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
+                    val config = androidx.compose.ui.platform.LocalConfiguration.current
+                    val isWide = config.screenWidthDp >= 600
+                    val isTall = config.screenHeightDp >= 800
+                    val emptyMinHeight = if (isTall) 460.dp else if (isWide) 400.dp else 340.dp
+                    val emptyMaxHeight = if (isTall) 660.dp else if (isWide) 560.dp else 520.dp
+                    val imgMaxHeight = if (isTall) 420.dp else if (isWide) 360.dp else 280.dp
+
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 64.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .heightIn(min = emptyMinHeight, max = emptyMaxHeight)
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        val emptyIcon = when (uiState.selectedTab) {
-                            DashboardTab.STARRED -> R.drawable.ic_star
-                            DashboardTab.RECENT -> R.drawable.ic_update_progress
-                            else -> R.drawable.ic_folder
+                        val isSearching = uiState.searchQuery.isNotEmpty()
+                        val emptyType = when {
+                            isSearching -> NexusEmptyStateType.NOT_FOUND
+                            uiState.selectedTab == DashboardTab.STARRED -> NexusEmptyStateType.FAVORITES
+                            uiState.selectedTab == DashboardTab.RECENT -> NexusEmptyStateType.RECENT
+                            else -> NexusEmptyStateType.STORAGE
                         }
                         
-                        Box(
+                        NexusEmptyStateImage(
+                            type = emptyType,
+                            contentDescription = if (isSearching) "No results found" else "Empty",
                             modifier = Modifier
-                                .size(120.dp)
-                                .clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                painter = painterResource(id = emptyIcon),
-                                contentDescription = "Empty",
-                                modifier = Modifier.size(56.dp),
-                                colorFilter = ColorFilter.tint(NexusTheme.colors.primary.copy(alpha = 0.8f))
+                                .fillMaxWidth(if (isWide) 0.70f else 0.92f)
+                                .weight(1f, fill = false)
+                                .heightIn(max = imgMaxHeight),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                        )
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        if (isSearching) {
+                            com.nexus.core.ui.components.NexusButton(
+                                text = "Clear Search",
+                                onClick = { viewModel.setSearchQuery("") }
+                            )
+                        } else if (uiState.selectedTag != null && uiState.selectedFilter != DocumentTypeFilter.ALL) {
+                            com.nexus.core.ui.components.NexusButton(
+                                text = "Clear All Filters",
+                                onClick = {
+                                    viewModel.setSelectedFilter(DocumentTypeFilter.ALL)
+                                    viewModel.selectTag(null)
+                                }
+                            )
+                        } else if (uiState.selectedTag != null) {
+                            com.nexus.core.ui.components.NexusButton(
+                                text = "Clear Tag Filter",
+                                onClick = { viewModel.selectTag(null) }
+                            )
+                        } else if (uiState.selectedFilter != DocumentTypeFilter.ALL) {
+                            com.nexus.core.ui.components.NexusButton(
+                                text = "Show All Formats",
+                                onClick = { viewModel.setSelectedFilter(DocumentTypeFilter.ALL) }
+                            )
+                        } else if (uiState.selectedTab != DashboardTab.ALL) {
+                            com.nexus.core.ui.components.NexusButton(
+                                text = "View All Documents",
+                                onClick = { viewModel.setSelectedTab(DashboardTab.ALL) }
+                            )
+                        } else {
+                            com.nexus.core.ui.components.NexusButton(
+                                text = "Scan New Document",
+                                onClick = { router.navigateToScanner() }
                             )
                         }
-                        Spacer(modifier = Modifier.height(24.dp))
-                        NexusText(
-                            text = when (uiState.selectedTab) {
-                                DashboardTab.STARRED -> "No starred files"
-                                DashboardTab.RECENT -> "No recent files"
-                                else -> "No files found"
-                            },
-                            style = NexusTheme.typography.title,
-                            color = NexusTheme.colors.textPrimary
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        NexusText(
-                            text = when (uiState.selectedTab) {
-                                DashboardTab.STARRED -> "Files you star will appear here for quick access."
-                                DashboardTab.RECENT -> "Recently opened files will appear here."
-                                else -> "Tap the Scan button or open a document to get started."
-                            },
-                            style = NexusTheme.typography.body,
-                            color = NexusTheme.colors.textSecondary,
-                            textAlign = TextAlign.Center
-                        )
                     }
                 }
             } else {
@@ -495,6 +883,15 @@ fun DashboardScreen(
                             isAccessible = uiModel.isAccessible,
                             isStarred = uiState.starredUris.contains(uiModel.doc.uri),
                             isSelected = uiState.selectedUris.contains(uiModel.doc.uri),
+                            tags = uiModel.tags,
+                            allAvailableTags = uiState.availableTags,
+                            onSaveTags = { updatedTags ->
+                                viewModel.setDocumentTags(uiModel.doc.uri, updatedTags)
+                            },
+                            onSaveTagDefinition = { name, colorHex, emoji ->
+                                viewModel.upsertTagDefinition(name, colorHex, emoji)
+                            },
+                            onOpenTagManager = { showTagManagerScreen = true },
                             onToggleStarred = { viewModel.toggleStarred(uiModel.doc.uri) },
                             onClick = {
                                 if (uiState.isSelectionMode) {
@@ -524,6 +921,15 @@ fun DashboardScreen(
                             isAccessible = uiModel.isAccessible,
                             isStarred = uiState.starredUris.contains(uiModel.doc.uri),
                             isSelected = uiState.selectedUris.contains(uiModel.doc.uri),
+                            tags = uiModel.tags,
+                            allAvailableTags = uiState.availableTags,
+                            onSaveTags = { updatedTags ->
+                                viewModel.setDocumentTags(uiModel.doc.uri, updatedTags)
+                            },
+                            onSaveTagDefinition = { name, colorHex, emoji ->
+                                viewModel.upsertTagDefinition(name, colorHex, emoji)
+                            },
+                            onOpenTagManager = { showTagManagerScreen = true },
                             onToggleStarred = { viewModel.toggleStarred(uiModel.doc.uri) },
                             onClick = {
                                 if (uiState.isSelectionMode) {
@@ -553,117 +959,193 @@ fun DashboardScreen(
         } // End of PullToRefreshBox block
 
         detailsDialogDoc?.let { doc ->
-            com.nexus.core.ui.components.NexusDialog(
-                onDismissRequest = { detailsDialogDoc = null },
-                title = { NexusText("File Details", style = NexusTheme.typography.h2) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        NexusText("Name: ${doc.fileName}", style = NexusTheme.typography.body)
-                        NexusText("Type: ${doc.documentType}", style = NexusTheme.typography.body)
-                        NexusText("Size: ${formatFileSize(doc.fileSizeBytes)}", style = NexusTheme.typography.body)
-                        NexusText("Last Opened: ${formatDate(doc.lastOpenedAt)}", style = NexusTheme.typography.body)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        NexusText("Location: ${doc.uri}", color = NexusTheme.colors.textSecondary, style = NexusTheme.typography.caption)
-                    }
-                },
-                confirmButton = {
-                    com.nexus.core.ui.components.NexusButton(
-                        text = "Close",
-                        onClick = { detailsDialogDoc = null }
-                    )
-                }
+            FileDetailsSheet(
+                doc = doc,
+                onDismissRequest = { detailsDialogDoc = null }
             )
         }
-        
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 80.dp) // above nav bar
-        )
 
-        // Multi-Select Action Bar with Glassmorphism
+        // Multi-Select Action Bar with Solid Opaque Background
         androidx.compose.animation.AnimatedVisibility(
             visible = uiState.isSelectionMode,
-            enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }) + androidx.compose.animation.fadeIn(),
-            exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) + androidx.compose.animation.fadeOut(),
+            enter = androidx.compose.animation.slideInVertically(
+                initialOffsetY = { it * 2 },
+                animationSpec = spring(dampingRatio = 0.8f, stiffness = 320f)
+            ) + androidx.compose.animation.fadeIn(animationSpec = tween(200)),
+            exit = androidx.compose.animation.slideOutVertically(
+                targetOffsetY = { it * 2 },
+                animationSpec = spring(dampingRatio = 0.8f, stiffness = 320f)
+            ) + androidx.compose.animation.fadeOut(animationSpec = tween(150)),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+            val areAllSelected = uiState.selectedUris.size == uiState.documents.size && uiState.documents.isNotEmpty()
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 24.dp)
-                    .clip(NexusTheme.shapes.large)
-                    .glassBackground(
-                        blurRadius = 40f,
-                        fallbackColor = NexusTheme.colors.surface,
-                        alpha = if (isDark) 0.4f else 0.55f,
-                        shape = NexusTheme.shapes.large
+                    .padding(horizontal = 16.dp, vertical = 18.dp)
+                    .shadow(
+                        elevation = 20.dp,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                        spotColor = Color.Black.copy(alpha = 0.35f),
+                        ambientColor = Color.Black.copy(alpha = 0.2f)
                     )
-                    .padding(16.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(22.dp))
+                    .background(NexusTheme.colors.surface)
+                    .border(
+                        width = 1.dp,
+                        color = NexusTheme.colors.divider.copy(alpha = 0.5f),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp)
+                    )
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        NexusText("${uiState.selectedUris.size} selected", style = NexusTheme.typography.title, color = NexusTheme.colors.textPrimary)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Box(
-                            modifier = Modifier
-                                .clip(NexusTheme.shapes.small)
-                                .background(NexusTheme.colors.primary.copy(alpha = 0.1f))
-                                .springBounceClick { viewModel.selectAll() }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            NexusText("Select all", style = NexusTheme.typography.label, color = NexusTheme.colors.primary)
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clip(androidx.compose.foundation.shape.CircleShape)
+                                    .background(NexusTheme.colors.primary),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                NexusText(
+                                    text = "${uiState.selectedUris.size}",
+                                    style = NexusTheme.typography.caption.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.5.sp
+                                    ),
+                                    color = NexusTheme.colors.onPrimary
+                                )
+                            }
+                            NexusText(
+                                text = if (uiState.selectedUris.size == 1) "File selected" else "Files selected",
+                                style = NexusTheme.typography.title.copy(fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold),
+                                color = NexusTheme.colors.textPrimary
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                                .background(NexusTheme.colors.primary.copy(alpha = 0.12f))
+                                .springBounceClick {
+                                    if (areAllSelected) viewModel.clearSelection() else viewModel.selectAll()
+                                }
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            NexusText(
+                                text = if (areAllSelected) "Deselect all" else "Select all",
+                                style = NexusTheme.typography.caption.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 11.sp
+                                ),
+                                color = NexusTheme.colors.primary
+                            )
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.springBounceClick { viewModel.shareSelectedDocuments(uiState.selectedUris); viewModel.clearSelection() }) {
-                            Image(
-                                painter = painterResource(id = R.drawable.ic_share),
-                                contentDescription = "Share",
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Share Action
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.springBounceClick {
+                                viewModel.shareSelectedDocuments(uiState.selectedUris)
+                                viewModel.clearSelection()
+                            }
+                        ) {
+                            Box(
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(42.dp)
                                     .clip(androidx.compose.foundation.shape.CircleShape)
-                                    .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f))
-                                    .padding(12.dp),
-                                colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
+                                    .background(NexusTheme.colors.surfaceVariant)
+                                    .border(0.8.dp, NexusTheme.colors.divider.copy(alpha = 0.4f), androidx.compose.foundation.shape.CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_share),
+                                    contentDescription = "Share",
+                                    modifier = Modifier.size(18.dp),
+                                    colorFilter = ColorFilter.tint(NexusTheme.colors.primary)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            NexusText(
+                                text = "Share",
+                                style = NexusTheme.typography.caption.copy(fontSize = 10.5.sp, fontWeight = FontWeight.Medium),
+                                color = NexusTheme.colors.textPrimary
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            NexusText("Share", style = NexusTheme.typography.caption, color = NexusTheme.colors.textPrimary)
                         }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.springBounceClick { viewModel.deleteSelected() }) {
-                            Image(
-                                painter = painterResource(id = R.drawable.ic_delete),
-                                contentDescription = "Delete",
+
+                        // Delete Action
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.springBounceClick { viewModel.deleteSelected() }
+                        ) {
+                            Box(
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(42.dp)
                                     .clip(androidx.compose.foundation.shape.CircleShape)
-                                    .background(NexusTheme.colors.error.copy(alpha = 0.15f))
-                                    .padding(12.dp),
-                                colorFilter = ColorFilter.tint(NexusTheme.colors.error)
+                                    .background(NexusTheme.colors.error.copy(alpha = 0.14f))
+                                    .border(0.8.dp, NexusTheme.colors.error.copy(alpha = 0.35f), androidx.compose.foundation.shape.CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_delete),
+                                    contentDescription = "Delete",
+                                    modifier = Modifier.size(18.dp),
+                                    colorFilter = ColorFilter.tint(NexusTheme.colors.error)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            NexusText(
+                                text = "Delete",
+                                style = NexusTheme.typography.caption.copy(fontSize = 10.5.sp, fontWeight = FontWeight.Medium),
+                                color = NexusTheme.colors.error
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            NexusText("Delete", style = NexusTheme.typography.caption, color = NexusTheme.colors.error)
                         }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.springBounceClick { viewModel.clearSelection() }) {
-                            Image(
-                                painter = painterResource(id = com.nexus.core.R.drawable.ic_close),
-                                contentDescription = "Close",
+
+                        // Close Action
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.springBounceClick { viewModel.clearSelection() }
+                        ) {
+                            Box(
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(42.dp)
                                     .clip(androidx.compose.foundation.shape.CircleShape)
-                                    .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f))
-                                    .padding(12.dp),
-                                colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
+                                    .background(NexusTheme.colors.surfaceVariant)
+                                    .border(0.8.dp, NexusTheme.colors.divider.copy(alpha = 0.4f), androidx.compose.foundation.shape.CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = com.nexus.core.R.drawable.ic_close),
+                                    contentDescription = "Close",
+                                    modifier = Modifier.size(16.dp),
+                                    colorFilter = ColorFilter.tint(NexusTheme.colors.textSecondary)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            NexusText(
+                                text = "Close",
+                                style = NexusTheme.typography.caption.copy(fontSize = 10.5.sp, fontWeight = FontWeight.Medium),
+                                color = NexusTheme.colors.textSecondary
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            NexusText("Close", style = NexusTheme.typography.caption, color = NexusTheme.colors.textPrimary)
                         }
                     }
                 }
@@ -675,7 +1157,7 @@ fun DashboardScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(bottom = if (uiState.isSelectionMode) 120.dp else 24.dp, start = 16.dp, end = 16.dp),
+                .padding(bottom = if (uiState.isSelectionMode) 130.dp else 32.dp, start = 16.dp, end = 16.dp),
             snackbar = { snackbarData ->
                 val isDark = androidx.compose.foundation.isSystemInDarkTheme()
                 val isUndo = snackbarData.visuals.actionLabel == "Undo"

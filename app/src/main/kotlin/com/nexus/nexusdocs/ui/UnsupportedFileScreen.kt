@@ -15,10 +15,12 @@ import androidx.compose.ui.unit.dp
 import com.nexus.core.theme.NexusTheme
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.components.NexusButton
+import com.nexus.core.ui.components.NexusEmptyStateImage
+import com.nexus.core.ui.components.NexusEmptyStateType
 import com.nexus.core.ui.components.NexusTopBar
 import com.nexus.core.R
 
-val SUPPORTED_TYPES_STRING = "Supported: PDF, DOCX, XLSX, TXT"
+val SUPPORTED_TYPES_STRING = "Supported: PDF, Word, Excel, Text, Markdown, JSON, XML, YAML, TOML, INI, CSV, Code"
 
 @Composable
 fun UnsupportedFileScreen(fileName: String, onBack: () -> Unit) {
@@ -42,37 +44,38 @@ fun UnsupportedFileScreen(fileName: String, onBack: () -> Unit) {
                 )
             }
         )
+        val config = androidx.compose.ui.platform.LocalConfiguration.current
+        val isWide = config.screenWidthDp >= 600
+        val isTall = config.screenHeightDp >= 800
+        val maxImgHeight = if (isTall) 480.dp else if (isWide) 400.dp else 300.dp
+
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(24.dp),
             contentAlignment = Alignment.Center
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(32.dp)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_info),
-                    contentDescription = "Unsupported",
-                    colorFilter = ColorFilter.tint(NexusTheme.colors.primary),
-                    modifier = Modifier.size(72.dp)
-                )
-                NexusText(
-                    text = "Unsupported File Type",
-                    style = NexusTheme.typography.title,
-                    color = NexusTheme.colors.textPrimary
-                )
-                NexusText(
-                    text = "\"$fileName\" cannot be opened.\n$SUPPORTED_TYPES_STRING",
-                    style = NexusTheme.typography.body,
-                    color = NexusTheme.colors.textSecondary,
-                    textAlign = TextAlign.Center
-                )
-                NexusButton(
-                    text = "Go Back",
-                    onClick = onBack
-                )
-            }
+            NexusEmptyStateImage(
+                type = NexusEmptyStateType.UNSUPPORTED,
+                contentDescription = "Unsupported File",
+                modifier = Modifier
+                    .fillMaxWidth(if (isWide) 0.70f else 0.95f)
+                    .heightIn(max = maxImgHeight),
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            NexusButton(
+                text = "Go Back",
+                onClick = onBack,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }

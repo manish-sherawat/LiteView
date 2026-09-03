@@ -3,7 +3,7 @@
 <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" />
 <img src="https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" />
 <img src="https://img.shields.io/badge/Jetpack%20Compose-2024.12-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" />
-<img src="https://img.shields.io/badge/Version-2.5.3-orange?style=for-the-badge" />
+<img src="https://img.shields.io/badge/Version-3.1.1-orange?style=for-the-badge" />
 <img src="https://img.shields.io/badge/Min%20SDK-26%20(Android%208.0)-blue?style=for-the-badge" />
 <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" />
 
@@ -43,6 +43,8 @@ View PDFs, Office files, and text documents. Annotate PDFs with stamps, text box
 | 🎨 **Glassmorphic Snackbar** | Custom floating dark-glass notification container with 1-tap spring-animated **Undo** restoration |
 | 🗂️ **Smart Dashboard** | View All, Recent, and Starred files with real-time list sync, sorting, and search |
 | 🔲 **Multi-Select Actions** | Long-press to select multiple files, then share or delete them in bulk |
+| 🏷️ **Tag System** | Create custom color + emoji tags, filter the dashboard by tag, and manage all tags in the Tag Library |
+| 🗑️ **Permanent File Delete** | Delete files physically from device storage with a confirmation dialog and a 10-second undo snackbar countdown |
 | 🌓 **Dark & Light Mode** | Full system theme support, AMOLED Deep Black, and reader background modes |
 | 🔄 **Glassmorphic Updater** | Checks for new releases via GitHub REST API with session dismissal memory & in-app APK installer |
 | 🔃 **Pull to Refresh** | Swipe down to re-scan the file system for new documents |
@@ -224,9 +226,27 @@ See [`future_enhancements.txt`](future_enhancements.txt) for the full list. Key 
 
 - [ ] **AI — Chat with Document** (Gemini API integration)
 - [ ] **AI — Auto-Summarization** (TL;DR for long documents)
+<<<<<<< Updated upstream
 - [ ] **Folder & Tag Management** (custom organization beyond Starred)
+=======
+- [x] **Tag Library & Management** (custom color + emoji tags, filters, bulk delete) ✅ v3.0.3
+- [ ] **Cloud Backup Hub** (Google Drive / Dropbox sync)
+>>>>>>> Stashed changes
 - [ ] **Comprehensive Onboarding** (3-step first-launch carousel)
 - [ ] **PDF Bookmarks & Outline** (table of contents navigation)
+
+---
+
+## 📝 What's New in v3.1.1
+
+### ✨ Improvements
+- 🎨 Settings page redesigned to match app-wide monochrome theme
+- 🎨 Three-dot contextual menu on Home Screen refreshed
+- 🏷️ Tag Manager & Tag Creator sheets completely redesigned — live preview chip, color swatches, emoji grid
+- 📄 File Details sheet redesigned with metadata rows and one-tap location copy
+- 🖐️ Reduced swipe-to-delete / swipe-to-share sensitivity to prevent accidental triggers
+- 🗑️ Files now **permanently deleted** from device storage with a confirmation dialog and a **10-second undo snackbar** countdown
+- 🖼️ New Tag Manager empty-state illustration
 
 ---
 

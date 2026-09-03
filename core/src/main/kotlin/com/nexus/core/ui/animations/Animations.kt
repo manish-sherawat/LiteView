@@ -246,10 +246,10 @@ fun <T> dialogSpring() = spring<T>(
     dampingRatio = Spring.DampingRatioLowBouncy
 )
 
-/** Floating nav pill: one soft landing bounce for a lively feel */
+/** Floating nav pill: fluid, organic collapse/expand with gentle deceleration */
 fun <T> navPillSpring() = spring<T>(
-    stiffness = Spring.StiffnessMedium,
-    dampingRatio = 0.75f
+    stiffness = 320f,
+    dampingRatio = 0.82f
 )
 
 /** Scale animations: quick pop-out or grow effect */

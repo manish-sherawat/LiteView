@@ -62,7 +62,7 @@ fun animateNexusColorsAsState(targetColors: NexusColors): NexusColors {
 
 @Composable
 fun NexusDocsViewerTheme(
-    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    themeMode: ThemeMode = ThemeMode.LIGHT,
     hapticFeedbackEnabled: Boolean = true,
     content: @Composable () -> Unit
 ) {

@@ -1,38 +1,80 @@
 package com.nexus.core.ui.components
 
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
+import androidx.annotation.DrawableRes
+import androidx.annotation.RawRes
+import androidx.annotation.StringRes
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selectableGroup
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import com.airbnb.lottie.LottieProperty
+import com.airbnb.lottie.compose.*
+import com.nexus.core.R
 import com.nexus.core.preferences.HomeStyle
 import com.nexus.core.theme.NexusTheme
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.animations.*
-import com.nexus.core.ui.utils.glassBackground
+import com.nexus.core.ui.utils.LocalGlassEffectConfig
 import com.nexus.core.ui.utils.liquidGlass
+import com.nexus.core.ui.utils.glassBackground
 import kotlinx.coroutines.launch
+
+// ─── Screen Navigation Sealed Class ──────────────────────────────────────────
+
+sealed class Screens(
+    @StringRes val titleId: Int,
+    @DrawableRes val iconIdInactive: Int,
+    @DrawableRes val iconIdActive: Int,
+    val route: String,
+    @RawRes val animRawRes: Int? = null,
+) {
+    data object Home     : Screens(R.string.home, R.drawable.ic_home_outline, R.drawable.ic_home_filled, "home")
+    data object Settings : Screens(R.string.settings, R.drawable.ic_settings_outline, R.drawable.ic_settings_filled, "settings")
+}
 
 // ─── Nav Item Model ───────────────────────────────────────────────────────────
 
@@ -42,11 +84,88 @@ data class NexusNavItem(
     val unselectedIconText: String = "",
     val selectedIconRes: Int? = null,
     val unselectedIconRes: Int? = null,
+    @RawRes val animRawRes: Int? = null,
     val route: String,
     val badge: Int = 0
 )
 
-// ─── Main Floating Bottom Nav ─────────────────────────────────────────────────
+// ─── Floating Tab Bar Scroll Connection Helper ────────────────────────────────
+
+@Composable
+fun rememberFloatingTabBarScrollConnection(
+    scrollThreshold: Dp = 36.dp,
+    onCollapseChanged: ((Boolean) -> Unit)? = null
+): NestedScrollConnection {
+    val density = LocalDensity.current
+    val thresholdPx = with(density) { scrollThreshold.toPx() }
+    var downAccumulator by remember { mutableFloatStateOf(0f) }
+    var upAccumulator by remember { mutableFloatStateOf(0f) }
+
+    return remember(thresholdPx) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val delta = available.y
+                if (delta < 0f) {
+                    // Scrolling down (finger moves up) -> Collapse
+                    upAccumulator = 0f
+                    downAccumulator += -delta
+                    if (downAccumulator > thresholdPx) {
+                        onCollapseChanged?.invoke(true)
+                        downAccumulator = 0f
+                    }
+                } else if (delta > 0f) {
+                    // Scrolling up (finger moves down) -> Expand
+                    downAccumulator = 0f
+                    upAccumulator += delta
+                    if (upAccumulator > (thresholdPx * 0.7f)) {
+                        onCollapseChanged?.invoke(false)
+                        upAccumulator = 0f
+                    }
+                }
+                return Offset.Zero
+            }
+        }
+    }
+}
+
+// ─── AppFloatingNavBar for Screens Model ──────────────────────────────────────
+
+@Composable
+fun AppFloatingNavBar(
+    navigationItems: List<Screens>,
+    currentRoute: String?,
+    onItemClick: (Screens, Int) -> Unit,
+    modifier: Modifier = Modifier,
+    scrollConnection: NestedScrollConnection? = null,
+    visible: Boolean = true
+) {
+    val convertedItems = remember(navigationItems) {
+        navigationItems.map { screen ->
+            NexusNavItem(
+                label = "",
+                selectedIconRes = screen.iconIdActive,
+                unselectedIconRes = screen.iconIdInactive,
+                animRawRes = screen.animRawRes,
+                route = screen.route
+            )
+        }
+    }
+
+    NexusFloatingBottomNav(
+        items = convertedItems,
+        currentRoute = currentRoute,
+        onItemSelected = { selectedItem ->
+            val index = navigationItems.indexOfFirst { it.route == selectedItem.route }
+            val screen = navigationItems.getOrNull(index) ?: Screens.Home
+            onItemClick(screen, if (index >= 0) index else 0)
+        },
+        homeStyle = HomeStyle.APPLE_GLASSMORPHIC,
+        modifier = modifier,
+        visible = visible
+    )
+}
+
+// ─── Floating Bottom Nav ──────────────────────────────────────────────────────
 
 @Composable
 fun NexusFloatingBottomNav(
@@ -55,22 +174,51 @@ fun NexusFloatingBottomNav(
     onItemSelected: (NexusNavItem) -> Unit,
     homeStyle: HomeStyle,
     modifier: Modifier = Modifier,
+    isCollapsed: Boolean = false,
+    onScrollToTop: (() -> Unit)? = null,    // long-press Home = scroll to top
     visible: Boolean = true
 ) {
-    val selectedIndex = items.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
-    // Middle item (index 1 of 3) is treated as the center FAB action
-    val isCenterFab = items.size == 3
+    val density = LocalDensity.current
+    val selectedIndex = items.indexOfFirst { it.route == currentRoute }
+    val isCapsuleSelected = selectedIndex >= 0
 
-    // ── Per-item layout measurements ──────────────────────────────────────────
-    var canvasRootX by remember { mutableStateOf(0f) }
-    val itemRootCentersX = remember { mutableStateListOf<Float>() }
-    val itemWidths       = remember { mutableStateListOf<Float>() }
+    // ── Dynamic Dimensions & Fluid Spring Specs ───────────────────────────────
+    val morphSpring = remember { spring<Dp>(dampingRatio = 0.85f, stiffness = 380f) }
 
-    // ── Sliding indicator animatables ─────────────────────────────────────────
-    val indicatorX      = remember { Animatable(0f) }
-    val indicatorWidth  = remember { Animatable(0f) }
-    val indicatorAlpha  = remember { Animatable(0f) }
-    val indicatorScaleY = remember { Animatable(1f) }
+    val animCapsuleHeight by animateDpAsState(
+        targetValue   = if (isCollapsed) 48.dp else 60.dp,
+        animationSpec = morphSpring,
+        label         = "capsuleH"
+    )
+
+    // Comfortable ergonomic tab width (wider for natural left-to-center thumb reach)
+    val baseTabWidth = if (isCollapsed) 68.dp else 96.dp
+    val animTabWidth by animateDpAsState(
+        targetValue   = baseTabWidth,
+        animationSpec = morphSpring,
+        label         = "tabW"
+    )
+
+    val animIndicatorHeight by animateDpAsState(
+        targetValue   = if (isCollapsed) 38.dp else 48.dp,
+        animationSpec = morphSpring,
+        label         = "indH"
+    )
+
+    val animIconSize by animateDpAsState(
+        targetValue   = if (isCollapsed) 22.dp else 24.dp,
+        animationSpec = morphSpring,
+        label         = "iconSize"
+    )
+
+    val horizontalPaddingDp = if (isCollapsed) 8.dp else 10.dp
+    val tabSpacingDp        = 6.dp
+
+    // ── Fluid Sliding Indicator Position Animatable ───────────────────────────
+    // Using an animated tab index fraction eliminates composition frame resets
+    // and guarantees perfect synchronization with dynamic width animations
+    val tabFraction = remember { Animatable(if (selectedIndex >= 0) selectedIndex.toFloat() else 0f) }
+    val indicatorAlpha = remember { Animatable(if (isCapsuleSelected) 1f else 0f) }
 
     // ── Container entry / exit ────────────────────────────────────────────────
     val containerAlpha by animateFloatAsState(
@@ -79,133 +227,91 @@ fun NexusFloatingBottomNav(
         label         = "navContainerAlpha"
     )
     val shadowElevation by animateDpAsState(
-        targetValue   = if (visible) 24.dp else 0.dp,
+        targetValue   = if (visible) 16.dp else 0.dp,
         animationSpec = navPillSpring(),
         label         = "navShadow"
     )
 
-    // ── Drive indicator spring physics on tab change ──────────────────────────
-    LaunchedEffect(selectedIndex, itemRootCentersX.size, itemWidths.size, canvasRootX) {
-        if (itemRootCentersX.size <= selectedIndex) return@LaunchedEffect
-        if (itemWidths.size <= selectedIndex) return@LaunchedEffect
-        // Never draw the indicator beneath the FAB slot
-        if (isCenterFab && selectedIndex == 1) return@LaunchedEffect
-
-        val targetCenterX = itemRootCentersX[selectedIndex] - canvasRootX
-        val targetW       = itemWidths[selectedIndex]
-        val targetLeft    = targetCenterX - targetW / 2f
-
-        if (indicatorAlpha.value < 0.05f) {
-            // First frame — snap then fade in
-            indicatorX.snapTo(targetLeft)
-            indicatorWidth.snapTo(targetW)
-            launch { indicatorAlpha.animateTo(1f, tween(220, easing = FastOutSlowInEasing)) }
+    // ── Drive indicator spring physics on tab selection change ────────────────
+    LaunchedEffect(selectedIndex, isCapsuleSelected) {
+        if (!isCapsuleSelected || selectedIndex < 0) {
+            indicatorAlpha.animateTo(0f, tween(140, easing = FastOutSlowInEasing))
             return@LaunchedEffect
         }
 
-        // Phase 1: vertical squish (rubber-band)
-        launch { indicatorScaleY.animateTo(0.82f, spring(dampingRatio = 0.50f, stiffness = 520f)) }
-
-        // Phase 2: slide to target
-        launch {
-            kotlinx.coroutines.delay(40)
-            indicatorX.animateTo(targetLeft, spring(dampingRatio = 0.68f, stiffness = 320f))
-        }
-        launch {
-            indicatorWidth.animateTo(targetW, spring(dampingRatio = 0.72f, stiffness = 280f))
+        if (indicatorAlpha.value < 0.05f) {
+            tabFraction.snapTo(selectedIndex.toFloat())
+            launch { indicatorAlpha.animateTo(1f, tween(160, easing = FastOutSlowInEasing)) }
+            return@LaunchedEffect
         }
 
-        // Phase 3: arrival splat
-        kotlinx.coroutines.delay(220)
-        launch { indicatorScaleY.animateTo(1.18f, spring(dampingRatio = 0.40f, stiffness = 260f)) }
-        kotlinx.coroutines.delay(150)
-        launch { indicatorScaleY.animateTo(1f,    spring(dampingRatio = 0.58f, stiffness = 300f)) }
+        launch { indicatorAlpha.animateTo(1f, tween(120, easing = FastOutSlowInEasing)) }
+        // Fluid, organic glide spring
+        launch {
+            tabFraction.animateTo(
+                targetValue = selectedIndex.toFloat(),
+                animationSpec = spring(
+                    dampingRatio = 0.80f,
+                    stiffness = 380f
+                )
+            )
+        }
     }
 
-    val pillShape = NexusTheme.shapes.pill
-    val isDark    = androidx.compose.foundation.isSystemInDarkTheme()
+    val isDark = isSystemInDarkTheme()
+    val pillShape = CircleShape
 
-    // ── Indicator colors ──────────────────────────────────────────────────────
-    val indicatorFill   = NexusTheme.colors.primary.copy(alpha = if (isDark) 0.16f else 0.10f)
-    val indicatorStroke = NexusTheme.colors.primary.copy(alpha = if (isDark) 0.30f else 0.20f)
-
-    // ── Glowing border: pulsing alpha driven by infinite transition ───────────
-    val glowTransition = rememberInfiniteTransition(label = "navGlow")
-    val glowAlpha by glowTransition.animateFloat(
-        initialValue  = 0.45f,
-        targetValue   = 0.90f,
-        animationSpec = infiniteRepeatable(
-            animation  = tween(2400, easing = com.nexus.core.ui.animations.EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "navGlowAlpha"
-    )
     val primaryColor = NexusTheme.colors.primary
 
-    // ── Pill glass background ─────────────────────────────────────────────────
-    val glassAlpha = if (isDark) 0.42f else 0.60f
-    val glassTint  = NexusTheme.colors.surfaceVariant
+    // ── Indicator colors with clean contrast ───────────────────────────────────
+    val indicatorFill = primaryColor.copy(alpha = 0.12f)
+    val indicatorStroke = primaryColor.copy(alpha = 0.18f)
 
-    // The glow border modifier is applied AFTER clip so it paints over the
-    // clipped surface edge — using drawWithContent so the border sits on top.
-    val glowBorderModifier = Modifier.drawWithContent {
-        drawContent()
-        val strokePx = 1.2.dp.toPx()
-        val inset    = strokePx / 2f
-        val r        = size.height / 2f            // pill corner radius
-        val brush    = Brush.linearGradient(
-            colors = listOf(
-                primaryColor.copy(alpha = 0f),
-                primaryColor.copy(alpha = glowAlpha),
-                primaryColor.copy(alpha = glowAlpha * 0.6f),
-                primaryColor.copy(alpha = glowAlpha),
-                primaryColor.copy(alpha = 0f)
-            ),
-            start = Offset(0f, size.height / 2f),
-            end   = Offset(size.width, size.height / 2f)
+    // ── Solid opaque background shell modifier ────────────────────────────────
+    val backgroundShellModifier = Modifier
+        .clip(pillShape)
+        .background(NexusTheme.colors.surface)
+        .border(
+            width = 1.dp,
+            color = NexusTheme.colors.divider.copy(alpha = 0.8f),
+            shape = pillShape
         )
-        drawRoundRect(
-            brush        = brush,
-            topLeft      = Offset(inset, inset),
-            size         = Size(size.width - strokePx, size.height - strokePx),
-            cornerRadius = CornerRadius(r, r),
-            style        = Stroke(width = strokePx)
-        )
-    }
 
-    val backgroundModifier = if (homeStyle == HomeStyle.APPLE_GLASSMORPHIC) {
-        Modifier
-            .glassBackground(fallbackColor = glassTint, alpha = glassAlpha, shape = pillShape)
-            .then(Modifier.liquidGlass())
-    } else {
-        Modifier
-            .background(glassTint.copy(alpha = 0.94f), pillShape)
-            .border(0.8.dp, NexusTheme.colors.divider.copy(alpha = 0.35f), pillShape)
-    }
+    // ── Full System Navigation Insets Clearance ────────────────────────────────
+    val navBarsBottom = with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }
+    val targetBottomOffset = (if (isCollapsed) 10.dp else 16.dp) + navBarsBottom
+    val animBottomOffset by animateDpAsState(
+        targetValue   = targetBottomOffset,
+        animationSpec = morphSpring,
+        label         = "bottomOffset"
+    )
 
-    // ── Bottom safe-area offset ───────────────────────────────────────────────
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val bottomOffset = 20.dp + with(density) {
-        WindowInsets.navigationBars.getBottom(this).toDp()
-    }.coerceAtMost(28.dp)
-
-    // ── Pill ambient shadow color ─────────────────────────────────────────────
     val ambientShadow = if (isDark)
-        Color.Black.copy(alpha = 0.55f)
+        Color.Black.copy(alpha = 0.50f)
     else
-        NexusTheme.colors.primary.copy(alpha = 0.06f)
+        Color.Black.copy(alpha = 0.10f)
 
+    val spotShadow = primaryColor.copy(alpha = if (isDark) 0.30f else 0.18f)
+
+    // Layout container — centered alignment with comfortable reach
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 28.dp)
-            .padding(top = 12.dp, bottom = bottomOffset)
+            .wrapContentWidth(Alignment.CenterHorizontally)
+            .widthIn(max = 480.dp)
+            .padding(horizontal = 20.dp)
+            .padding(top = 6.dp, bottom = animBottomOffset)
             .graphicsLayer { alpha = containerAlpha },
         contentAlignment = Alignment.Center
     ) {
-        Box(contentAlignment = Alignment.Center) {
-
-            // ── Pill shell ────────────────────────────────────────────────────
+        // ── Navigation Capsule Pill ───────────────────────────────────────────
+        Box(
+            modifier = Modifier
+                .clip(pillShape)
+                .semantics { selectableGroup() },
+            contentAlignment = Alignment.Center
+        ) {
+            // Backdrop + solid shell
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -213,120 +319,86 @@ fun NexusFloatingBottomNav(
                         elevation    = shadowElevation,
                         shape        = pillShape,
                         clip         = false,
-                        spotColor    = Color.Black.copy(alpha = 0.22f),
+                        spotColor    = spotShadow,
                         ambientColor = ambientShadow
                     )
-                    .clip(pillShape)
-                    .then(backgroundModifier)
+                    .then(backgroundShellModifier)
             )
 
-            // ── Glow border overlay (separate layer so it never enters the
-            //    liquidGlass RenderEffect pipeline which would corrupt blur) ─────
+            // Sliding Indicator Pill + accessibility
             Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .drawBehind {
-                        val strokePx = 1.4.dp.toPx()
-                        val inset    = strokePx / 2f
-                        val r        = size.height / 2f
-                        val brush    = Brush.linearGradient(
-                            colors = listOf(
-                                primaryColor.copy(alpha = 0f),
-                                primaryColor.copy(alpha = glowAlpha * 0.70f),
-                                primaryColor.copy(alpha = glowAlpha),
-                                primaryColor.copy(alpha = glowAlpha * 0.70f),
-                                primaryColor.copy(alpha = 0f)
-                            ),
-                            start = Offset(size.width * 0.05f, size.height / 2f),
-                            end   = Offset(size.width * 0.95f, size.height / 2f)
-                        )
-                        drawRoundRect(
-                            brush        = brush,
-                            topLeft      = Offset(inset, inset),
-                            size         = Size(size.width - strokePx, size.height - strokePx),
-                            cornerRadius = CornerRadius(r, r),
-                            style        = Stroke(width = strokePx)
-                        )
-                    }
-            )
-
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .onGloballyPositioned { coords ->
-                        canvasRootX = coords.positionInRoot().x
+                    .semantics {
+                        val activeItem = items.getOrNull(selectedIndex)
+                        if (activeItem != null && isCapsuleSelected) {
+                            stateDescription = "${activeItem.label} selected"
+                        }
                     }
                     .graphicsLayer { alpha = indicatorAlpha.value }
                     .drawBehind {
-                        if (indicatorWidth.value <= 0f) return@drawBehind
+                        if (indicatorAlpha.value <= 0f) return@drawBehind
 
-                        val indicatorH = 46.dp.toPx()
-                        val centerY    = size.height / 2f
-                        val radius     = indicatorH / 2f
-                        val scaleY     = indicatorScaleY.value
-                        val scaledH    = indicatorH * scaleY
-                        val top        = centerY - scaledH / 2f
-                        val iW         = indicatorWidth.value
-                        val iX         = indicatorX.value
+                        val tabW = animTabWidth.toPx()
+                        val spacing = tabSpacingDp.toPx()
+                        val pad = horizontalPaddingDp.toPx()
+                        val indH = animIndicatorHeight.toPx()
+                        val centerY = size.height / 2f
+                        val radius = indH / 2f
+                        val top = centerY - indH / 2f
 
-                        // Filled pill
+                        val currentLeft = pad + (tabW + spacing) * tabFraction.value
+                        val iW = (tabW - 6.dp.toPx()).coerceAtLeast(0f)
+                        val iX = currentLeft + 3.dp.toPx()
+
                         drawRoundRect(
                             color        = indicatorFill,
                             topLeft      = Offset(iX, top),
-                            size         = Size(iW, scaledH),
+                            size         = Size(iW, indH),
                             cornerRadius = CornerRadius(radius, radius)
                         )
-                        // Stroke ring
                         drawRoundRect(
                             color        = indicatorStroke,
                             topLeft      = Offset(iX + 0.5f, top + 0.5f),
-                            size         = Size(iW - 1f, scaledH - 1f),
+                            size         = Size(iW - 1f, indH - 1f),
                             cornerRadius = CornerRadius(radius, radius),
                             style        = Stroke(width = 1.dp.toPx())
                         )
                     }
             )
 
-            // ── Icons row ─────────────────────────────────────────────────────
+            // Nav Items Row
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(68.dp)
-                    .padding(horizontal = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .height(animCapsuleHeight)
+                    .padding(horizontal = horizontalPaddingDp),
+                horizontalArrangement = Arrangement.spacedBy(tabSpacingDp),
                 verticalAlignment     = Alignment.CenterVertically
             ) {
                 items.forEachIndexed { index, item ->
-                    val isCenter = isCenterFab && index == 1
+                    val isSelected = isCapsuleSelected && currentRoute == item.route
 
                     Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .onGloballyPositioned { coords ->
-                                val rootCenterX = coords.positionInRoot().x + coords.size.width / 2f
-                                val w           = coords.size.width.toFloat()
-                                if (itemRootCentersX.size <= index) {
-                                    itemRootCentersX.add(rootCenterX)
-                                } else {
-                                    itemRootCentersX[index] = rootCenterX
-                                }
-                                if (itemWidths.size <= index) {
-                                    itemWidths.add(w)
-                                } else {
-                                    itemWidths[index] = w
-                                }
+                            .width(animTabWidth)
+                            .height(animCapsuleHeight)
+                            // Accessibility: Tab role + selected state
+                            .semantics {
+                                role = Role.Tab
+                                selected = isSelected
+                                contentDescription = item.label
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (isCenter) {
-                            NexusCenterFabIcon(item = item, onClick = { onItemSelected(item) })
-                        } else {
-                            NexusNavIconWithLabel(
-                                item       = item,
-                                isSelected = currentRoute == item.route,
-                                onClick    = { onItemSelected(item) }
-                            )
-                        }
+                        NexusNavIconWithLabel(
+                            item        = item,
+                            isSelected  = isSelected,
+                            isCollapsed = isCollapsed,
+                            iconSize    = animIconSize,
+                            onClick     = { onItemSelected(item) },
+                            // Long-press on first (Home) item = scroll to top
+                            onLongClick = if (index == 0) onScrollToTop else null
+                        )
                     }
                 }
             }
@@ -336,92 +408,140 @@ fun NexusFloatingBottomNav(
 
 // ─── Regular Nav Icon + Animated Label ───────────────────────────────────────
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun NexusNavIconWithLabel(
     item: NexusNavItem,
     isSelected: Boolean,
-    onClick: () -> Unit
+    isCollapsed: Boolean,
+    iconSize: Dp = 22.dp,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null
 ) {
-    val iconScale        = remember { Animatable(if (isSelected) 1.08f else 1f) }
-    val iconTranslationY = remember { Animatable(0f) }
+    val haptic = LocalHapticFeedback.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
 
+    // Tactile press squish spring
+    val pressScale by animateFloatAsState(
+        targetValue   = if (isPressed) 0.88f else 1f,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = 600f),
+        label         = "navPressScale"
+    )
+
+    // Selection pop-in bounce spring
+    val selectionScale = remember { Animatable(if (isSelected) 1f else 0.94f) }
     LaunchedEffect(isSelected) {
         if (isSelected) {
-            launch {
-                iconTranslationY.animateTo(-6f, spring(dampingRatio = 0.38f, stiffness = 400f))
-                iconTranslationY.animateTo(0f,  spring(dampingRatio = 0.60f, stiffness = 280f))
-            }
-            launch {
-                iconScale.animateTo(1.22f, spring(dampingRatio = 0.38f, stiffness = 380f))
-                iconScale.animateTo(1.08f, spring(dampingRatio = 0.65f, stiffness = 300f))
-            }
+            selectionScale.snapTo(0.80f)
+            selectionScale.animateTo(
+                targetValue   = 1f,
+                animationSpec = spring(
+                    dampingRatio = 0.48f, // energetic, delightful pop
+                    stiffness    = 420f
+                )
+            )
         } else {
-            launch { iconScale.animateTo(1f, spring(dampingRatio = 0.72f, stiffness = 320f)) }
-            launch { iconTranslationY.animateTo(0f, spring(dampingRatio = 0.78f, stiffness = 300f)) }
+            selectionScale.animateTo(
+                targetValue   = 0.94f,
+                animationSpec = spring(
+                    dampingRatio = 0.85f,
+                    stiffness    = 380f
+                )
+            )
         }
     }
 
     val iconTint by animateColorAsState(
         targetValue   = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textSecondary,
-        animationSpec = tween(durationMillis = DurationScreenEnter, easing = EmphasizedDecelerateEasing),
+        animationSpec = tween(durationMillis = 200, easing = EmphasizedDecelerateEasing),
         label         = "iconTint"
     )
 
     val labelAlpha by animateFloatAsState(
-        targetValue   = if (isSelected) 1f else 0.70f,
-        animationSpec = tween(durationMillis = 200, easing = EmphasizedDecelerateEasing),
+        targetValue   = if (isCollapsed) 0f else if (isSelected) 1f else 0.85f,
+        animationSpec = tween(
+            durationMillis = if (isCollapsed) 140 else 200,
+            easing         = if (isCollapsed) FastOutLinearInEasing else LinearOutSlowInEasing
+        ),
         label         = "labelAlpha"
     )
-    val labelScale by animateFloatAsState(
-        targetValue   = if (isSelected) 1f else 0.88f,
-        animationSpec = spring(dampingRatio = 0.65f, stiffness = 380f),
-        label         = "labelScale"
-    )
-    // Icon drifts slightly upward to balance with the label below
-    val iconOffsetY by animateFloatAsState(
-        targetValue   = if (isSelected) -1.5f else 0f,
-        animationSpec = spring(dampingRatio = 0.68f, stiffness = 340f),
-        label         = "iconOffsetY"
+    val labelHeight by animateDpAsState(
+        targetValue   = if (isCollapsed) 0.dp else if (item.label.isEmpty()) 0.dp else 16.dp,
+        animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
+        label         = "labelHeight"
     )
 
+    val totalIconScale = pressScale * selectionScale.value
+    val hasIcon = item.selectedIconRes != null || item.unselectedIconRes != null || item.animRawRes != null || item.selectedIconText.isNotEmpty()
+
     Column(
-        modifier            = Modifier
-            .padding(vertical = 10.dp, horizontal = 4.dp)
-            .springBounceClick(enabled = true, scaleDown = 0.88f, onClick = onClick),
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(CircleShape)
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onClick()
+                },
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongClick?.invoke()
+                }
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Icon (with optional badge)
-        Box(contentAlignment = Alignment.TopEnd) {
-            NavIcon(
-                item         = item,
-                isSelected   = isSelected,
-                tint         = iconTint,
-                scale        = iconScale.value,
-                translationY = iconTranslationY.value + iconOffsetY
-            )
-            if (item.badge > 0) {
-                BadgeDot(count = item.badge)
+        if (hasIcon) {
+            // Icon with crossfade + badge pop-in
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(iconSize)
+            ) {
+                NavIcon(
+                    item       = item,
+                    isSelected = isSelected,
+                    tint       = iconTint,
+                    scale      = totalIconScale,
+                    iconSize   = iconSize
+                )
+                // Badge: shown/hidden with pop-in scale animation inside BadgeDot
+                if (item.badge > 0) {
+                    BadgeDot(count = item.badge)
+                }
+            }
+
+            // Animated label (collapses cleanly when collapsed)
+            if (labelHeight > 0.dp && item.label.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .clipToBounds()
+                    .graphicsLayer { alpha = labelAlpha }
+                    .height(labelHeight)
+                    .padding(top = 2.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                NexusText(
+                    text  = item.label,
+                    color = iconTint,
+                    style = NexusTheme.typography.caption.copy(
+                        fontSize      = 11.sp,
+                        fontWeight    = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                        letterSpacing = 0.2.sp
+                    ),
+                    maxLines = 1
+                )
             }
         }
-
-        // Animated label
-        Box(
-            modifier = Modifier
-                .graphicsLayer {
-                    alpha  = labelAlpha
-                    scaleX = labelScale
-                    scaleY = labelScale
-                }
-                .height(13.dp),
-            contentAlignment = Alignment.Center
-        ) {
+        } else {
             NexusText(
                 text  = item.label,
                 color = iconTint,
-                style = NexusTheme.typography.caption.copy(
-                    fontSize      = 9.5.sp,
-                    fontWeight    = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                style = NexusTheme.typography.body.copy(
+                    fontSize      = if (isSelected) 14.5.sp else 14.sp,
+                    fontWeight    = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                     letterSpacing = 0.3.sp
                 ),
                 maxLines = 1
@@ -430,7 +550,7 @@ private fun NexusNavIconWithLabel(
     }
 }
 
-// ─── Shared icon renderer ─────────────────────────────────────────────────────
+// ─── Shared Icon Renderer — with Crisp Vector Crossfade ──────────────────────
 
 @Composable
 private fun NavIcon(
@@ -438,143 +558,107 @@ private fun NavIcon(
     isSelected: Boolean,
     tint: Color,
     scale: Float,
-    translationY: Float
+    iconSize: Dp = 24.dp
 ) {
     val iconModifier = Modifier
-        .size(22.dp)
+        .size(iconSize)
         .graphicsLayer {
-            scaleX            = scale
-            scaleY            = scale
-            this.translationY = translationY
+            scaleX = scale
+            scaleY = scale
         }
 
-    when {
-        isSelected && item.selectedIconRes != null -> Image(
-            painter            = painterResource(id = item.selectedIconRes),
-            contentDescription = item.label,
-            modifier           = iconModifier,
-            colorFilter        = ColorFilter.tint(tint)
+    val iconRes = if (isSelected) (item.selectedIconRes ?: item.unselectedIconRes) else (item.unselectedIconRes ?: item.selectedIconRes)
+
+    if (iconRes != null) {
+        Crossfade(
+            targetState   = isSelected,
+            animationSpec = tween(durationMillis = 200, easing = EmphasizedDecelerateEasing),
+            label         = "iconCrossfade"
+        ) { selected ->
+            val res = if (selected) (item.selectedIconRes ?: iconRes) else (item.unselectedIconRes ?: iconRes)
+            Image(
+                painter            = painterResource(id = res),
+                contentDescription = item.label,
+                modifier           = iconModifier,
+                colorFilter        = ColorFilter.tint(tint)
+            )
+        }
+    } else if (item.animRawRes != null) {
+        LottieNavIcon(
+            animRes = item.animRawRes,
+            isSelected = isSelected,
+            tint = tint,
+            modifier = iconModifier
         )
-        !isSelected && item.unselectedIconRes != null -> Image(
-            painter            = painterResource(id = item.unselectedIconRes),
-            contentDescription = item.label,
-            modifier           = iconModifier,
-            colorFilter        = ColorFilter.tint(tint)
-        )
-        else -> NexusText(
+    } else {
+        NexusText(
             text     = if (isSelected) item.selectedIconText else item.unselectedIconText,
             color    = tint,
             style    = NexusTheme.typography.h2,
             modifier = Modifier.graphicsLayer {
-                scaleX            = scale
-                scaleY            = scale
-                this.translationY = translationY
+                scaleX = scale
+                scaleY = scale
             }
         )
     }
 }
-
-// ─── Center FAB ───────────────────────────────────────────────────────────────
 
 @Composable
-private fun NexusCenterFabIcon(
-    item: NexusNavItem,
-    onClick: () -> Unit
+private fun LottieNavIcon(
+    @RawRes animRes: Int,
+    isSelected: Boolean,
+    tint: Color,
+    modifier: Modifier = Modifier
 ) {
-    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(animRes))
+    val animatable = rememberLottieAnimatable()
 
-    // Breathing glow ring
-    val pulseTransition = rememberInfiniteTransition(label = "fabPulse")
-    val pulseAlpha by pulseTransition.animateFloat(
-        initialValue  = 0.55f,
-        targetValue   = 0.08f,
-        animationSpec = infiniteRepeatable(
-            animation  = tween(1800, easing = com.nexus.core.ui.animations.EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "fabPulseAlpha"
-    )
-    val pulseScale by pulseTransition.animateFloat(
-        initialValue  = 1.00f,
-        targetValue   = 1.38f,
-        animationSpec = infiniteRepeatable(
-            animation  = tween(1800, easing = com.nexus.core.ui.animations.EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "fabPulseScale"
-    )
-
-    val fabBg     = NexusTheme.colors.primary
-    val fabFg     = NexusTheme.colors.onPrimary
-    val glowColor = NexusTheme.colors.primary
-
-    Box(
-        modifier         = Modifier.size(60.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        // Pulsing radial glow behind button
-        Box(
-            modifier = Modifier
-                .size(60.dp)
-                .graphicsLayer {
-                    scaleX = pulseScale
-                    scaleY = pulseScale
-                    alpha  = pulseAlpha
-                }
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            glowColor.copy(alpha = 0.50f),
-                            glowColor.copy(alpha = 0.20f),
-                            Color.Transparent
-                        ),
-                        radius = 90f
-                    ),
-                    shape = CircleShape
-                )
+    val colorFilter = remember(tint) {
+        PorterDuffColorFilter(tint.toArgb(), PorterDuff.Mode.SRC_ATOP)
+    }
+    val dynamicProperties = rememberLottieDynamicProperties(
+        rememberLottieDynamicProperty(
+            property = LottieProperty.COLOR_FILTER,
+            value = colorFilter,
+            keyPath = arrayOf("**")
         )
+    )
 
-        // FAB button
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .shadow(
-                    elevation    = 12.dp,
-                    shape        = CircleShape,
-                    spotColor    = glowColor.copy(alpha = if (isDark) 0.65f else 0.35f),
-                    ambientColor = glowColor.copy(alpha = if (isDark) 0.30f else 0.14f)
-                )
-                .clip(CircleShape)
-                .background(fabBg)
-                .springBounceClick(enabled = true, scaleDown = 0.84f, onClick = onClick),
-            contentAlignment = Alignment.Center
-        ) {
-            if (item.selectedIconRes != null) {
-                Image(
-                    painter            = painterResource(id = item.selectedIconRes),
-                    contentDescription = item.label,
-                    modifier           = Modifier.size(20.dp),
-                    colorFilter        = ColorFilter.tint(fabFg)
-                )
-            } else {
-                NexusText(
-                    text  = item.selectedIconText,
-                    color = fabFg,
-                    style = NexusTheme.typography.h2
-                )
-            }
+    LaunchedEffect(isSelected, composition) {
+        val comp = composition ?: return@LaunchedEffect
+        if (isSelected) {
+            animatable.animate(
+                composition = comp,
+                iterations = 1,
+                speed = 1.25f,
+                initialProgress = 0f
+            )
+        } else {
+            animatable.snapTo(comp, 0f)
         }
     }
+
+    LottieAnimation(
+        composition = composition,
+        progress = { animatable.progress },
+        dynamicProperties = dynamicProperties,
+        modifier = modifier
+    )
 }
 
-// ─── Badge Dot ────────────────────────────────────────────────────────────────
+// ─── Badge Dot — with scale pop-in animation ──────────────────────────────────
 
 @Composable
 private fun BadgeDot(count: Int) {
+    val scale = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        scale.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 480f))
+    }
     Box(
         modifier = Modifier
-            .offset(x = 8.dp, y = (-5).dp)
+            .offset(x = 6.dp, y = (-3).dp)
             .size(15.dp)
+            .graphicsLayer { scaleX = scale.value; scaleY = scale.value }
             .clip(CircleShape)
             .background(NexusTheme.colors.error),
         contentAlignment = Alignment.Center

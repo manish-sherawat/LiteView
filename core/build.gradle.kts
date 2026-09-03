@@ -59,6 +59,9 @@ dependencies {
     // Navigation
     implementation(libs.navigation.compose)
 
+    // Lottie Animations
+    implementation(libs.lottie.compose)
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

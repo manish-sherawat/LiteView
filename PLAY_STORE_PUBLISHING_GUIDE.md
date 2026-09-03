@@ -25,7 +25,34 @@ Welcome to the official publishing guide for **LiteView** (`v2.5.3`). This guide
 
 ## 📦 2. Build & Release Bundle (.aab)
 
-To generate the signed Android App Bundle (`.aab`) for Google Play upload:
+> [!IMPORTANT]
+> **Why Play Store reported "File in Debug Mode":**
+> Previous builds assigned `signingConfig = signingConfigs.getByName("debug")` under the release build type, causing Play Console to detect the standard Android debug certificate and reject the bundle. This issue has been fixed in [app/build.gradle.kts](file:///d:/Kotlin/Dex%20Files/NexusDocsViewer/app/build.gradle.kts).
+
+### Step 1: Create a Release Keystore (One-Time Setup)
+
+Generate a production keystore using `keytool` from your terminal:
+
+```powershell
+keytool -genkey -v -keystore release.keystore -alias liteview -keyalg RSA -keysize 2048 -validity 10000
+```
+
+### Step 2: Configure `keystore.properties`
+
+Create a file named `keystore.properties` in the root of the project (this file is ignored by `.gitignore`):
+
+```properties
+storeFile=../release.keystore
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=liteview
+keyPassword=YOUR_KEY_PASSWORD
+```
+
+*(Note: `storeFile=../release.keystore` points to `release.keystore` located in the root directory relative to the `app` module).*
+
+### Step 3: Generate the Release Bundle
+
+Run the release bundle command:
 
 ```powershell
 .\gradlew.bat bundleRelease
@@ -33,8 +60,7 @@ To generate the signed Android App Bundle (`.aab`) for Google Play upload:
 
 ### Output Bundle Details
 - **Location**: `app/build/outputs/bundle/release/app-release.aab`
-- **File Size**: `~39.8 MB`
-- **Build Status**: Verified release build with R8 minification enabled.
+- **Build Status**: Production release build (`isDebuggable = false`) signed with your release key, with R8 minification and resource shrinking enabled.
 
 ---
 

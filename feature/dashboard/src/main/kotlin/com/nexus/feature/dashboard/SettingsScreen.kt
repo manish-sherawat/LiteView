@@ -84,12 +84,16 @@ fun SettingsScreen(
 ) {
     val uiState        by viewModel.uiState.collectAsStateWithLifecycle()
     val updateState    by viewModel.updateState.collectAsStateWithLifecycle()
+    val availableTags  by viewModel.availableTags.collectAsStateWithLifecycle()
+    val documents      by viewModel.documents.collectAsStateWithLifecycle()
     val changelogState by viewModel.changelogState.collectAsStateWithLifecycle()
     val context        = LocalContext.current
 
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var showChangelogDialog  by remember { mutableStateOf(false) }
     var showThemeDialog      by remember { mutableStateOf(false) }
+    var showLicensesDialog   by remember { mutableStateOf(false) }
+    var showTagManagerScreen by remember { mutableStateOf(false) }
 
     LaunchedEffect(showChangelogDialog) {
         onChangelogVisibilityChanged(showChangelogDialog)
@@ -156,6 +160,34 @@ fun SettingsScreen(
         }
     }
 
+    if (showTagManagerScreen) {
+        TagManagerScreen(
+            tags = availableTags,
+            documents = documents,
+            onBack = { showTagManagerScreen = false },
+            onRenameTag = { oldName, newName, colorHex, emoji ->
+                viewModel.renameTagGlobally(oldName, newName, colorHex, emoji)
+            },
+            onUpsertTag = { name, colorHex, emoji ->
+                viewModel.upsertTagDefinition(name, colorHex, emoji)
+            },
+            onDeleteTag = { name ->
+                viewModel.deleteTagGlobally(name)
+            },
+            onOpenDocument = { doc ->
+                showTagManagerScreen = false
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(Uri.parse(doc.uri), doc.mimeType)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(intent)
+                } catch (_: Exception) {}
+            }
+        )
+        return
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -197,17 +229,16 @@ fun SettingsScreen(
                     modifier = Modifier.fadeSlideIn(delay = 60, offsetY = 16.dp)
                 ) {
                     val themeText = when (uiState.themeMode) {
+                        ThemeMode.SYSTEM -> "System Default"
                         ThemeMode.LIGHT  -> "Light"
                         ThemeMode.DARK   -> "Dark"
-                        ThemeMode.AMOLED -> "Pitch Black (AMOLED)"
+                        ThemeMode.AMOLED -> "AMOLED Black"
                         ThemeMode.SEPIA  -> "Sepia"
                         ThemeMode.FOREST -> "Forest"
                         ThemeMode.SUNSET -> "Sunset"
-                        ThemeMode.SYSTEM -> "System Default"
                     }
                     SettingsNavRow(
                         iconRes  = R.drawable.ic_theme,
-                        iconTint = NexusTheme.colors.primary,
                         title    = "Theme",
                         value    = themeText,
                         onClick  = { showThemeDialog = true }
@@ -223,7 +254,6 @@ fun SettingsScreen(
                 ) {
                     SettingsSwitchRow(
                         iconRes         = R.drawable.ic_book,
-                        iconTint        = Color(0xFF10B981),
                         title           = "Remember Position",
                         subtitle        = "Resume where you left off",
                         checked         = uiState.rememberReadingPosition,
@@ -232,7 +262,6 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsSwitchRow(
                         iconRes         = R.drawable.ic_screen_awake,
-                        iconTint        = Color(0xFFF59E0B),
                         title           = "Keep Screen Awake",
                         subtitle        = "Prevent sleep while reading",
                         checked         = uiState.keepScreenAwake,
@@ -249,7 +278,6 @@ fun SettingsScreen(
                 ) {
                     SettingsSwitchRow(
                         iconRes         = R.drawable.ic_haptic,
-                        iconTint        = Color(0xFF6366F1),
                         title           = "Haptic Feedback",
                         subtitle        = "Vibrate on button taps and interactions",
                         checked         = uiState.hapticFeedbackEnabled,
@@ -258,11 +286,17 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsSwitchRow(
                         iconRes         = R.drawable.ic_view_grid,
-                        iconTint        = Color(0xFF0EA5E9),
                         title           = "Default to Grid View",
                         subtitle        = "Show documents in a grid layout by default",
                         checked         = uiState.defaultIsGridView,
                         onCheckedChange = { viewModel.setDefaultIsGridView(it) }
+                    )
+                    SettingsDivider()
+                    SettingsNavRow(
+                        iconRes  = R.drawable.ic_tag,
+                        title    = "Tag Library",
+                        value    = if (availableTags.isEmpty()) "Manage" else "${availableTags.size} tags",
+                        onClick  = { showTagManagerScreen = true }
                     )
                     SettingsDivider()
                     SettingsDestructiveRow(
@@ -289,22 +323,20 @@ fun SettingsScreen(
                 }
             }
 
-            // ── About ────────────────────────────────────────────────────────
+            // ── About & Legal ────────────────────────────────────────────────
             item {
                 SettingsSectionGroup(
-                    label    = "About",
+                    label    = "About & Legal",
                     modifier = Modifier.fadeSlideIn(delay = 300, offsetY = 16.dp)
                 ) {
                     SettingsInfoRow(
                         iconRes  = R.drawable.ic_info,
-                        iconTint = Color(0xFF64748B),
                         title    = "App Version",
                         value    = uiState.appVersion
                     )
                     SettingsDivider()
                     SettingsNavRow(
                         iconRes  = R.drawable.ic_changelog,
-                        iconTint = Color(0xFFF43F5E),
                         title    = "Changelog",
                         value    = "What's new",
                         onClick  = {
@@ -315,7 +347,6 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsNavRow(
                         iconRes  = R.drawable.ic_update_progress,
-                        iconTint = Color(0xFF0284C7),
                         title    = "Check for Updates",
                         value    = when (updateState) {
                             is UpdateState.Checking    -> "Checking…"
@@ -326,6 +357,27 @@ fun SettingsScreen(
                             else                       -> "Tap to check"
                         },
                         onClick = { viewModel.checkForUpdates() }
+                    )
+                    SettingsDivider()
+                    SettingsNavRow(
+                        iconRes  = R.drawable.ic_lock,
+                        title    = "Privacy Policy",
+                        value    = "100% Offline",
+                        onClick  = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://lite-view.vercel.app/privacy.html"))
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                                Toast.makeText(context, "Could not open browser", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
+                    SettingsDivider()
+                    SettingsNavRow(
+                        iconRes  = R.drawable.ic_startup,
+                        title    = "Open Source Licenses",
+                        value    = "Libraries",
+                        onClick  = { showLicensesDialog = true }
                     )
                 }
             }
@@ -392,6 +444,10 @@ fun SettingsScreen(
             onDismiss       = { showThemeDialog = false }
         )
     }
+
+    if (showLicensesDialog) {
+        LicensesDialog(onDismiss = { showLicensesDialog = false })
+    }
 }
 
 // ─── Section group ────────────────────────────────────────────────────────────
@@ -400,20 +456,45 @@ fun SettingsScreen(
 private fun SettingsSectionGroup(
     label: String,
     modifier: Modifier = Modifier,
+    badge: String? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(modifier = modifier) {
         // Section label
-        NexusText(
-            text     = label,
-            style    = NexusTheme.typography.label.copy(
-                fontSize      = 11.sp,
-                fontWeight    = FontWeight.SemiBold,
-                letterSpacing = 0.6.sp
-            ),
-            color    = NexusTheme.colors.textSecondary,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-        )
+        ) {
+            NexusText(
+                text     = label,
+                style    = NexusTheme.typography.label.copy(
+                    fontSize      = 11.sp,
+                    fontWeight    = FontWeight.SemiBold,
+                    letterSpacing = 0.6.sp
+                ),
+                color    = NexusTheme.colors.textSecondary
+            )
+            if (badge != null) {
+                Spacer(modifier = Modifier.width(6.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(NexusTheme.colors.primary.copy(alpha = 0.15f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    NexusText(
+                        text = badge.uppercase(),
+                        style = NexusTheme.typography.caption.copy(
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 0.5.sp
+                        ),
+                        color = NexusTheme.colors.primary
+                    )
+                }
+            }
+        }
         // Card shell
         Box(
             modifier = Modifier
@@ -447,7 +528,7 @@ private fun SettingsNavRow(
     value:    String,
     onClick:  () -> Unit,
     iconRes:  Int,
-    iconTint: Color = NexusTheme.colors.primary
+    iconTint: Color = NexusTheme.colors.textPrimary
 ) {
     Row(
         modifier = Modifier
@@ -460,7 +541,7 @@ private fun SettingsNavRow(
             modifier = Modifier
                 .size(38.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(iconTint.copy(alpha = 0.12f)),
+                .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.7f)),
             contentAlignment = Alignment.Center
         ) {
             Image(
@@ -498,7 +579,7 @@ private fun SettingsSwitchRow(
     checked:         Boolean,
     onCheckedChange: (Boolean) -> Unit,
     iconRes:         Int,
-    iconTint:        Color = NexusTheme.colors.primary
+    iconTint:        Color = NexusTheme.colors.textPrimary
 ) {
     Row(
         modifier = Modifier
@@ -511,7 +592,7 @@ private fun SettingsSwitchRow(
             modifier = Modifier
                 .size(38.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(iconTint.copy(alpha = 0.12f)),
+                .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.7f)),
             contentAlignment = Alignment.Center
         ) {
             Image(
@@ -591,7 +672,7 @@ private fun SettingsPermissionRow(
     isGranted: Boolean,
     onClick:   (() -> Unit)?,
     iconRes:   Int,
-    iconTint:  Color = if (isGranted) Color(0xFF14B8A6) else NexusTheme.colors.error
+    iconTint:  Color = NexusTheme.colors.textPrimary
 ) {
     val statusColor = if (isGranted) NexusTheme.colors.success else NexusTheme.colors.error
 
@@ -606,7 +687,7 @@ private fun SettingsPermissionRow(
             modifier = Modifier
                 .size(38.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(iconTint.copy(alpha = 0.12f)),
+                .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.7f)),
             contentAlignment = Alignment.Center
         ) {
             Image(
@@ -665,7 +746,7 @@ private fun SettingsInfoRow(
     title:    String,
     value:    String,
     iconRes:  Int,
-    iconTint: Color = NexusTheme.colors.primary
+    iconTint: Color = NexusTheme.colors.textPrimary
 ) {
     Row(
         modifier = Modifier
@@ -677,7 +758,7 @@ private fun SettingsInfoRow(
             modifier = Modifier
                 .size(38.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(iconTint.copy(alpha = 0.12f)),
+                .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.7f)),
             contentAlignment = Alignment.Center
         ) {
             Image(
@@ -724,13 +805,10 @@ private fun ThemeSelectionDialog(
     onDismiss:       () -> Unit
 ) {
     val options = listOf(
-        Triple(ThemeMode.SYSTEM, "System Default",        R.drawable.ic_theme_system),
-        Triple(ThemeMode.LIGHT,  "Light",                 R.drawable.ic_theme_light),
-        Triple(ThemeMode.DARK,   "Dark",                  R.drawable.ic_theme_dark),
-        Triple(ThemeMode.AMOLED, "Pitch Black (AMOLED)",  R.drawable.ic_theme_dark),
-        Triple(ThemeMode.SEPIA,  "Sepia",                 R.drawable.ic_theme_sepia),
-        Triple(ThemeMode.FOREST, "Forest",                R.drawable.ic_theme_forest),
-        Triple(ThemeMode.SUNSET, "Sunset",                R.drawable.ic_theme_sunset)
+        Triple(ThemeMode.LIGHT,  "Light",          R.drawable.ic_theme_light),
+        Triple(ThemeMode.SEPIA,  "Sepia",          R.drawable.ic_theme_sepia),
+        Triple(ThemeMode.FOREST, "Forest",         R.drawable.ic_theme_forest),
+        Triple(ThemeMode.SUNSET, "Sunset",         R.drawable.ic_theme_sunset)
     )
 
     val sheetState = androidx.compose.material3.rememberModalBottomSheetState()
@@ -783,22 +861,18 @@ private fun ThemeSelectionDialog(
                 val isSelected  = currentTheme == mode
                 val accentColor = when (mode) {
                     ThemeMode.LIGHT  -> Color(0xFF2563EB)
-                    ThemeMode.DARK   -> Color(0xFF60A5FA)
-                    ThemeMode.AMOLED -> Color(0xFF38BDF8)
                     ThemeMode.SEPIA  -> Color(0xFFD97706)
                     ThemeMode.FOREST -> Color(0xFF10B981)
                     ThemeMode.SUNSET -> Color(0xFFF43F5E)
-                    ThemeMode.SYSTEM -> NexusTheme.colors.primary
+                    else             -> NexusTheme.colors.primary
                 }
 
                 val swatchColor = when (mode) {
                     ThemeMode.LIGHT  -> Color(0xFFF8F9FA)
-                    ThemeMode.DARK   -> Color(0xFF1E1E1E)
-                    ThemeMode.AMOLED -> Color.Black
                     ThemeMode.SEPIA  -> Color(0xFFF4ECD8)
                     ThemeMode.FOREST -> Color(0xFF1F2E20)
                     ThemeMode.SUNSET -> Color(0xFF2E1C2B)
-                    ThemeMode.SYSTEM -> NexusTheme.colors.surfaceVariant
+                    else             -> NexusTheme.colors.background
                 }
 
                 val contentColor by animateColorAsState(
@@ -876,6 +950,59 @@ private fun ThemeSelectionDialog(
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
+}
+
+// ─── Open Source Licenses Dialog ──────────────────────────────────────────────
+
+@Composable
+private fun LicensesDialog(onDismiss: () -> Unit) {
+    val libraries = listOf(
+        Pair("MuPDF 1.23", "High-performance PDF rendering engine (AGPL / Commercial license)"),
+        Pair("Jetpack Compose & Kotlin", "Modern declarative UI framework & Coroutines by Google / JetBrains (Apache 2.0)"),
+        Pair("Hilt & Dagger", "Dependency injection framework by Google (Apache 2.0)"),
+        Pair("Jetpack DataStore", "Robust, asynchronous key-value storage by Google (Apache 2.0)"),
+        Pair("Apache POI", "Java API for Microsoft Documents (Apache 2.0)"),
+        Pair("Material Components", "Modular and customizable Material Design UI components (Apache 2.0)")
+    )
+    NexusDialog(
+        onDismissRequest = onDismiss,
+        title = { NexusText("Open Source Licenses", style = NexusTheme.typography.h2) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                libraries.forEach { (name, desc) ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.6f))
+                            .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                            .padding(12.dp)
+                    ) {
+                        NexusText(
+                            text = name,
+                            style = NexusTheme.typography.body.copy(fontWeight = FontWeight.SemiBold),
+                            color = NexusTheme.colors.textPrimary
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        NexusText(
+                            text = desc,
+                            style = NexusTheme.typography.caption,
+                            color = NexusTheme.colors.textSecondary
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            NexusButton(
+                text = "Close",
+                onClick = onDismiss
+            )
+        }
+    )
 }
 
 // ─── Changelog full-screen ────────────────────────────────────────────────────

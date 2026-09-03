@@ -70,13 +70,10 @@ class UserPreferencesRepository @Inject constructor(
     /** Reactive stream of the current theme preference. */
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
         when (prefs[Keys.THEME_MODE]) {
-            ThemeMode.LIGHT.name -> ThemeMode.LIGHT
-            ThemeMode.DARK.name -> ThemeMode.DARK
-            ThemeMode.AMOLED.name -> ThemeMode.AMOLED
             ThemeMode.SEPIA.name -> ThemeMode.SEPIA
             ThemeMode.FOREST.name -> ThemeMode.FOREST
             ThemeMode.SUNSET.name -> ThemeMode.SUNSET
-            else -> ThemeMode.SYSTEM
+            else -> ThemeMode.LIGHT
         }
     }
 

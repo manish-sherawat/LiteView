@@ -764,7 +764,7 @@ class PdfReaderViewModel @Inject constructor(
             } catch (e: Exception) {
                 e.printStackTrace()
                 withContext(Dispatchers.Main) {
-                    onResult(true)
+                    onResult(false)
                 }
             }
         }
@@ -811,7 +811,7 @@ class PdfReaderViewModel @Inject constructor(
         val totalPages = mupdfDocument?.countPages() ?: 0
         
         for (i in 0 until totalPages) {
-            val pageBitmap = renderPageToBitmapSync(i, 1200)
+            val pageBitmap = renderPageToBitmapSync(i, 2000)
             if (pageBitmap != null) {
                 val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(pageBitmap.width, pageBitmap.height, i + 1).create()
                 val page = pdfDoc.startPage(pageInfo)
@@ -851,56 +851,149 @@ class PdfReaderViewModel @Inject constructor(
             }
         }
         
-        if (item.tool == com.nexus.feature.reader.pdf.components.AnnotationTool.Shapes && item.points.size >= 2) {
-            val p1 = item.points[0]
-            val p2 = item.points[1]
-            val x1 = p1.x * pageWidth
-            val y1 = p1.y * pageHeight
-            val x2 = p2.x * pageWidth
-            val y2 = p2.y * pageHeight
-            
-            when (item.shapeType) {
-                com.nexus.feature.reader.pdf.components.ShapeType.Rectangle -> {
-                    val rect = android.graphics.RectF(minOf(x1, x2), minOf(y1, y2), maxOf(x1, x2), maxOf(y1, y2))
-                    canvas.drawRect(rect, paint)
-                }
-                com.nexus.feature.reader.pdf.components.ShapeType.Oval -> {
-                    val rect = android.graphics.RectF(minOf(x1, x2), minOf(y1, y2), maxOf(x1, x2), maxOf(y1, y2))
-                    canvas.drawOval(rect, paint)
-                }
-                com.nexus.feature.reader.pdf.components.ShapeType.Line -> {
-                    canvas.drawLine(x1, y1, x2, y2, paint)
-                }
-                com.nexus.feature.reader.pdf.components.ShapeType.Arrow -> {
-                    canvas.drawLine(x1, y1, x2, y2, paint)
-                    val angle = Math.atan2((y2 - y1).toDouble(), (x2 - x1).toDouble())
-                    val arrowSize = 25f
-                    val xA = (x2 - arrowSize * Math.cos(angle - Math.PI / 6)).toFloat()
-                    val yA = (y2 - arrowSize * Math.sin(angle - Math.PI / 6)).toFloat()
-                    val xB = (x2 - arrowSize * Math.cos(angle + Math.PI / 6)).toFloat()
-                    val yB = (y2 - arrowSize * Math.sin(angle + Math.PI / 6)).toFloat()
-                    canvas.drawLine(x2, y2, xA, yA, paint)
-                    canvas.drawLine(x2, y2, xB, yB, paint)
-                }
-                else -> {
-                    canvas.drawLine(x1, y1, x2, y2, paint)
+        when (item.tool) {
+            com.nexus.feature.reader.pdf.components.AnnotationTool.Text -> {
+                val textStr = item.text ?: ""
+                if (item.points.isNotEmpty() && textStr.isNotEmpty()) {
+                    val pt = item.points.first()
+                    val textPaint = android.graphics.Paint().apply {
+                        color = item.color.toArgb()
+                        textSize = (item.strokeWidth * (pageWidth / 400f) * 4f).coerceIn(24f * (pageWidth / 800f), 64f * (pageWidth / 800f))
+                        isAntiAlias = true
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    }
+                    val lines = textStr.split("\n")
+                    val lineHeight = textPaint.fontSpacing
+                    val startY = pt.y * pageHeight - textPaint.fontMetrics.ascent
+                    lines.forEachIndexed { idx, line ->
+                        canvas.drawText(line, pt.x * pageWidth, startY + (idx * lineHeight), textPaint)
+                    }
                 }
             }
-        } else if (item.points.isNotEmpty()) {
-            if (item.points.size == 1) {
-                val pt = item.points.first()
-                val dotRadius = (paint.strokeWidth / 2f).coerceAtLeast(3f)
-                val fillPaint = android.graphics.Paint(paint).apply { style = android.graphics.Paint.Style.FILL }
-                canvas.drawCircle(pt.x * pageWidth, pt.y * pageHeight, dotRadius, fillPaint)
-            } else {
-                val path = android.graphics.Path()
-                val first = item.points.first()
-                path.moveTo(first.x * pageWidth, first.y * pageHeight)
-                for (i in 1 until item.points.size) {
-                    val pt = item.points[i]
-                    path.lineTo(pt.x * pageWidth, pt.y * pageHeight)
+            com.nexus.feature.reader.pdf.components.AnnotationTool.Stamp -> {
+                if (item.points.isNotEmpty()) {
+                    val pt = item.points.first()
+                    val stamp = item.stampType ?: com.nexus.feature.reader.pdf.components.StampType.APPROVED
+                    val stampColor = stamp.colorHex.toInt()
+                    val badgeW = 160f * (pageWidth / 800f)
+                    val badgeH = 50f * (pageWidth / 800f)
+                    val cx = pt.x * pageWidth
+                    val cy = pt.y * pageHeight
+                    val rect = android.graphics.RectF(cx - badgeW / 2f, cy - badgeH / 2f, cx + badgeW / 2f, cy + badgeH / 2f)
+
+                    val bgPaint = android.graphics.Paint().apply {
+                        color = stampColor
+                        alpha = 40
+                        style = android.graphics.Paint.Style.FILL
+                    }
+                    val borderPaint = android.graphics.Paint().apply {
+                        color = stampColor
+                        style = android.graphics.Paint.Style.STROKE
+                        strokeWidth = 3f * (pageWidth / 800f)
+                        isAntiAlias = true
+                    }
+                    val textPaint = android.graphics.Paint().apply {
+                        color = stampColor
+                        textSize = 18f * (pageWidth / 800f)
+                        isAntiAlias = true
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                        textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                    canvas.drawRoundRect(rect, 10f * (pageWidth / 800f), 10f * (pageWidth / 800f), bgPaint)
+                    canvas.drawRoundRect(rect, 10f * (pageWidth / 800f), 10f * (pageWidth / 800f), borderPaint)
+                    canvas.drawText(stamp.label, cx, cy + 6f * (pageWidth / 800f), textPaint)
                 }
-                canvas.drawPath(path, paint)
+            }
+            com.nexus.feature.reader.pdf.components.AnnotationTool.Ruler -> {
+                if (item.points.size >= 2) {
+                    val p1 = item.points[0]
+                    val p2 = item.points[1]
+                    val start = android.graphics.PointF(p1.x * pageWidth, p1.y * pageHeight)
+                    val end = android.graphics.PointF(p2.x * pageWidth, p2.y * pageHeight)
+                    canvas.drawLine(start.x, start.y, end.x, end.y, paint)
+
+                    val angle = Math.atan2((end.y - start.y).toDouble(), (end.x - start.x).toDouble())
+                    val perp = angle + Math.PI / 2.0
+                    val tickLen = 14f * (pageWidth / 800f)
+                    canvas.drawLine(
+                        (start.x + tickLen * Math.cos(perp)).toFloat(), (start.y + tickLen * Math.sin(perp)).toFloat(),
+                        (start.x - tickLen * Math.cos(perp)).toFloat(), (start.y - tickLen * Math.sin(perp)).toFloat(),
+                        paint
+                    )
+                    canvas.drawLine(
+                        (end.x + tickLen * Math.cos(perp)).toFloat(), (end.y + tickLen * Math.sin(perp)).toFloat(),
+                        (end.x - tickLen * Math.cos(perp)).toFloat(), (end.y - tickLen * Math.sin(perp)).toFloat(),
+                        paint
+                    )
+
+                    val normDist = Math.hypot((p2.x - p1.x).toDouble(), (p2.y - p1.y).toDouble()).toFloat()
+                    val cm = (normDist * 595.28f) * (2.54f / 72f)
+                    val labelPaint = android.graphics.Paint().apply {
+                        color = item.color.toArgb()
+                        textSize = 20f * (pageWidth / 800f)
+                        isAntiAlias = true
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                        textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                    canvas.drawText(String.format(java.util.Locale.US, "%.1f cm", cm), (start.x + end.x) / 2f, (start.y + end.y) / 2f - 10f * (pageWidth / 800f), labelPaint)
+                }
+            }
+            com.nexus.feature.reader.pdf.components.AnnotationTool.Shapes -> {
+                if (item.points.size >= 2) {
+                    val p1 = item.points[0]
+                    val p2 = item.points[1]
+                    val x1 = p1.x * pageWidth
+                    val y1 = p1.y * pageHeight
+                    val x2 = p2.x * pageWidth
+                    val y2 = p2.y * pageHeight
+                    
+                    when (item.shapeType) {
+                        com.nexus.feature.reader.pdf.components.ShapeType.Rectangle -> {
+                            val rect = android.graphics.RectF(minOf(x1, x2), minOf(y1, y2), maxOf(x1, x2), maxOf(y1, y2))
+                            canvas.drawRect(rect, paint)
+                        }
+                        com.nexus.feature.reader.pdf.components.ShapeType.Oval -> {
+                            val rect = android.graphics.RectF(minOf(x1, x2), minOf(y1, y2), maxOf(x1, x2), maxOf(y1, y2))
+                            canvas.drawOval(rect, paint)
+                        }
+                        com.nexus.feature.reader.pdf.components.ShapeType.Line -> {
+                            canvas.drawLine(x1, y1, x2, y2, paint)
+                        }
+                        com.nexus.feature.reader.pdf.components.ShapeType.Arrow -> {
+                            canvas.drawLine(x1, y1, x2, y2, paint)
+                            val angle = Math.atan2((y2 - y1).toDouble(), (x2 - x1).toDouble())
+                            val arrowSize = 25f * (pageWidth / 800f)
+                            val xA = (x2 - arrowSize * Math.cos(angle - Math.PI / 6)).toFloat()
+                            val yA = (y2 - arrowSize * Math.sin(angle - Math.PI / 6)).toFloat()
+                            val xB = (x2 - arrowSize * Math.cos(angle + Math.PI / 6)).toFloat()
+                            val yB = (y2 - arrowSize * Math.sin(angle + Math.PI / 6)).toFloat()
+                            canvas.drawLine(x2, y2, xA, yA, paint)
+                            canvas.drawLine(x2, y2, xB, yB, paint)
+                        }
+                        else -> {
+                            canvas.drawLine(x1, y1, x2, y2, paint)
+                        }
+                    }
+                }
+            }
+            else -> {
+                if (item.points.isNotEmpty()) {
+                    if (item.points.size == 1) {
+                        val pt = item.points.first()
+                        val dotRadius = (paint.strokeWidth / 2f).coerceAtLeast(3f * (pageWidth / 800f))
+                        val fillPaint = android.graphics.Paint(paint).apply { style = android.graphics.Paint.Style.FILL }
+                        canvas.drawCircle(pt.x * pageWidth, pt.y * pageHeight, dotRadius, fillPaint)
+                    } else {
+                        val path = android.graphics.Path()
+                        val first = item.points.first()
+                        path.moveTo(first.x * pageWidth, first.y * pageHeight)
+                        for (i in 1 until item.points.size) {
+                            val pt = item.points[i]
+                            path.lineTo(pt.x * pageWidth, pt.y * pageHeight)
+                        }
+                        canvas.drawPath(path, paint)
+                    }
+                }
             }
         }
     }

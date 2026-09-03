@@ -83,8 +83,7 @@ fun FileGridItemShimmer(modifier: Modifier = Modifier) {
 
     NexusCard(
         modifier = modifier
-            .aspectRatio(0.7f)
-            .padding(4.dp)
+            .padding(0.dp)
             .shadow(
                 elevation = 2.dp, 
                 shape = NexusTheme.shapes.large,
@@ -93,53 +92,39 @@ fun FileGridItemShimmer(modifier: Modifier = Modifier) {
             )
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
+            modifier = Modifier.fillMaxWidth()
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(96.dp)
-                    .clip(NexusTheme.shapes.small)
+                    .aspectRatio(0.82f)
                     .background(shimmerBg)
                     .shimmerEffect()
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
-
             Column(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.8f)
-                        .height(12.dp)
+                        .fillMaxWidth(0.85f)
+                        .height(11.dp)
                         .clip(NexusTheme.shapes.small)
                         .background(shimmerBg)
                         .shimmerEffect()
                 )
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.5f)
-                        .height(12.dp)
+                        .fillMaxWidth(0.55f)
+                        .height(9.dp)
                         .clip(NexusTheme.shapes.small)
                         .background(shimmerBg)
                         .shimmerEffect()
                 )
             }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Box(
-                modifier = Modifier
-                    .width(48.dp)
-                    .height(10.dp)
-                    .clip(NexusTheme.shapes.pill)
-                    .background(shimmerBg)
-                    .shimmerEffect()
-            )
         }
     }
 }

@@ -12,33 +12,63 @@ enum class DocumentType {
     UNKNOWN;
 
     companion object {
+        private val TXT_EXTENSIONS = setOf(
+            "txt", "log",
+            "md", "markdown", "rst",
+            "json", "jsonl", "geojson",
+            "xml",
+            "yaml", "yml",
+            "toml",
+            "ini", "cfg", "conf",
+            "csv", "tsv",
+            "html", "htm",
+            "css", "scss", "sass", "less",
+            "js", "mjs", "cjs", "ts",
+            "svg",
+            "kt", "java", "py", "c", "cpp", "h", "cs", "rb", "sh", "sql"
+        )
+
+        private val TXT_MIME_TYPES = setOf(
+            "text/plain", "text/markdown", "text/x-markdown",
+            "application/json", "text/json", "application/geo+json", "application/x-ndjson", "application/jsonlines",
+            "text/xml", "application/xml",
+            "text/yaml", "text/x-yaml", "application/x-yaml", "application/yaml",
+            "application/toml", "text/x-toml",
+            "text/csv", "text/tab-separated-values", "text/tsv",
+            "text/html", "application/xhtml+xml",
+            "text/css", "text/x-scss", "text/x-sass", "text/x-less",
+            "application/javascript", "text/javascript", "application/x-javascript",
+            "image/svg+xml", "text/x-log", "text/x-ini", "text/x-config"
+        )
+
         /**
          * Detects [DocumentType] from a file URI or MIME type string.
          * Tries extension matching first, then falls back to MIME type.
          */
         fun fromUri(uri: Uri, mimeType: String? = null): DocumentType {
             val path = uri.path?.lowercase() ?: uri.toString().lowercase()
+            val ext = path.substringAfterLast('.', "")
             return when {
                 path.endsWith(".pdf") || mimeType == "application/pdf" -> PDF
                 path.endsWith(".docx") || mimeType == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> DOCX
                 path.endsWith(".doc") || mimeType == "application/msword" -> DOCX
                 path.endsWith(".xlsx") || mimeType == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> XLSX
                 path.endsWith(".xls") || mimeType == "application/vnd.ms-excel" -> XLSX
-                path.endsWith(".txt") || mimeType == "text/plain" -> TXT
-                path.endsWith(".log") -> TXT
-                path.endsWith(".csv") -> TXT
+                TXT_EXTENSIONS.contains(ext) || (mimeType != null && TXT_MIME_TYPES.contains(mimeType)) -> TXT
+                mimeType?.startsWith("text/") == true -> TXT
                 else -> UNKNOWN
             }
         }
 
         fun fromMimeType(mimeType: String?): DocumentType {
-            return when (mimeType) {
-                "application/pdf" -> PDF
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                "application/msword" -> DOCX
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "application/vnd.ms-excel" -> XLSX
-                "text/plain", "text/csv" -> TXT
+            if (mimeType == null) return UNKNOWN
+            return when {
+                mimeType == "application/pdf" -> PDF
+                mimeType == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+                mimeType == "application/msword" -> DOCX
+                mimeType == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+                mimeType == "application/vnd.ms-excel" -> XLSX
+                TXT_MIME_TYPES.contains(mimeType) || mimeType.startsWith("text/") -> TXT
                 else -> UNKNOWN
             }
         }

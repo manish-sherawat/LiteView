@@ -19,10 +19,13 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.nexus.core.updater.AppUpdater
 import com.nexus.core.updater.UpdateState
+import com.nexus.feature.dashboard.data.RecentDocumentRepository
+import com.nexus.feature.dashboard.data.TagDefinition
+
 // ─── Settings UI State ────────────────────────────────────────────────────────
 
 data class SettingsUiState(
-    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val themeMode: ThemeMode = ThemeMode.LIGHT,
     val defaultFontSize: Float = 14f,
     val appVersion: String = "1.0.0",
     val cacheSizeText: String = "0 B",
@@ -40,6 +43,7 @@ data class SettingsUiState(
 class SettingsViewModel @Inject constructor(
     private val prefsRepository: UserPreferencesRepository,
     private val recentDocumentDao: com.nexus.feature.dashboard.data.RecentDocumentDao,
+    private val repository: RecentDocumentRepository,
     private val appUpdater: AppUpdater,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
@@ -246,6 +250,74 @@ class SettingsViewModel @Inject constructor(
             } catch (e: Exception) {
                 _changelogState.value = ChangelogState.Error("Failed to load changelog: ${e.message}")
             }
+        }
+    }
+
+    // ─── Tag Library Management ──────────────────────────────────────────────
+
+    val availableTags: StateFlow<List<TagUiModel>> = combine(
+        repository.observeAllTags(),
+        repository.observeAllTagDefinitions()
+    ) { docTags, defs ->
+        val defMap = defs.associateBy { it.name }
+        val allNames = (docTags.map { it.tag } + defs.map { it.name }).distinct().sorted()
+        allNames.map { name ->
+            val def = defMap[name]
+            TagUiModel(
+                name = name,
+                colorHex = def?.colorHex ?: TagColorPresets.getColorHexForTag(name),
+                emoji = def?.emoji
+            )
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList()
+    )
+
+    val documents: StateFlow<List<RecentDocumentUiModel>> = combine(
+        repository.observeRecentDocuments(),
+        repository.observeAllTags(),
+        repository.observeAllTagDefinitions()
+    ) { docs, allTags, defs ->
+        val tagsByDoc = allTags.groupBy({ it.documentUri }, { it.tag })
+        val defMap = defs.associateBy { it.name }
+        docs.map { doc ->
+            val docTags = tagsByDoc[doc.uri] ?: emptyList()
+            RecentDocumentUiModel(
+                doc = doc,
+                isAccessible = true,
+                tags = docTags.map { tagName ->
+                    val def = defMap[tagName]
+                    TagUiModel(
+                        name = tagName,
+                        colorHex = def?.colorHex ?: TagColorPresets.getColorHexForTag(tagName),
+                        emoji = def?.emoji
+                    )
+                }
+            )
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList()
+    )
+
+    fun upsertTagDefinition(name: String, colorHex: String, emoji: String?) {
+        viewModelScope.launch {
+            repository.upsertTagDefinition(name, colorHex, emoji)
+        }
+    }
+
+    fun renameTagGlobally(oldName: String, newName: String, colorHex: String, emoji: String?) {
+        viewModelScope.launch {
+            repository.renameTagGlobally(oldName, newName, colorHex, emoji)
+        }
+    }
+
+    fun deleteTagGlobally(name: String) {
+        viewModelScope.launch {
+            repository.deleteTagGlobally(name)
         }
     }
 }

@@ -21,3 +21,10 @@ temp_apk_unzip/
 test_mupdf/
 needed_icons.txt
 .kotlin/
+
+# Keystores & Signing Credentials
+*.jks
+*.keystore
+keystore.properties
+key.properties
+

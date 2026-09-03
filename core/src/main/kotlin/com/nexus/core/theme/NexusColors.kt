@@ -38,17 +38,17 @@ val LocalNexusColors = compositionLocalOf {
 }
 
 val lightNexusColors = NexusColors(
-    background = Color(0xFFF1F1F3),
-    surface = Color(0xFFFCFCFE),
-    surfaceVariant = Color(0xFFF1F3F5),
-    primary = Color(0xFF000000), // Minimal black accent
+    background = Color(0xFFF6F8FA),      // Clean Apple/GitHub light-grey canvas
+    surface = Color(0xFFFFFFFF),         // Crisp pure white card surface
+    surfaceVariant = Color(0xFFEFF2F5),  // Soft container/shimmer
+    primary = Color(0xFF0F172A),         // Deep slate black accent
     onPrimary = Color(0xFFFFFFFF),
-    textPrimary = Color(0xFF212529),
-    textSecondary = Color(0xFF868E96),
-    divider = Color(0xFFE9ECEF),
-    error = Color(0xFFFA5252),
-    success = Color(0xFF4CAF50),
-    warning = Color(0xFFFF9800),
+    textPrimary = Color(0xFF0F172A),     // High-contrast slate-900 text
+    textSecondary = Color(0xFF64748B),   // Slate-500 secondary text
+    divider = Color(0xFFE2E8F0),         // Crisp subtle border
+    error = Color(0xFFEF4444),
+    success = Color(0xFF10B981),
+    warning = Color(0xFFF59E0B),
     searchHighlight = Color(0x66FFEB3B)
 )
 

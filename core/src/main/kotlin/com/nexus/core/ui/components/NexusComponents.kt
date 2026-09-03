@@ -43,6 +43,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -78,9 +80,19 @@ fun NexusCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(8.dp, NexusTheme.shapes.large, spotColor = Color.Black.copy(alpha = 0.12f), ambientColor = Color.Black.copy(alpha = 0.05f))
+            .shadow(
+                elevation = 2.dp,
+                shape = NexusTheme.shapes.large,
+                spotColor = Color.Black.copy(alpha = 0.08f),
+                ambientColor = Color.Black.copy(alpha = 0.04f)
+            )
             .clip(NexusTheme.shapes.large)
-            .background(NexusTheme.colors.surfaceVariant)
+            .background(NexusTheme.colors.surface)
+            .border(
+                width = 1.dp,
+                color = NexusTheme.colors.divider.copy(alpha = 0.7f),
+                shape = NexusTheme.shapes.large
+            )
             .then(
                 if (onClick != null || onLongClick != null) 
                     Modifier.springBounceCombinedClick(
@@ -93,7 +105,7 @@ fun NexusCard(
             .alpha(if (enabled) 1f else 0.5f)
     ) {
         if (accentColor != null) {
-            Box(modifier = Modifier.align(Alignment.CenterStart).width(3.dp).fillMaxHeight().background(accentColor))
+            Box(modifier = Modifier.align(Alignment.CenterStart).width(3.5.dp).fillMaxHeight().background(accentColor))
         }
         content()
     }
@@ -105,7 +117,8 @@ fun NexusSearchBar(
     onQueryChange: (String) -> Unit,
     onClear: () -> Unit,
     modifier: Modifier = Modifier,
-    placeholderText: String = "Search..."
+    placeholderText: String = "Search...",
+    focusRequester: androidx.compose.ui.focus.FocusRequester? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
@@ -151,6 +164,7 @@ fun NexusSearchBar(
                     cursorBrush = SolidColor(NexusTheme.colors.primary),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                         .semantics { 
                             contentDescription = placeholderText 
                         }
@@ -552,8 +566,8 @@ fun NexusDialog(
             )
         ) {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.85f)
+                modifier = modifier
+                    .imePadding()
                     .shadow(24.dp, NexusTheme.shapes.large)
                     .clip(NexusTheme.shapes.large)
                     .background(NexusTheme.colors.surface)

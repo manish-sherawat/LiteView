@@ -17,6 +17,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -37,8 +39,11 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 
 enum class ToolbarDockPosition {
     Left, Right, Top, Bottom
@@ -128,8 +133,7 @@ fun PdfAnnotationPill(
     }
 
     val configuration = LocalConfiguration.current
-    val isWideScreen = configuration.screenWidthDp >= 600
-    val isHorizontalRibbon = isWideScreen || dockPosition == ToolbarDockPosition.Top || dockPosition == ToolbarDockPosition.Bottom
+    val isHorizontalRibbon = dockPosition == ToolbarDockPosition.Top || dockPosition == ToolbarDockPosition.Bottom
     val maxPillHeight = (configuration.screenHeightDp * 0.72f).toInt().dp
 
     AnimatedVisibility(
@@ -179,6 +183,11 @@ fun PdfAnnotationPill(
                 )
             }
         } else {
+            var liveDragOffset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+            val density = LocalDensity.current
+            val tapThresholdPx = with(density) { 18.dp.toPx() }
+            val dragThresholdPx = with(density) { 48.dp.toPx() }
+
             val dragHandleContent: @Composable () -> Unit = {
                 var totalDragOffset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
                 Box(
@@ -188,28 +197,36 @@ fun PdfAnnotationPill(
                         .background(NexusTheme.colors.primary.copy(alpha = 0.15f))
                         .pointerInput(Unit) {
                             detectDragGestures(
-                                onDragStart = { totalDragOffset = androidx.compose.ui.geometry.Offset.Zero },
+                                onDragStart = {
+                                    totalDragOffset = androidx.compose.ui.geometry.Offset.Zero
+                                    liveDragOffset = androidx.compose.ui.geometry.Offset.Zero
+                                },
                                 onDragEnd = {
                                     val (dx, dy) = totalDragOffset
                                     val distance = totalDragOffset.getDistance()
-                                    if (distance < 15f) {
+                                    liveDragOffset = androidx.compose.ui.geometry.Offset.Zero
+                                    if (distance < tapThresholdPx) {
                                         performHaptic()
                                         onToggleCollapse()
                                     } else {
                                         performHaptic()
                                         if (kotlin.math.abs(dx) > kotlin.math.abs(dy)) {
-                                            if (dx > 40f) onDockPositionChange(ToolbarDockPosition.Right)
-                                            else if (dx < -40f) onDockPositionChange(ToolbarDockPosition.Left)
+                                            if (dx > dragThresholdPx) onDockPositionChange(ToolbarDockPosition.Right)
+                                            else if (dx < -dragThresholdPx) onDockPositionChange(ToolbarDockPosition.Left)
                                         } else {
-                                            if (dy > 40f) onDockPositionChange(ToolbarDockPosition.Bottom)
-                                            else if (dy < -40f) onDockPositionChange(ToolbarDockPosition.Top)
+                                            if (dy > dragThresholdPx) onDockPositionChange(ToolbarDockPosition.Bottom)
+                                            else if (dy < -dragThresholdPx) onDockPositionChange(ToolbarDockPosition.Top)
                                         }
                                     }
                                 },
-                                onDragCancel = { totalDragOffset = androidx.compose.ui.geometry.Offset.Zero },
+                                onDragCancel = {
+                                    totalDragOffset = androidx.compose.ui.geometry.Offset.Zero
+                                    liveDragOffset = androidx.compose.ui.geometry.Offset.Zero
+                                },
                                 onDrag = { change, dragAmount ->
                                     change.consume()
                                     totalDragOffset += dragAmount
+                                    liveDragOffset += dragAmount
                                 }
                             )
                         },
@@ -582,6 +599,9 @@ fun PdfAnnotationPill(
             }
 
             Box(
+                modifier = Modifier.offset {
+                    IntOffset(liveDragOffset.x.roundToInt(), liveDragOffset.y.roundToInt())
+                },
                 contentAlignment = when (dockPosition) {
                     ToolbarDockPosition.Left -> Alignment.CenterStart
                     ToolbarDockPosition.Right -> Alignment.CenterEnd
@@ -653,35 +673,33 @@ private fun ToolIconButton(
     enabled: Boolean = true
 ) {
     val alpha = if (enabled) 1f else 0.35f
-    val targetBgColor = if (isSelected) NexusTheme.colors.primary else Color.Transparent
+    val primaryColor = NexusTheme.colors.primary
     val targetIconTint = if (isSelected) Color.White else NexusTheme.colors.textPrimary
 
-    val animatedBgColor by animateColorAsState(
-        targetValue = targetBgColor,
-        animationSpec = tween(durationMillis = 200),
-        label = "toolBgColor"
-    )
     val animatedIconTint by animateColorAsState(
         targetValue = targetIconTint,
         animationSpec = tween(durationMillis = 200),
         label = "toolIconTint"
     )
     val animatedScale by animateFloatAsState(
-        targetValue = if (isSelected) 1.12f else 1.0f,
-        animationSpec = spring(dampingRatio = 0.65f, stiffness = 400f),
+        targetValue = if (isSelected) 1.14f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.58f, stiffness = 450f),
         label = "toolScale"
     )
 
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(36.dp)
+            .size(38.dp)
             .scale(animatedScale)
             .clip(CircleShape)
-            .background(animatedBgColor)
+            .background(
+                if (isSelected) Brush.linearGradient(listOf(primaryColor, primaryColor.copy(alpha = 0.85f)))
+                else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+            )
             .border(
                 width = if (isSelected) 1.5.dp else 0.dp,
-                color = if (isSelected) Color.White.copy(alpha = 0.6f) else Color.Transparent,
+                brush = if (isSelected) Brush.linearGradient(listOf(Color.White.copy(alpha = 0.8f), Color.White.copy(alpha = 0.3f))) else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)),
                 shape = CircleShape
             )
             .then(
@@ -694,7 +712,7 @@ private fun ToolIconButton(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = animatedIconTint.copy(alpha = alpha),
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(19.dp)
         )
     }
 }
@@ -707,8 +725,8 @@ private fun ColorIconButton(
     isHighlighter: Boolean = false
 ) {
     val animatedScale by animateFloatAsState(
-        targetValue = if (isSelected) 1.15f else 1.0f,
-        animationSpec = spring(dampingRatio = 0.55f, stiffness = 400f),
+        targetValue = if (isSelected) 1.18f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.52f, stiffness = 420f),
         label = "colorScale"
     )
 
@@ -721,16 +739,16 @@ private fun ColorIconButton(
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(36.dp)
+            .size(38.dp)
             .scale(animatedScale)
             .clip(CircleShape)
             .background(
-                if (isSelected) NexusTheme.colors.primary.copy(alpha = 0.35f)
+                if (isSelected) NexusTheme.colors.primary.copy(alpha = 0.30f)
                 else Color.Transparent
             )
             .border(
                 width = if (isSelected) 2.dp else 0.dp,
-                color = if (isSelected) NexusTheme.colors.primary else Color.Transparent,
+                brush = if (isSelected) Brush.sweepGradient(listOf(NexusTheme.colors.primary, Color.White, NexusTheme.colors.primary)) else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)),
                 shape = CircleShape
             )
             .springBounceClick(onClick = onClick)
@@ -743,7 +761,7 @@ private fun ColorIconButton(
                 .clip(CircleShape)
                 .background(displayColor)
                 .border(
-                    width = 1.2.dp,
+                    width = 1.5.dp,
                     color = if (isHighlighter) NexusTheme.colors.primary.copy(alpha = 0.8f) else Color.White,
                     shape = CircleShape
                 )
@@ -752,7 +770,7 @@ private fun ColorIconButton(
                 imageVector = rememberPaletteIcon(isFilled = isSelected),
                 contentDescription = "Colors",
                 tint = iconTint,
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(15.dp)
             )
         }
     }
@@ -778,98 +796,142 @@ fun PdfAnnotationColorVerticalPopover(
 
     val strokeWidths = listOf(2f, 4f, 8f, 12f)
     val configuration = LocalConfiguration.current
-    val maxPopoverHeight = (configuration.screenHeightDp * 0.50f).toInt().dp
+    val maxPopoverHeight = (configuration.screenHeightDp * 0.55f).toInt().dp
 
     NexusSurface(
         shape = NexusTheme.shapes.medium,
-        elevation = 8.dp,
+        elevation = 10.dp,
         color = Color.Transparent,
         modifier = modifier
             .clip(NexusTheme.shapes.medium)
-            .glassBackground(blurRadius = 30f, alpha = 0.92f, fallbackColor = NexusTheme.colors.surfaceVariant)
-            .border(0.8.dp, NexusTheme.colors.divider.copy(alpha = 0.6f), NexusTheme.shapes.medium)
-            .padding(vertical = 12.dp, horizontal = 10.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier
-                .heightIn(max = maxPopoverHeight)
-                .verticalScroll(rememberScrollState())
-        ) {
-            // Vertical Column of Color Swatches
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                colors.forEach { color ->
-                    val isSelected = selectedColor == color
-                    val scale by animateFloatAsState(
-                        targetValue = if (isSelected) 1.15f else 1.0f,
-                        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
-                        label = "swatchScale"
+            .glassBackground(blurRadius = 35f, alpha = 0.94f, fallbackColor = NexusTheme.colors.surfaceVariant)
+            .border(
+                1.dp,
+                Brush.verticalGradient(
+                    listOf(
+                        NexusTheme.colors.primary.copy(alpha = 0.7f),
+                        NexusTheme.colors.divider.copy(alpha = 0.3f)
                     )
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .scale(scale)
-                            .clip(CircleShape)
-                            .background(color)
-                            .border(
-                                width = if (isSelected) 2.5.dp else 0.5.dp,
-                                color = if (isSelected) NexusTheme.colors.primary else Color.Gray.copy(alpha = 0.4f),
-                                shape = CircleShape
-                            )
-                            .springBounceClick { onColorSelect(color) }
+                ),
+                NexusTheme.shapes.medium
+            )
+            .padding(vertical = 12.dp, horizontal = 12.dp)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.heightIn(max = maxPopoverHeight)
+        ) {
+            // Live Stroke Preview Bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(24.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.6f))
+                    .padding(horizontal = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawLine(
+                        color = selectedColor,
+                        start = Offset(4f, size.height / 2f),
+                        end = Offset(size.width - 4f, size.height / 2f),
+                        strokeWidth = (strokeWidth * 1.5f).dp.toPx().coerceIn(2f, 22f),
+                        cap = StrokeCap.Round
                     )
                 }
             }
 
-            // Dynamic Height Divider line
-            Box(
-                modifier = Modifier
-                    .width(1.dp)
-                    .height(190.dp)
-                    .background(NexusTheme.colors.divider.copy(alpha = 0.5f))
-            )
-
-            // Vertical Column of Stroke Width Options
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
             ) {
-                strokeWidths.forEach { width ->
-                    val isSelected = strokeWidth == width
-                    val scale by animateFloatAsState(
-                        targetValue = if (isSelected) 1.15f else 1.0f,
-                        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
-                        label = "strokeScale"
-                    )
-                    val dotSize = (width.coerceIn(2f, 12f) * 1.3f).coerceIn(5f, 16f).dp
-
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(28.dp)
-                            .scale(scale)
-                            .clip(CircleShape)
-                            .background(
-                                if (isSelected) NexusTheme.colors.primary.copy(alpha = 0.20f)
-                                else Color.Transparent
-                            )
-                            .border(
-                                width = if (isSelected) 1.5.dp else 0.dp,
-                                color = if (isSelected) NexusTheme.colors.primary else Color.Transparent,
-                                shape = CircleShape
-                            )
-                            .springBounceClick { onStrokeWidthSelect(width) }
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(dotSize)
-                                .clip(CircleShape)
-                                .background(if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textSecondary)
+                // Vertical Column of Color Swatches
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    colors.forEach { color ->
+                        val isSelected = selectedColor == color
+                        val scale by animateFloatAsState(
+                            targetValue = if (isSelected) 1.22f else 1.0f,
+                            animationSpec = spring(dampingRatio = 0.55f, stiffness = 420f),
+                            label = "swatchScale"
                         )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .scale(scale)
+                                .clip(CircleShape)
+                                .background(color)
+                                .border(
+                                    width = if (isSelected) 2.5.dp else 0.8.dp,
+                                    color = if (isSelected) NexusTheme.colors.primary else Color.Gray.copy(alpha = 0.35f),
+                                    shape = CircleShape
+                                )
+                                .springBounceClick { onColorSelect(color) }
+                        ) {
+                            if (isSelected) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(if (color == Color(0xFF000000)) Color.White else Color.Black.copy(alpha = 0.7f))
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Dynamic Height Divider line
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(210.dp)
+                        .background(NexusTheme.colors.divider.copy(alpha = 0.6f))
+                )
+
+                // Vertical Column of Stroke Width Options
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    strokeWidths.forEach { width ->
+                        val isSelected = strokeWidth == width
+                        val scale by animateFloatAsState(
+                            targetValue = if (isSelected) 1.20f else 1.0f,
+                            animationSpec = spring(dampingRatio = 0.55f, stiffness = 420f),
+                            label = "strokeScale"
+                        )
+                        val dotSize = (width.coerceIn(2f, 12f) * 1.35f).coerceIn(5f, 18f).dp
+
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(30.dp)
+                                .scale(scale)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isSelected) NexusTheme.colors.primary.copy(alpha = 0.22f)
+                                    else Color.Transparent
+                                )
+                                .border(
+                                    width = if (isSelected) 1.8.dp else 0.dp,
+                                    color = if (isSelected) NexusTheme.colors.primary else Color.Transparent,
+                                    shape = CircleShape
+                                )
+                                .springBounceClick { onStrokeWidthSelect(width) }
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(dotSize)
+                                    .clip(CircleShape)
+                                    .background(if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textSecondary)
+                            )
+                        }
                     }
                 }
             }
@@ -1165,6 +1227,9 @@ fun PdfAnnotationEraserOptionsPopover(
     onEraserFilterSelect: (EraserTargetFilter) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val configuration = LocalConfiguration.current
+    val maxPopoverHeight = (configuration.screenHeightDp * 0.55f).toInt().dp
+
     NexusSurface(
         shape = NexusTheme.shapes.medium,
         elevation = 8.dp,
@@ -1178,7 +1243,10 @@ fun PdfAnnotationEraserOptionsPopover(
     ) {
         Column(
             horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier
+                .heightIn(max = maxPopoverHeight)
+                .verticalScroll(rememberScrollState())
         ) {
             NexusText(
                 text = "ERASE TARGET",
@@ -1299,6 +1367,9 @@ fun PdfAnnotationStampsPopover(
     onStampSelect: (StampType) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val configuration = LocalConfiguration.current
+    val maxPopoverHeight = (configuration.screenHeightDp * 0.55f).toInt().dp
+
     NexusSurface(
         shape = NexusTheme.shapes.medium,
         elevation = 8.dp,
@@ -1312,7 +1383,10 @@ fun PdfAnnotationStampsPopover(
     ) {
         Column(
             horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier
+                .heightIn(max = maxPopoverHeight)
+                .verticalScroll(rememberScrollState())
         ) {
             NexusText(
                 text = "BUSINESS STAMPS",

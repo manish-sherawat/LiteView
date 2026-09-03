@@ -175,29 +175,29 @@ fun splashExitTransition(): ExitTransition = fadeOut(
 // ─── DASHBOARD SCREEN ANIMATIONS ─────────────────────────────────────
 fun dashboardEnterTransition(): EnterTransition = fadeIn(
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_ENTER, easing = EmphasizedDecelerateEasing)
-) + slideInVertically(
-    initialOffsetY = { 100 },
+) + slideInHorizontally(
+    initialOffsetX = { fullWidth -> -fullWidth / 4 },
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_ENTER, easing = EmphasizedDecelerateEasing)
 )
 
 fun dashboardExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_EXIT, easing = EmphasizedAccelerateEasing)
 ) + slideOutHorizontally(
-    targetOffsetX = { 200 },
+    targetOffsetX = { fullWidth -> -fullWidth / 4 },
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
 fun dashboardBackEnterTransition(): EnterTransition = fadeIn(
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_BACK, easing = EmphasizedDecelerateEasing)
 ) + slideInHorizontally(
-    initialOffsetX = { -200 },
+    initialOffsetX = { fullWidth -> -fullWidth / 4 },
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_BACK, easing = EmphasizedDecelerateEasing)
 )
 
 fun dashboardBackExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_BACK, easing = EmphasizedAccelerateEasing)
 ) + slideOutHorizontally(
-    targetOffsetX = { 200 },
+    targetOffsetX = { fullWidth -> fullWidth },
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_BACK, easing = EmphasizedAccelerateEasing)
 )
 
@@ -205,29 +205,29 @@ fun dashboardBackExitTransition(): ExitTransition = fadeOut(
 fun settingsEnterTransition(): EnterTransition = fadeIn(
     animationSpec = tween(NavConstants.DURATION_SETTINGS_ENTER, easing = EmphasizedDecelerateEasing)
 ) + slideInHorizontally(
-    initialOffsetX = { 300 },
+    initialOffsetX = { fullWidth -> fullWidth },
     animationSpec = tween(NavConstants.DURATION_SETTINGS_ENTER, easing = EmphasizedDecelerateEasing)
 )
 
 fun settingsExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedAccelerateEasing)
 ) + slideOutHorizontally(
-    targetOffsetX = { 300 },
+    targetOffsetX = { fullWidth -> -fullWidth / 4 },
     animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
 fun settingsBackEnterTransition(): EnterTransition = fadeIn(
     animationSpec = tween(NavConstants.DURATION_SETTINGS_BACK, easing = EmphasizedDecelerateEasing)
 ) + slideInHorizontally(
-    initialOffsetX = { -300 },
+    initialOffsetX = { fullWidth -> -fullWidth / 4 },
     animationSpec = tween(NavConstants.DURATION_SETTINGS_BACK, easing = EmphasizedDecelerateEasing)
 )
 
 fun settingsBackExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedAccelerateEasing)
 ) + slideOutHorizontally(
-    targetOffsetX = { 300 },
-    animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedAccelerateEasing)
+    targetOffsetX = { fullWidth -> fullWidth },
+    animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedDecelerateEasing)
 )
 
 // ─── SCANNER SCREEN ANIMATIONS ───────────────────────────────────────
@@ -263,29 +263,29 @@ fun scannerBackExitTransition(): ExitTransition = fadeOut(
 fun readerEnterTransition(): EnterTransition = fadeIn(
     animationSpec = tween(NavConstants.DURATION_READER_ENTER, easing = EmphasizedDecelerateEasing)
 ) + slideInHorizontally(
-    initialOffsetX = { 500 },
+    initialOffsetX = { fullWidth -> fullWidth },
     animationSpec = tween(NavConstants.DURATION_READER_ENTER, easing = EmphasizedDecelerateEasing)
 )
 
 fun readerExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedAccelerateEasing)
 ) + slideOutHorizontally(
-    targetOffsetX = { 500 },
+    targetOffsetX = { fullWidth -> -fullWidth / 4 },
     animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
 fun readerBackEnterTransition(): EnterTransition = fadeIn(
     animationSpec = tween(NavConstants.DURATION_READER_BACK, easing = EmphasizedDecelerateEasing)
 ) + slideInHorizontally(
-    initialOffsetX = { -500 },
+    initialOffsetX = { fullWidth -> -fullWidth / 4 },
     animationSpec = tween(NavConstants.DURATION_READER_BACK, easing = EmphasizedDecelerateEasing)
 )
 
 fun readerBackExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedAccelerateEasing)
 ) + slideOutHorizontally(
-    targetOffsetX = { 500 },
-    animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedAccelerateEasing)
+    targetOffsetX = { fullWidth -> fullWidth },
+    animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedDecelerateEasing)
 )
 
 // ─── UNSUPPORTED FILE SCREEN ANIMATIONS ──────────────────────────────

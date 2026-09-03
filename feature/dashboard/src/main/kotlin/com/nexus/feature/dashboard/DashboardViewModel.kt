@@ -27,13 +27,46 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// ─── Sort Options ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Sort Options â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 enum class SortOrder { BY_DATE, BY_NAME, BY_TYPE, BY_SIZE }
 
-// ─── Dashboard Tab ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Dashboard Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 enum class DashboardTab { ALL, RECENT, STARRED }
 
-// ─── Dashboard UI State ───────────────────────────────────────────────────────
+// ─── File Type Filter ────────────────────────────────────────────────────────
+enum class DocumentTypeFilter(val title: String, val docType: DocumentType?) {
+    ALL("All", null),
+    PDF("PDF", DocumentType.PDF),
+    DOCX("Word", DocumentType.DOCX),
+    XLSX("Excel", DocumentType.XLSX),
+    TXT("Text", DocumentType.TXT)
+}
+
+data class Tuple4<out A, out B, out C, out D>(
+    val first: A,
+    val second: B,
+    val third: C,
+    val fourth: D
+) {
+    override fun toString(): String = "($first, $second, $third, $fourth)"
+}
+
+data class Tuple5<out A, out B, out C, out D, out E>(
+    val first: A,
+    val second: B,
+    val third: C,
+    val fourth: D,
+    val fifth: E
+) {
+    override fun toString(): String = "($first, $second, $third, $fourth, $fifth)"
+}
+
+// â”€â”€â”€ Dashboard UI State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+data class PendingDeletionState(
+    val documents: List<RecentDocument>,
+    val remainingSeconds: Int
+)
+
 data class DashboardUiState(
     val documents: List<RecentDocumentUiModel> = emptyList(),
     val isLoading: Boolean = true,
@@ -42,15 +75,21 @@ data class DashboardUiState(
     val sortOrder: SortOrder = SortOrder.BY_DATE,
     val isGridView: Boolean = false,
     val selectedTab: DashboardTab = DashboardTab.ALL,
+    val selectedFilter: DocumentTypeFilter = DocumentTypeFilter.ALL,
+    val filterCounts: Map<DocumentTypeFilter, Int> = emptyMap(),
+    val availableTags: List<TagUiModel> = emptyList(),
+    val selectedTag: String? = null,
+    val tagCounts: Map<String, Int> = emptyMap(),
     val starredUris: Set<String> = emptySet(),
     val sortAscending: Boolean = false,
     val permissionRationaleShown: Boolean = false,
     val permissionBannerDismissed: Boolean = false,
     val selectedUris: Set<String> = emptySet(),
-    val isSelectionMode: Boolean = false
+    val isSelectionMode: Boolean = false,
+    val pendingDeletion: PendingDeletionState? = null
 )
 
-// ─── Dashboard ViewModel ──────────────────────────────────────────────────────
+// â”€â”€â”€ Dashboard ViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Owns the recent documents list, search/sort state, and file-open logic.
 
 @HiltViewModel
@@ -71,6 +110,8 @@ class DashboardViewModel @Inject constructor(
     private val _selectedUris = MutableStateFlow<Set<String>>(emptySet())
     private val _isSelectionMode = MutableStateFlow(false)
     private val _selectedTab = MutableStateFlow(DashboardTab.ALL)
+    private val _selectedFilter = MutableStateFlow(DocumentTypeFilter.ALL)
+    private val _selectedTag = MutableStateFlow<String?>(null)
     private val _starredUris: StateFlow<Set<String>> = prefsRepository.starredUris
         .stateIn(
             scope = viewModelScope,
@@ -78,11 +119,24 @@ class DashboardViewModel @Inject constructor(
             initialValue = emptySet()
         )
     private val _sortAscending = MutableStateFlow(false)
-
     val updateState: StateFlow<UpdateState> = appUpdater.updateState
-    
+
     private val _uiEvents = kotlinx.coroutines.flow.MutableSharedFlow<String>()
     val uiEvents = _uiEvents.asSharedFlow()
+
+    private val _searchFocusEvent = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val searchFocusEvent = _searchFocusEvent.asSharedFlow()
+
+    private val _scrollToTopEvent = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val scrollToTopEvent = _scrollToTopEvent.asSharedFlow()
+
+    fun triggerSearchFocus() {
+        _searchFocusEvent.tryEmit(Unit)
+    }
+
+    fun scrollToTop() {
+        _scrollToTopEvent.tryEmit(Unit)
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<DashboardUiState> = combine(
@@ -90,7 +144,9 @@ class DashboardViewModel @Inject constructor(
             repository.observeRecentDocuments(),
             _scannedDocuments,
             _inaccessibleUris,
-            ::Triple
+            repository.observeAllTags(),
+            repository.observeAllTagDefinitions(),
+            ::Tuple5
         ),
         combine(
             _isLoading,
@@ -113,28 +169,97 @@ class DashboardViewModel @Inject constructor(
         combine(
             prefsRepository.permissionRationaleShown,
             _sortAscending,
-            _isRefreshing,
+            combine(_isRefreshing, _selectedFilter, _selectedTag, ::Triple),
             ::Triple
         )
-    ) { (docs, scanned, inaccessible): Triple<List<RecentDocument>, List<RecentDocument>, Set<String>>,
+    ) { (docs, scanned, inaccessible, allTags, allTagDefs): Tuple5<List<RecentDocument>, List<RecentDocument>, Set<String>, List<com.nexus.feature.dashboard.data.DocumentTag>, List<com.nexus.feature.dashboard.data.TagDefinition>>,
         (loading, query, sort): Triple<Boolean, String, SortOrder>,
         (grid, tab, starred): Triple<Boolean, DashboardTab, Set<String>>,
         (selectionMode, selected, bannerDismissed): Triple<Boolean, Set<String>, Boolean>,
-        (rationale, ascending, refreshing): Triple<Boolean?, Boolean, Boolean> ->
+        (rationale, ascending, refreshingFilterAndTag): Triple<Boolean?, Boolean, Triple<Boolean, DocumentTypeFilter, String?>> ->
 
-        val dedupBase = docs + scanned
+        val (refreshing, fileFilter, activeTag) = refreshingFilterAndTag
+
+        val dedupKey: (RecentDocument) -> String = { doc ->
+            val decodedUri = try { java.net.URLDecoder.decode(doc.uri, "UTF-8") } catch (_: Exception) { doc.uri }
+            if (decodedUri.startsWith("file://")) {
+                decodedUri.removePrefix("file://").lowercase()
+            } else if (doc.fileName.isNotEmpty()) {
+                "${doc.fileName.lowercase()}_${doc.documentType}"
+            } else {
+                doc.uri
+            }
+        }
+        val dedupBase = (docs + scanned).distinctBy(dedupKey)
         val baseDocs = when (tab) {
-            DashboardTab.RECENT -> docs.distinctBy { it.uri.ifEmpty { "${it.fileName}_${it.fileSizeBytes}" } }
-            DashboardTab.STARRED -> dedupBase.distinctBy { it.uri.ifEmpty { "${it.fileName}_${it.fileSizeBytes}" } }.filter { starred.contains(it.uri) }
-            DashboardTab.ALL -> dedupBase.distinctBy { it.uri.ifEmpty { "${it.fileName}_${it.fileSizeBytes}" } }
+            DashboardTab.RECENT -> docs.distinctBy(dedupKey)
+            DashboardTab.STARRED -> dedupBase.filter { starred.contains(it.uri) }
+            DashboardTab.ALL -> dedupBase
         }
 
-        val mapped = baseDocs
+        fun isDocMatchingFilter(doc: RecentDocument, filter: DocumentTypeFilter): Boolean {
+            val type = runCatching { DocumentType.valueOf(doc.documentType) }.getOrElse {
+                DocumentType.fromUri(Uri.parse(doc.uri), doc.mimeType)
+            }
+            return when (filter) {
+                DocumentTypeFilter.ALL -> true
+                DocumentTypeFilter.PDF -> type == DocumentType.PDF || doc.fileName.endsWith(".pdf", ignoreCase = true)
+                DocumentTypeFilter.DOCX -> type == DocumentType.DOCX || doc.fileName.endsWith(".docx", ignoreCase = true) || doc.fileName.endsWith(".doc", ignoreCase = true)
+                DocumentTypeFilter.XLSX -> type == DocumentType.XLSX || doc.fileName.endsWith(".xlsx", ignoreCase = true) || doc.fileName.endsWith(".xls", ignoreCase = true)
+                DocumentTypeFilter.TXT -> type == DocumentType.TXT || DocumentType.fromUri(Uri.parse("file:///${doc.fileName}")) == DocumentType.TXT
+            }
+        }
+
+        val tagDefMap = allTagDefs.associateBy { it.name }
+        val uriToTagNamesMap: Map<String, List<String>> = allTags.groupBy({ it.documentUri }, { it.tag })
+
+        val uriToTagUiModelsMap: Map<String, List<TagUiModel>> = uriToTagNamesMap.mapValues { (_, tagNames) ->
+            tagNames.map { tagName ->
+                val def = tagDefMap[tagName]
+                TagUiModel(
+                    name = tagName,
+                    colorHex = def?.colorHex ?: TagColorPresets.getColorHexForTag(tagName),
+                    emoji = def?.emoji
+                )
+            }
+        }
+
+        val allUniqueTagNames: List<String> = (allTags.map { it.tag } + allTagDefs.map { it.name }).distinct().sorted()
+        val tagCounts: Map<String, Int> = allUniqueTagNames.associateWith { tagName ->
+            baseDocs.count { doc -> (uriToTagNamesMap[doc.uri] ?: emptyList()).contains(tagName) }
+        }
+
+        val availableTagUiModels: List<TagUiModel> = allUniqueTagNames.map { tagName ->
+            val def = tagDefMap[tagName]
+            TagUiModel(
+                name = tagName,
+                colorHex = def?.colorHex ?: TagColorPresets.getColorHexForTag(tagName),
+                emoji = def?.emoji,
+                count = tagCounts[tagName] ?: 0
+            )
+        }
+
+        val counts = mapOf(
+            DocumentTypeFilter.ALL to baseDocs.size,
+            DocumentTypeFilter.PDF to baseDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.PDF) },
+            DocumentTypeFilter.DOCX to baseDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.DOCX) },
+            DocumentTypeFilter.XLSX to baseDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.XLSX) },
+            DocumentTypeFilter.TXT to baseDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.TXT) }
+        )
+
+        val filteredDocs = baseDocs.filter { doc ->
+            val matchesType = if (fileFilter == DocumentTypeFilter.ALL) true else isDocMatchingFilter(doc, fileFilter)
+            val matchesTag = if (activeTag == null) true else (uriToTagNamesMap[doc.uri] ?: emptyList()).contains(activeTag)
+            matchesType && matchesTag
+        }
+
+        val mapped = filteredDocs
             .filter { it.fileName.contains(query, ignoreCase = true) }
             .map { doc ->
                 RecentDocumentUiModel(
                     doc = doc,
-                    isAccessible = !inaccessible.contains(doc.uri)
+                    isAccessible = !inaccessible.contains(doc.uri),
+                    tags = uriToTagUiModelsMap[doc.uri] ?: emptyList()
                 )
             }
             .let { list: List<RecentDocumentUiModel> ->
@@ -162,6 +287,11 @@ class DashboardViewModel @Inject constructor(
             sortOrder = sort,
             isGridView = grid,
             selectedTab = tab,
+            selectedFilter = fileFilter,
+            filterCounts = counts,
+            availableTags = availableTagUiModels,
+            selectedTag = activeTag,
+            tagCounts = tagCounts,
             starredUris = starred,
             sortAscending = ascending,
             permissionRationaleShown = rationale ?: false,
@@ -171,7 +301,7 @@ class DashboardViewModel @Inject constructor(
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
+        started = SharingStarted.WhileSubscribed(5000),
         initialValue = DashboardUiState()
     )
 
@@ -245,14 +375,19 @@ class DashboardViewModel @Inject constructor(
                     android.provider.MediaStore.Files.FileColumns.MIME_TYPE
                 )
 
-                val selection = (
-                    android.provider.MediaStore.Files.FileColumns.DATA + " LIKE '%.pdf' OR " +
-                    android.provider.MediaStore.Files.FileColumns.DATA + " LIKE '%.docx' OR " +
-                    android.provider.MediaStore.Files.FileColumns.DATA + " LIKE '%.doc' OR " +
-                    android.provider.MediaStore.Files.FileColumns.DATA + " LIKE '%.xlsx' OR " +
-                    android.provider.MediaStore.Files.FileColumns.DATA + " LIKE '%.xls' OR " +
-                    android.provider.MediaStore.Files.FileColumns.DATA + " LIKE '%.txt'"
+                val supportedExtensions = listOf(
+                    "pdf", "docx", "doc", "xlsx", "xls",
+                    "txt", "log", "md", "markdown", "rst",
+                    "json", "jsonl", "geojson", "xml",
+                    "yaml", "yml", "toml", "ini", "cfg", "conf",
+                    "csv", "tsv", "html", "htm", "css", "scss", "sass", "less",
+                    "js", "mjs", "cjs", "ts", "svg",
+                    "kt", "java", "py", "c", "cpp", "h", "cs", "rb", "sh", "sql"
                 )
+
+                val selection = supportedExtensions.joinToString(" OR ") { ext ->
+                    "${android.provider.MediaStore.Files.FileColumns.DATA} LIKE '%.$ext'"
+                }
 
                 val cursor = context.contentResolver.query(
                     uri,
@@ -282,13 +417,7 @@ class DashboardViewModel @Inject constructor(
                         val mimeType = if (mimeIdx >= 0) c.getString(mimeIdx) else null
 
                         val ext = file.extension.lowercase()
-                        val docType = when (ext) {
-                            "pdf" -> DocumentType.PDF
-                            "docx", "doc" -> DocumentType.DOCX
-                            "xlsx", "xls" -> DocumentType.XLSX
-                            "txt" -> DocumentType.TXT
-                            else -> DocumentType.UNKNOWN
-                        }
+                        val docType = DocumentType.fromUri(Uri.fromFile(file), mimeType)
                         if (docType == DocumentType.UNKNOWN) continue
 
                         val resolvedMimeType = mimeType ?: when (ext) {
@@ -297,8 +426,18 @@ class DashboardViewModel @Inject constructor(
                             "doc" -> "application/msword"
                             "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                             "xls" -> "application/vnd.ms-excel"
-                            "txt" -> "text/plain"
-                            else -> "*/*"
+                            "md", "markdown" -> "text/markdown"
+                            "json", "jsonl", "geojson" -> "application/json"
+                            "xml" -> "text/xml"
+                            "yaml", "yml" -> "text/yaml"
+                            "toml" -> "application/toml"
+                            "csv" -> "text/csv"
+                            "tsv" -> "text/tab-separated-values"
+                            "html", "htm" -> "text/html"
+                            "css", "scss", "sass", "less" -> "text/css"
+                            "js", "mjs", "cjs", "ts" -> "application/javascript"
+                            "svg" -> "image/svg+xml"
+                            else -> "text/plain"
                         }
 
                         scanned.add(
@@ -341,6 +480,58 @@ class DashboardViewModel @Inject constructor(
         _selectedTab.value = tab 
         clearSelection()
     }
+    fun setSelectedFilter(filter: DocumentTypeFilter) {
+        if (_selectedFilter.value == filter) {
+            _selectedFilter.value = DocumentTypeFilter.ALL
+        } else {
+            _selectedFilter.value = filter
+        }
+        clearSelection()
+    }
+    fun selectTag(tag: String?) {
+        if (_selectedTag.value == tag) {
+            _selectedTag.value = null
+        } else {
+            _selectedTag.value = tag
+        }
+        clearSelection()
+    }
+    fun addTagToDocument(uri: String, tag: String) {
+        viewModelScope.launch {
+            repository.addTag(uri, tag)
+        }
+    }
+    fun removeTagFromDocument(uri: String, tag: String) {
+        viewModelScope.launch {
+            repository.removeTag(uri, tag)
+        }
+    }
+    fun setDocumentTags(uri: String, tags: List<String>) {
+        viewModelScope.launch {
+            repository.setDocumentTags(uri, tags)
+        }
+    }
+    fun upsertTagDefinition(name: String, colorHex: String, emoji: String?) {
+        viewModelScope.launch {
+            repository.upsertTagDefinition(name, colorHex, emoji)
+        }
+    }
+    fun renameTagGlobally(oldName: String, newName: String, colorHex: String, emoji: String?) {
+        viewModelScope.launch {
+            if (_selectedTag.value == oldName) {
+                _selectedTag.value = newName
+            }
+            repository.renameTagGlobally(oldName, newName, colorHex, emoji)
+        }
+    }
+    fun deleteTagGlobally(name: String) {
+        viewModelScope.launch {
+            if (_selectedTag.value == name) {
+                _selectedTag.value = null
+            }
+            repository.deleteTagGlobally(name)
+        }
+    }
     fun toggleStarred(uri: String) {
         viewModelScope.launch {
             val current = _starredUris.value.toMutableSet()
@@ -376,7 +567,7 @@ class DashboardViewModel @Inject constructor(
 
     private val processingUris = mutableSetOf<String>()
 
-    /** Remove one document from the recent list and delete physically. */
+    /** Remove one document from the recent list without deleting the physical file from device storage. */
     fun removeDocument(uri: String) {
         if (processingUris.contains(uri)) return
         processingUris.add(uri)
@@ -387,13 +578,12 @@ class DashboardViewModel @Inject constructor(
                 if (docToRemove != null) {
                     lastDeletedDocument = docToRemove
                 }
-                deletePhysicalFile(uri)
                 repository.removeDocument(uri)
                 _scannedDocuments.value = _scannedDocuments.value.filter { it.uri != uri }
                 val updatedSelection = _selectedUris.value - uri
                 _selectedUris.value = updatedSelection
                 if (updatedSelection.isEmpty()) _isSelectionMode.value = false
-                _uiEvents.emit("File deleted successfully")
+                _uiEvents.emit("Removed from Recents")
             } finally {
                 processingUris.remove(uri)
             }
@@ -409,7 +599,9 @@ class DashboardViewModel @Inject constructor(
                 currentScanned.add(0, doc)
                 _scannedDocuments.value = currentScanned
             }
-            _uiEvents.emit("File restored")
+            // Ensure restored file is marked accessible
+            _inaccessibleUris.value = _inaccessibleUris.value - doc.uri
+            _uiEvents.emit("File restored to Recents")
         }
     }
 
@@ -422,7 +614,7 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    // ─── Multi-Select ──────────────────────────────────────────────────────────
+    // â”€â”€â”€ Multi-Select â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     fun toggleSelection(uri: String) {
         val current = _selectedUris.value.toMutableSet()
@@ -453,12 +645,11 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             val count = selected.size
             selected.forEach { uri ->
-                deletePhysicalFile(uri)
                 repository.removeDocument(uri)
             }
             _scannedDocuments.value = _scannedDocuments.value.filter { !selected.contains(it.uri) }
             clearSelection()
-            _uiEvents.emit("$count file${if (count > 1) "s" else ""} deleted successfully")
+            _uiEvents.emit("Removed $count file${if (count > 1) "s" else ""} from Recents")
         }
     }
 
@@ -478,7 +669,7 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    // ─── File Operations ───────────────────────────────────────────────────────
+    // â”€â”€â”€ File Operations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     fun shareDocument(uriStr: String) {
         viewModelScope.launch {
@@ -531,14 +722,14 @@ class DashboardViewModel @Inject constructor(
                 if (shareUris.isEmpty()) return@launch
 
                 val intent = if (shareUris.size == 1) {
-                    // Single file — use ACTION_SEND for better app compatibility
+                    // Single file â€” use ACTION_SEND for better app compatibility
                     android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                         type = "*/*"
                         putExtra(android.content.Intent.EXTRA_STREAM, shareUris[0])
                         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                 } else {
-                    // Multiple files — use ACTION_SEND_MULTIPLE
+                    // Multiple files â€” use ACTION_SEND_MULTIPLE
                     android.content.Intent(android.content.Intent.ACTION_SEND_MULTIPLE).apply {
                         type = "*/*"
                         putParcelableArrayListExtra(android.content.Intent.EXTRA_STREAM, shareUris)
@@ -613,7 +804,7 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    // ─── Permission Banner ───────────────────────────────────────────────────────
+    // â”€â”€â”€ Permission Banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     fun dismissPermissionBanner() {
         viewModelScope.launch {
@@ -633,7 +824,7 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch { repository.clearAll() }
     }
 
-    // ─── Updater ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€ Updater â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     fun downloadUpdate(url: String, version: String) {
         appUpdater.downloadAndInstallUpdate(url, version)
@@ -647,7 +838,7 @@ class DashboardViewModel @Inject constructor(
         appUpdater.resetState()
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private fun resolveFileMeta(uri: Uri, mimeType: String?): RecentDocument {
         var fileName = uri.lastPathSegment ?: "Document"
@@ -719,3 +910,4 @@ class DashboardViewModel @Inject constructor(
         }
     }
 }
+

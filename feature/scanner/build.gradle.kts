@@ -66,9 +66,6 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
     
-    // Accompanist for permissions
-    implementation(libs.accompanist.permissions)
-    
     // ML Kit for OCR & Scanner
     implementation(libs.mlkit.text.recognition)
     implementation(libs.mlkit.document.scanner)

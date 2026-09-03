@@ -46,7 +46,6 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.androidx.datastore.preferences)
 }
 
 tasks.withType<JavaCompile>().configureEach {

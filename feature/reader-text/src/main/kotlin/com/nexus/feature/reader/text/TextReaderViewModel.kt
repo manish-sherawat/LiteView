@@ -34,7 +34,8 @@ sealed class TextReaderUiState {
         val charset: String,
         val totalLineCount: Int,
         val isTruncated: Boolean = false,
-        val isCodeFile: Boolean = false
+        val isCodeFile: Boolean = false,
+        val fileExtension: String = ""
     ) : TextReaderUiState()
     data class Error(val message: String) : TextReaderUiState()
 }
@@ -257,7 +258,13 @@ class TextReaderViewModel @Inject constructor(
                     reader.close()
                     
                     val extension = uriStr.substringAfterLast('.', "").lowercase()
-                    val codeExtensions = setOf("kt", "java", "py", "js", "ts", "json", "xml", "html", "css", "c", "cpp", "h", "cs", "rb", "sh", "yml", "yaml", "md")
+                    val codeExtensions = setOf(
+                        "kt", "java", "py", "js", "mjs", "cjs", "ts", "json", "jsonl", "geojson",
+                        "xml", "html", "htm", "css", "scss", "sass", "less",
+                        "c", "cpp", "h", "cs", "rb", "sh", "sql",
+                        "yml", "yaml", "toml", "ini", "cfg", "conf",
+                        "log", "md", "markdown", "rst", "csv", "tsv", "svg"
+                    )
                     val isCode = codeExtensions.contains(extension)
 
                     val rememberPosition = prefsRepository.rememberReadingPosition.first()
@@ -310,6 +317,7 @@ class TextReaderViewModel @Inject constructor(
                         totalLinesCount = totalLines
                         _isTruncatedFlag = truncated
                         _isCodeFileFlag = isCode
+                        _fileExtension = extension
                         _visibleLinesCount.value = 1000.coerceAtMost(allLines.size)
                         context.getSharedPreferences("nexus_page_counts", Context.MODE_PRIVATE)
                             .edit()
@@ -341,6 +349,7 @@ class TextReaderViewModel @Inject constructor(
 
     private var _isTruncatedFlag = false
     private var _isCodeFileFlag = false
+    private var _fileExtension = ""
 
     private fun updateUiStateSuccess() {
         val count = _visibleLinesCount.value
@@ -350,7 +359,8 @@ class TextReaderViewModel @Inject constructor(
             charset = fileCharsetName,
             totalLineCount = totalLinesCount,
             isTruncated = _isTruncatedFlag,
-            isCodeFile = _isCodeFileFlag
+            isCodeFile = _isCodeFileFlag,
+            fileExtension = _fileExtension
         )
     }
 

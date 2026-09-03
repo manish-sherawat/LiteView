@@ -19,4 +19,11 @@
     <string name="label_m_ago">%1$dm ago</string>
     <string name="label_h_ago">%1$dh ago</string>
     <string name="label_yesterday">Yesterday</string>
+    <!-- Permission Strings -->
+    <string name="storage_permission_title">Access Storage</string>
+    <string name="storage_permission_body">Nexus needs permission to scan and open PDF files from your device storage.</string>
+    <string name="permission_denied_forever_title">Permission Denied Permanently</string>
+    <string name="permission_denied_forever_body">You have permanently denied storage permission. Please enable it in the app settings.</string>
+    <string name="btn_go_to_settings">Go to Settings</string>
+    <string name="action_retry">Retry</string>
 </resources>
