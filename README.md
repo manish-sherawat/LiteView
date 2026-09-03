@@ -13,7 +13,16 @@
 
 <div align="center">
 
+<img src="assets/Banner_1024x500.png" width="100%" alt="LiteView Banner" />
+
+</div>
+
+---
+
+<div align="center">
+
 <img src="app/src/main/ic_launcher-playstore.png" width="150" alt="LiteView Logo" />
+
 
 # LiteView — Document Viewer, Scanner & Annotation Suite
 
