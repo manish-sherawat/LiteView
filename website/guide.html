@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LITEVIEW — User Guide & Architecture Onboarding</title>
+    <meta name="description" content="Step-by-step master guide for LiteView offline document engine. Onboarding architecture, tag management, scanner workflows, and zero-state system.">
+    <link rel="icon" type="image/png" href="assets/app_icon.png">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Top Navigation -->
+    <header class="top-nav" id="top-nav">
+        <div class="m-stripe-divider"></div>
+        <div class="container nav-inner">
+            <a href="index.html" class="brand-wrapper">
+                <div class="brand-m-stripe">
+                    <span class="s1"></span>
+                    <span class="s2"></span>
+                    <span class="s3"></span>
+                </div>
+                <img src="assets/app_icon.png" alt="LiteView Emblem" class="brand-logo-img">
+                <span class="brand-title">LITEVIEW</span>
+            </a>
+
+            <nav>
+                <ul class="nav-menu">
+                    <li><a href="index.html" class="nav-item-link">OVERVIEW</a></li>
+                    <li><a href="features.html" class="nav-item-link">FEATURES</a></li>
+                    <li><a href="scanner.html" class="nav-item-link">SCANNER</a></li>
+                    <li><a href="formats.html" class="nav-item-link">FORMATS</a></li>
+                    <li><a href="specs.html" class="nav-item-link">SPECS</a></li>
+                    <li><a href="guide.html" class="nav-item-link active">GUIDE</a></li>
+                    <li><a href="changelog.html" class="nav-item-link">CHANGELOG</a></li>
+                    <li><a href="privacy.html" class="nav-item-link">PRIVACY</a></li>
+                </ul>
+            </nav>
+
+            <div class="nav-action">
+                <a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank" rel="noopener noreferrer" class="button-primary">GET THE APP</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Guide Hero Banner Section -->
+    <section class="page-hero-section">
+        <div class="container">
+            <div class="hero-tagline">
+                <span class="m-stripe-badge"></span>
+                <span class="label-uppercase">OFFICIAL DOCUMENTATION • ONBOARDING ARCHITECTURE</span>
+            </div>
+            <h1 class="display-lg" style="margin-top: 12px; margin-bottom: 24px;">
+                ENGINEERING GUIDE &amp; <br>
+                WORKFLOW MASTERCLASS.
+            </h1>
+            <p class="body-lead" style="max-width: 800px; margin-bottom: 32px;">
+                Learn how LiteView indexes local storage, utilizes computer-vision edge rectification, organizes multi-format catalogs via zero-latency tags, and maintains absolute offline data sovereignty.
+            </p>
+            <img src="assets/Banner_1024x500.png" alt="LiteView Feature Banner" class="guide-hero-banner">
+        </div>
+    </section>
+
+    <!-- Onboarding Step Architecture -->
+    <section class="content-band surface-soft">
+        <div class="container">
+            <div class="section-header-row">
+                <div>
+                    <span class="label-uppercase" style="color: var(--m-blue-dark);">CORE ONBOARDING</span>
+                    <h2 class="display-md">3-STEP RAPID INITIALIZATION</h2>
+                </div>
+                <p class="section-desc">
+                    LiteView requires zero accounts, zero cloud keys, and zero telemetry. On first launch, the local indexing engine configures memory boundaries in under 400ms.
+                </p>
+            </div>
+
+            <div class="card-grid-3up reveal" style="margin-top: 40px;">
+                <!-- Step 1 -->
+                <div class="guide-step-card">
+                    <span class="guide-step-number">PHASE 01 • DIRECTORY INDEXING</span>
+                    <img src="assets/wlc_screen_1.png" alt="Universal Storage Access" class="guide-screen-img">
+                    <h3 class="display-sm" style="margin-bottom: 8px;">STORAGE REPOSITORIES</h3>
+                    <p class="body-sm" style="color: var(--muted); margin-bottom: 16px;">
+                        Grant local read permission for device storage or SD-Card. LiteView parses file tables asynchronously without modifying any filesystem timestamps.
+                    </p>
+                    <div class="meta-tag">PARSER SPEED: 10,000 FILES / SEC</div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="guide-step-card">
+                    <span class="guide-step-number">PHASE 02 • SCANNER CALIBRATION</span>
+                    <img src="assets/wlc_screen_2.png" alt="HD Document Scanner Calibration" class="guide-screen-img">
+                    <h3 class="display-sm" style="margin-bottom: 8px;">HARDWARE CAMERA LINK</h3>
+                    <p class="body-sm" style="color: var(--muted); margin-bottom: 16px;">
+                        Connect to the CameraX API for zero-shutter-lag document capture with live edge-quadrilateral projection and adaptive contrast matrixing.
+                    </p>
+                    <div class="meta-tag">ALGORITHM: CANNY + HOMOGRAPHY</div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="guide-step-card">
+                    <span class="guide-step-number">PHASE 03 • OFFLINE VAULT READY</span>
+                    <img src="assets/wlc_screen_3.png" alt="100% Offline Sandbox" class="guide-screen-img">
+                    <h3 class="display-sm" style="margin-bottom: 8px;">ZERO TELEMETRY ACTIVE</h3>
+                    <p class="body-sm" style="color: var(--muted); margin-bottom: 16px;">
+                        Your documents remain sealed strictly in your device's memory. No tracking cookies, no advertising SDKs, and no network connections required.
+                    </p>
+                    <div class="meta-tag">NETWORK STATUS: AIR-GAPPED</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tag Management Architecture -->
+    <section class="content-band">
+        <div class="container">
+            <div class="feature-detail-row">
+                <div class="feature-detail-content">
+                    <div class="badge-accent">ORGANIZATION PROTOCOL</div>
+                    <h2 class="display-md" style="margin-top: 12px; margin-bottom: 20px;">
+                        RELATIONAL TAG SYSTEM &amp; <br>
+                        ZERO-COPY METADATA.
+                    </h2>
+                    <p class="body-base" style="margin-bottom: 20px;">
+                        Unlike standard file managers that duplicate files into folders, LiteView implements a lightweight SQLite metadata index. Assign custom tags like <strong>Tax 2026</strong>, <strong>Confidential</strong>, <strong>Contracts</strong>, or <strong>Invoices</strong> without changing physical disk paths.
+                    </p>
+                    <ul class="timeline-list">
+                        <li>Instant multi-tag intersecting queries (e.g. <code>#Tax</code> AND <code>#PDF</code>) with sub-1ms response.</li>
+                        <li>Non-destructive tagging preserves original file modified timestamps and hash signatures.</li>
+                        <li>Single-tap color coding and rapid batch tag reassignment.</li>
+                    </ul>
+                </div>
+                <div class="feature-detail-visual">
+                    <img src="assets/tag_manger_state.png" alt="LiteView Tag Manager State" style="width: 100%; max-height: 420px; object-fit: contain; background-color: var(--surface-soft); border: 1px solid var(--hairline); padding: 24px;">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Smart Zero-State Experience Architecture -->
+    <section class="content-band surface-soft">
+        <div class="container">
+            <div class="section-header-row">
+                <div>
+                    <span class="label-uppercase" style="color: var(--m-blue-dark);">SYSTEM RESPONSIVENESS</span>
+                    <h2 class="display-md">STATEFUL ZERO-STATE INTELLIGENCE</h2>
+                </div>
+                <p class="section-desc">
+                    Every state in LiteView is engineered with clean, informative vectors that guide users intuitively when queues, search queries, or storage caches are empty.
+                </p>
+            </div>
+
+            <div class="empty-state-grid reveal">
+                <!-- Recent Empty -->
+                <div class="empty-state-card">
+                    <img src="assets/img_empty_recent.png" alt="Empty Recent Files" class="empty-state-img">
+                    <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 4px;">NO RECENT FILES</h4>
+                    <p class="body-sm" style="color: var(--muted);">Displays automatically when history is cleared or prior to first read execution.</p>
+                </div>
+
+                <!-- Favorites Empty -->
+                <div class="empty-state-card">
+                    <img src="assets/img_empty_fav.png" alt="Empty Favorites" class="empty-state-img">
+                    <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 4px;">FAVORITES PINNED</h4>
+                    <p class="body-sm" style="color: var(--muted);">Star mission-critical spreadsheets and contracts for instant one-tap header access.</p>
+                </div>
+
+                <!-- Storage Empty -->
+                <div class="empty-state-card">
+                    <img src="assets/img_empty_storage.png" alt="Empty Storage" class="empty-state-img">
+                    <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 4px;">STORAGE SCANNING</h4>
+                    <p class="body-sm" style="color: var(--muted);">Prompts directory permissions gracefully if local storage access is revoked.</p>
+                </div>
+
+                <!-- Not Found Empty -->
+                <div class="empty-state-card">
+                    <img src="assets/img_empty_not_found.png" alt="Search Not Found" class="empty-state-img">
+                    <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 4px;">INDEX NOT FOUND</h4>
+                    <p class="body-sm" style="color: var(--muted);">Dynamic suggestions appear if regex or substring search query yields zero matches.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Band -->
+    <section class="download-cta-band">
+        <div class="container text-center">
+            <span class="m-stripe-badge" style="margin: 0 auto 16px auto;"></span>
+            <h2 class="display-lg" style="margin-bottom: 16px;">MASTER YOUR DOCUMENTS TODAY</h2>
+            <p class="body-lead" style="max-width: 680px; margin: 0 auto 32px auto;">
+                Experience the precision of LiteView on your Android device. 100% offline, zero tracking, instant rendering.
+            </p>
+            <div class="cta-button-group">
+                <a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank" rel="noopener noreferrer" class="button-primary-large">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.5,12.92 20.16,13.19L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/></svg>
+                    DOWNLOAD FROM GOOGLE PLAY
+                </a>
+                <a href="specs.html" class="button-primary-outline">INSPECT TECHNICAL SPECS</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Site Footer -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-grid-4col">
+                <div class="footer-col brand-col">
+                    <div class="footer-brand-title">LITEVIEW</div>
+                    <div class="m-stripe-divider" style="max-width: 120px; margin-bottom: 16px;"></div>
+                    <p class="footer-desc">
+                        Engineered with German precision. The ultimate 100% offline document and scanner workstation for Android.
+                    </p>
+                </div>
+                <div class="footer-col">
+                    <div class="footer-heading">NAVIGATION</div>
+                    <ul class="footer-link-list">
+                        <li><a href="index.html">Overview</a></li>
+                        <li><a href="features.html">Features</a></li>
+                        <li><a href="scanner.html">Scanner Engine</a></li>
+                        <li><a href="formats.html">Format Matrix</a></li>
+                        <li><a href="specs.html">Tech Specs</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <div class="footer-heading">DOCUMENTATION</div>
+                    <ul class="footer-link-list">
+                        <li><a href="guide.html">User Guide</a></li>
+                        <li><a href="changelog.html">Release Notes</a></li>
+                        <li><a href="privacy.html">Privacy Specification</a></li>
+                        <li><a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank" rel="noopener noreferrer">Google Play Store</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <div class="footer-heading">ENGINEERING</div>
+                    <p class="footer-desc">Architecture: Kotlin Coroutines • OpenCV • Canny Quad • Zero Telemetry.</p>
+                </div>
+            </div>
+            <div class="footer-bottom-row">
+                <div class="copyright-text">© 2026 NEXUS CORE TECHNOLOGIES. ALL RIGHTS RESERVED.</div>
+                <div class="footer-bottom-links">
+                    <a href="privacy.html">PRIVACY POLICY</a>
+                    <a href="specs.html">SYSTEM AUDIT</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -3,165 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="LiteView Privacy Policy — Learn how LiteView protects your document privacy with 100% offline local processing.">
-    <title>Privacy Policy — LiteView Document Reader & Scanner</title>
+    <meta name="description" content="LiteView Privacy Policy — Technical architecture and data protection guidelines. 100% offline local on-device processing.">
+    <title>PRIVACY POLICY — LITEVIEW DOCUMENT ENGINE</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="assets/app_icon.png">
+    <link rel="apple-touch-icon" href="assets/app_icon.png">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
 
     <!-- CSS Stylesheet -->
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="light-theme">
+<body>
 
-    <!-- Ambient Grid & Lighting Background -->
-    <div class="bg-grid-overlay"></div>
-    <div class="glow-sphere sphere-1"></div>
-    <div class="glow-sphere sphere-2"></div>
-
-    <!-- Navigation Header -->
-    <header class="navbar" id="navbar">
-        <div class="container nav-container">
-            <a href="index.html" class="brand-logo">
-                <img src="assets/app_icon.png" alt="LiteView Icon" class="real-app-icon">
-                <span class="brand-text">LiteView</span>
+    <!-- Top Navigation -->
+    <header class="top-nav" id="top-nav">
+        <div class="m-stripe-divider"></div>
+        <div class="container nav-inner">
+            <a href="index.html" class="brand-wrapper">
+                <div class="brand-m-stripe">
+                    <span class="s1"></span>
+                    <span class="s2"></span>
+                    <span class="s3"></span>
+                </div>
+                <img src="assets/app_icon.png" alt="LiteView Emblem" class="brand-logo-img">
+                <span class="brand-title">LITEVIEW</span>
             </a>
 
-            <nav class="nav-links">
-                <a href="index.html#features" class="nav-link">Features</a>
-                <a href="index.html#formats" class="nav-link">Formats</a>
-                <a href="index.html#faq" class="nav-link">FAQ</a>
-                <a href="privacy.html" class="nav-link active">Privacy Policy</a>
+            <nav>
+                <ul class="nav-menu">
+                    <li><a href="index.html" class="nav-item-link">OVERVIEW</a></li>
+                    <li><a href="features.html" class="nav-item-link">FEATURES</a></li>
+                    <li><a href="scanner.html" class="nav-item-link">SCANNER</a></li>
+                    <li><a href="formats.html" class="nav-item-link">FORMATS</a></li>
+                    <li><a href="specs.html" class="nav-item-link">SPECS</a></li>
+                    <li><a href="guide.html" class="nav-item-link">GUIDE</a></li>
+                    <li><a href="changelog.html" class="nav-item-link">CHANGELOG</a></li>
+                    <li><a href="privacy.html" class="nav-item-link active">PRIVACY</a></li>
+                </ul>
             </nav>
 
-            <div class="nav-cta">
-                <a href="index.html#download" class="btn btn-primary btn-sm">Get App</a>
+            <div class="nav-action">
+                <a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank" rel="noopener noreferrer" class="button-primary">GET THE APP</a>
             </div>
         </div>
     </header>
 
-    <!-- Privacy Policy Hero -->
-    <section class="privacy-hero">
-        <div class="container text-center">
-            <div class="hero-pill">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                <span>Privacy-First Architecture</span>
+    <!-- Privacy Policy Section -->
+    <main class="privacy-page-wrap">
+        <div id="vanta-bg" class="vanta-bg-canvas"></div>
+        <div class="container">
+            <div class="section-head-wrap text-left reveal" style="margin-bottom: 48px;">
+                <span class="label-uppercase"><span class="m-stripe-badge"></span>DATA ARCHITECTURE</span>
+                <h1 class="display-lg" style="margin-top: 8px;">PRIVACY POLICY</h1>
+                <p class="body-lead" style="max-width: 760px; margin-top: 12px;">
+                    Technical data protection guidelines for LiteView. All document parsing, rendering, and camera operations execute locally on your physical Android hardware with zero cloud telemetry.
+                </p>
             </div>
 
-            <h1 class="hero-title">Privacy Policy</h1>
-            <p class="hero-description">
-                Your documents, camera scans, and personal files belong strictly to you. Learn how LiteView protects your data with 100% offline local processing.
-            </p>
-
-            <div class="privacy-highlights-row">
-                <div class="privacy-chip">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                    <span>100% Offline Operation</span>
-                </div>
-                <div class="privacy-chip">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                    <span>Zero Analytics or Telemetry</span>
-                </div>
-                <div class="privacy-chip">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                    <span>No Cloud File Uploads</span>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Policy Content Document Card -->
-    <section class="privacy-body-section">
-        <div class="container privacy-container">
-            <div class="privacy-card">
-                <div class="privacy-card-header">
-                    <span class="effective-date">Last Updated: August 7, 2026 • Version 2.5.3</span>
+            <!-- Policy Article Container -->
+            <article class="privacy-article reveal stagger-1">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--hairline); padding-bottom: 16px;">
+                    <span class="label-uppercase" style="color: var(--muted);">EFFECTIVE DATE: AUGUST 2026</span>
+                    <span class="label-uppercase" style="color: var(--on-dark);">VERSION 2.5.3</span>
                 </div>
 
-                <div class="privacy-block">
-                    <h2>1. Overview & Privacy Commitment</h2>
-                    <p>At <strong>LiteView</strong>, we believe that personal documents, camera scans, and notes should remain private. LiteView is engineered from the ground up to operate <strong>completely offline</strong> without relying on cloud servers or external data pipelines.</p>
-                    <p>We do not collect, transmit, store, or sell any personal information, document content, or usage data to third parties.</p>
+                <div class="privacy-section-block">
+                    <h2>01. OVERVIEW & PRIVACY COMMITMENT</h2>
+                    <p>
+                        LiteView is engineered as an air-gapped, zero-telemetry utility application for Android. We believe personal documents, digital notes, and camera scans must never be accessible to unauthorized remote services.
+                    </p>
+                    <p>
+                        LiteView does not collect, record, transmit, monetize, or profile any personal information, usage metrics, or document contents.
+                    </p>
                 </div>
 
-                <div class="privacy-block">
-                    <h2>2. Information Collection & Data Use</h2>
-                    <p>Because LiteView functions entirely on your local Android device hardware, our data collection practices are minimal:</p>
-                    <ul class="policy-list">
-                        <li><strong>No Personal Identification:</strong> LiteView does not require account registration, email addresses, phone numbers, or user profiles.</li>
-                        <li><strong>No Document Content Access:</strong> Your PDF, Word, Excel, PowerPoint, and Text files are parsed and rendered strictly inside your device's memory.</li>
-                        <li><strong>No Network Tracking:</strong> LiteView contains zero third-party analytics frameworks, advertising trackers, or telemetry beacons.</li>
+                <div class="privacy-section-block">
+                    <h2>02. DATA COLLECTION ARCHITECTURE</h2>
+                    <p>
+                        Because LiteView functions entirely within the local Android OS sandbox without external cloud connections:
+                    </p>
+                    <ul class="privacy-spec-list">
+                        <li class="privacy-spec-item">
+                            <span class="privacy-spec-title">NO USER IDENTITY TRACKING</span>
+                            <span class="privacy-spec-desc">No accounts, passwords, email addresses, or phone numbers are ever required or stored.</span>
+                        </li>
+                        <li class="privacy-spec-item">
+                            <span class="privacy-spec-title">NO CLOUD UPLOADS</span>
+                            <span class="privacy-spec-desc">All PDF, Word, Excel, and Text files are rendered strictly in volatile device memory and local storage.</span>
+                        </li>
+                        <li class="privacy-spec-item">
+                            <span class="privacy-spec-title">ZERO TELEMETRY BEACONS</span>
+                            <span class="privacy-spec-desc">The application includes zero third-party advertising frameworks, analytics SDKs, or background pinging routines.</span>
+                        </li>
                     </ul>
                 </div>
 
-                <div class="privacy-block">
-                    <h2>3. Device Permissions Explained</h2>
-                    <p>To view and scan documents on your phone, LiteView requires specific Android system permissions:</p>
+                <div class="privacy-section-block" id="permissions">
+                    <h2>03. ANDROID SYSTEM PERMISSIONS SPECIFICATION</h2>
+                    <p>
+                        To execute document rendering and optical camera scanning, LiteView requests only minimal, necessary Android system permissions:
+                    </p>
 
-                    <div class="permission-cards-grid">
-                        <div class="perm-box">
-                            <div class="perm-icon-bubble blue-icon">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                            </div>
-                            <div class="perm-text">
-                                <h3>Storage & Document Access</h3>
-                                <p>Used strictly to locate, read, and display documents stored in your device memory or SD card.</p>
-                            </div>
-                        </div>
+                    <ul class="privacy-spec-list">
+                        <li class="privacy-spec-item">
+                            <span class="privacy-spec-title">STORAGE & FILE ACCESS (READ/WRITE)</span>
+                            <span class="privacy-spec-desc">Used strictly to discover, open, and save document files located on your internal flash storage or SD card.</span>
+                        </li>
+                        <li class="privacy-spec-item">
+                            <span class="privacy-spec-title">CAMERA ACCESS (HARDWARE SENSOR)</span>
+                            <span class="privacy-spec-desc">Used exclusively during active HD Document Scanner capture sessions to convert physical documents to local PDFs.</span>
+                        </li>
+                    </ul>
+                </div>
 
-                        <div class="perm-box">
-                            <div class="perm-icon-bubble purple-icon">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                            </div>
-                            <div class="perm-text">
-                                <h3>Camera Access</h3>
-                                <p>Used exclusively when you trigger the HD Document Scanner feature to capture paper files into local PDFs.</p>
-                            </div>
-                        </div>
+                <div class="privacy-section-block" id="storage">
+                    <h2>04. LOCAL DATA RETENTION & CONTROL</h2>
+                    <p>
+                        All user annotations, highlights, digital signatures, bookmarks, and scans created in LiteView are stored exclusively on your device. You retain 100% control to edit, backup, export, or permanently delete any file at any time.
+                    </p>
+                </div>
+
+                <div class="privacy-section-block">
+                    <h2>05. DEVELOPER CONTACT</h2>
+                    <p>
+                        For technical inquiries, audit requests, or feedback regarding LiteView's offline architecture, contact our engineering team:
+                    </p>
+                    <div class="contact-card">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        <span>SHERAWAT003@GMAIL.COM</span>
                     </div>
                 </div>
-
-                <div class="privacy-block">
-                    <h2>4. Data Storage & Retention</h2>
-                    <p>All annotations, highlights, sticky notes, signatures, or scanned documents created within LiteView remain stored locally in your phone's sandbox or public Downloads folder. You retain complete control to move, back up, or delete your files at any time.</p>
-                </div>
-
-                <div class="privacy-block">
-                    <h2>5. Children's Privacy</h2>
-                    <p>LiteView does not target or collect data from individuals under 13 years of age. Our application contains no user accounts or data collection features for any age group.</p>
-                </div>
-
-                <div class="privacy-block">
-                    <h2>6. Contact Us</h2>
-                    <p>If you have any questions or feedback regarding this Privacy Policy or LiteView's offline architecture, please reach out to us:</p>
-                    <div class="support-card">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                        <span>Support Email: <strong>sherawat003@gmail.com</strong></span>
-                    </div>
-                </div>
-            </div>
+            </article>
         </div>
-    </section>
+    </main>
 
-    <!-- Footer -->
-    <footer class="app-footer">
-        <div class="container footer-layout">
-            <div class="footer-left">
-                <div class="footer-brand-row">
-                    <img src="assets/app_icon.png" alt="LiteView Icon" class="footer-app-icon">
-                    <span class="footer-brand">LiteView</span>
+    <!-- Site Footer -->
+    <footer class="site-footer">
+        <div class="m-stripe-divider" style="margin-bottom: 48px;"></div>
+        <div class="container reveal">
+            <div class="footer-grid-4col">
+                <div>
+                    <h4 class="footer-col-title">PAGES</h4>
+                    <ul class="footer-col-links">
+                        <li><a href="index.html" class="footer-link">OVERVIEW</a></li>
+                        <li><a href="features.html" class="footer-link">FEATURES</a></li>
+                        <li><a href="scanner.html" class="footer-link">SCANNER</a></li>
+                        <li><a href="specs.html" class="footer-link">SPECIFICATIONS</a></li>
+                    </ul>
                 </div>
-                <p>Private & Lightweight Android Document Reader</p>
+
+                <div>
+                    <h4 class="footer-col-title">MODULES</h4>
+                    <ul class="footer-col-links">
+                        <li><a href="features.html" class="footer-link">PDF ENGINE</a></li>
+                        <li><a href="features.html" class="footer-link">OFFICE VIEWER</a></li>
+                        <li><a href="scanner.html" class="footer-link">HD SCANNER</a></li>
+                        <li><a href="features.html" class="footer-link">TAG MANAGER</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="footer-col-title">LEGAL & PRIVACY</h4>
+                    <ul class="footer-col-links">
+                        <li><a href="privacy.html" class="footer-link">PRIVACY POLICY</a></li>
+                        <li><a href="privacy.html#permissions" class="footer-link">PERMISSIONS SPEC</a></li>
+                        <li><a href="privacy.html#storage" class="footer-link">DATA RETENTION</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="footer-col-title">SUPPORT</h4>
+                    <ul class="footer-col-links">
+                        <li><a href="mailto:sherawat003@gmail.com" class="footer-link">SHERAWAT003@GMAIL.COM</a></li>
+                        <li><a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank" rel="noopener noreferrer" class="footer-link">GOOGLE PLAY STORE</a></li>
+                    </ul>
+                </div>
             </div>
-            <div class="footer-links">
-                <a href="index.html">Home</a>
-                <a href="privacy.html">Privacy Policy</a>
+
+            <div class="footer-bottom-row">
+                <span class="footer-disclaimer">© 2026 LITEVIEW. ALL RIGHTS RESERVED. PRECISION OFFLINE RUNTIME.</span>
+                <span class="footer-disclaimer">RELEASE VERSION 2.5.3</span>
             </div>
-            <p class="copyright">© 2026 LiteView. All rights reserved.</p>
         </div>
     </footer>
 
+    <!-- Three.js & Vanta Fog Animated Background Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>

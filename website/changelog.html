@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LITEVIEW — Release Logs &amp; Engineering Roadmap</title>
+    <meta name="description" content="Changelog, release notes, and version roadmap for LiteView offline document engine on Android.">
+    <link rel="icon" type="image/png" href="assets/app_icon.png">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Top Navigation -->
+    <header class="top-nav" id="top-nav">
+        <div class="m-stripe-divider"></div>
+        <div class="container nav-inner">
+            <a href="index.html" class="brand-wrapper">
+                <div class="brand-m-stripe">
+                    <span class="s1"></span>
+                    <span class="s2"></span>
+                    <span class="s3"></span>
+                </div>
+                <img src="assets/app_icon.png" alt="LiteView Emblem" class="brand-logo-img">
+                <span class="brand-title">LITEVIEW</span>
+            </a>
+
+            <nav>
+                <ul class="nav-menu">
+                    <li><a href="index.html" class="nav-item-link">OVERVIEW</a></li>
+                    <li><a href="features.html" class="nav-item-link">FEATURES</a></li>
+                    <li><a href="scanner.html" class="nav-item-link">SCANNER</a></li>
+                    <li><a href="formats.html" class="nav-item-link">FORMATS</a></li>
+                    <li><a href="specs.html" class="nav-item-link">SPECS</a></li>
+                    <li><a href="guide.html" class="nav-item-link">GUIDE</a></li>
+                    <li><a href="changelog.html" class="nav-item-link active">CHANGELOG</a></li>
+                    <li><a href="privacy.html" class="nav-item-link">PRIVACY</a></li>
+                </ul>
+            </nav>
+
+            <div class="nav-action">
+                <a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank" rel="noopener noreferrer" class="button-primary">GET THE APP</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Page Hero Section -->
+    <section class="page-hero-section">
+        <div class="container">
+            <div class="hero-tagline">
+                <span class="m-stripe-badge"></span>
+                <span class="label-uppercase">CONTINUOUS DELIVERY • VERIFIED BUILDS</span>
+            </div>
+            <h1 class="display-lg" style="margin-top: 12px; margin-bottom: 24px;">
+                ENGINEERING LOGS &amp; <br>
+                PRODUCTION RELEASES.
+            </h1>
+            <p class="body-lead" style="max-width: 800px; margin-bottom: 32px;">
+                Transparent technical change audits, performance optimizations, memory reduction metrics, and version histories for the LiteView Android client.
+            </p>
+            <img src="assets/playstore_feature_graphic.png" alt="LiteView Production Graphic" class="guide-hero-banner" style="max-height: 360px;">
+        </div>
+    </section>
+
+    <!-- Version Timeline -->
+    <section class="content-band surface-soft">
+        <div class="container">
+            <div class="section-header-row">
+                <div>
+                    <span class="label-uppercase" style="color: var(--m-blue-dark);">VERSION TIMELINE</span>
+                    <h2 class="display-md">CHANGELOG &amp; MILESTONES</h2>
+                </div>
+                <p class="section-desc">
+                    Every production release is compiled with strict R8 code-shrinking and verified against air-gapped security testbeds.
+                </p>
+            </div>
+
+            <div class="timeline-wrap reveal" style="margin-top: 40px; max-width: 960px;">
+                <!-- Version 1.2.0 (Latest) -->
+                <div class="timeline-entry latest">
+                    <div class="timeline-card">
+                        <div class="timeline-header">
+                            <div>
+                                <h3 class="display-sm" style="display: inline-block; margin-right: 12px;">VERSION 1.2.0</h3>
+                                <span class="timeline-badge">LATEST PRODUCTION RELEASE</span>
+                            </div>
+                            <span class="meta-tag">BUILD 2026.09.12</span>
+                        </div>
+                        <p class="body-base" style="margin-bottom: 12px;">
+                            Major architecture refresh introducing the 6-phase Computer Vision Camera Scanner pipeline and tile-based vector PDF rendering engine.
+                        </p>
+                        <ul class="timeline-list">
+                            <li><strong>Integrated HD Camera Scanner:</strong> Real-time Canny edge detection, quadrilateral perspective homography, and B&amp;W contrast thresholding.</li>
+                            <li><strong>Stylus &amp; Touch Annotations:</strong> Freehand vector drawing, highlight overlays, text notes, and instant flattened PDF export.</li>
+                            <li><strong>Vanta.js Dynamic Web Portal:</strong> Precision light theme visual overhaul with interactive fluid particle acoustics.</li>
+                            <li><strong>Memory Optimization:</strong> Reduced peak RAM overhead during 1,000+ page PDF scrolling by 34%.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Version 1.1.0 -->
+                <div class="timeline-entry">
+                    <div class="timeline-card">
+                        <div class="timeline-header">
+                            <div>
+                                <h3 class="display-sm" style="display: inline-block; margin-right: 12px;">VERSION 1.1.0</h3>
+                                <span class="meta-tag">STABLE PRODUCTION</span>
+                            </div>
+                            <span class="meta-tag">BUILD 2026.06.01</span>
+                        </div>
+                        <p class="body-base" style="margin-bottom: 12px;">
+                            Office document expansion and relational tag index database.
+                        </p>
+                        <ul class="timeline-list">
+                            <li><strong>Virtual Spreadsheet Grid:</strong> 60 FPS viewport rendering for Excel <code>.xlsx</code> workbooks with over 50,000 active cells.</li>
+                            <li><strong>Relational Tag Manager:</strong> Zero-copy tagging system with color labels and Boolean intersection queries.</li>
+                            <li><strong>Night Mode Inversion:</strong> Hardware-accelerated color matrix filter for low-light reading environments.</li>
+                            <li><strong>Search Engine:</strong> Sub-10ms fuzzy substring search across all indexed file names and metadata tags.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Version 1.0.0 -->
+                <div class="timeline-entry">
+                    <div class="timeline-card">
+                        <div class="timeline-header">
+                            <div>
+                                <h3 class="display-sm" style="display: inline-block; margin-right: 12px;">VERSION 1.0.0</h3>
+                                <span class="meta-tag">INITIAL CORE ENGINE</span>
+                            </div>
+                            <span class="meta-tag">BUILD 2026.02.15</span>
+                        </div>
+                        <p class="body-base" style="margin-bottom: 12px;">
+                            Foundation launch of the LiteView offline document engine.
+                        </p>
+                        <ul class="timeline-list">
+                            <li><strong>100% Offline Core:</strong> Zero network permissions requested. Air-gapped privacy architecture.</li>
+                            <li><strong>Multi-Format Reader:</strong> High-performance rendering for PDF, DOCX, XLSX, PPTX, and TXT files.</li>
+                            <li><strong>Universal File Explorer:</strong> Auto-categorized tabs for instant document grouping by extension.</li>
+                            <li><strong>Zero Cloud Dependency:</strong> No user registration, telemetry SDKs, or cloud server syncing required.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Download CTA Band -->
+    <section class="download-cta-band">
+        <div class="container text-center">
+            <span class="m-stripe-badge" style="margin: 0 auto 16px auto;"></span>
+            <h2 class="display-lg" style="margin-bottom: 16px;">UPGRADE TO THE LATEST BUILD</h2>
+            <p class="body-lead" style="max-width: 680px; margin: 0 auto 32px auto;">
+                Get the latest version of LiteView on Google Play with all performance optimizations included.
+            </p>
+            <div class="cta-button-group">
+                <a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank" rel="noopener noreferrer" class="button-primary-large">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.5,12.92 20.16,13.19L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/></svg>
+                    INSTALL FROM GOOGLE PLAY
+                </a>
+                <a href="guide.html" class="button-primary-outline">READ USER GUIDE</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Site Footer -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-grid-4col">
+                <div class="footer-col brand-col">
+                    <div class="footer-brand-title">LITEVIEW</div>
+                    <div class="m-stripe-divider" style="max-width: 120px; margin-bottom: 16px;"></div>
+                    <p class="footer-desc">
+                        Engineered with German precision. The ultimate 100% offline document and scanner workstation for Android.
+                    </p>
+                </div>
+                <div class="footer-col">
+                    <div class="footer-heading">NAVIGATION</div>
+                    <ul class="footer-link-list">
+                        <li><a href="index.html">Overview</a></li>
+                        <li><a href="features.html">Features</a></li>
+                        <li><a href="scanner.html">Scanner Engine</a></li>
+                        <li><a href="formats.html">Format Matrix</a></li>
+                        <li><a href="specs.html">Tech Specs</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <div class="footer-heading">DOCUMENTATION</div>
+                    <ul class="footer-link-list">
+                        <li><a href="guide.html">User Guide</a></li>
+                        <li><a href="changelog.html">Release Notes</a></li>
+                        <li><a href="privacy.html">Privacy Specification</a></li>
+                        <li><a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank" rel="noopener noreferrer">Google Play Store</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <div class="footer-heading">ENGINEERING</div>
+                    <p class="footer-desc">Architecture: Kotlin Coroutines • OpenCV • Canny Quad • Zero Telemetry.</p>
+                </div>
+            </div>
+            <div class="footer-bottom-row">
+                <div class="copyright-text">© 2026 NEXUS CORE TECHNOLOGIES. ALL RIGHTS RESERVED.</div>
+                <div class="footer-bottom-links">
+                    <a href="privacy.html">PRIVACY POLICY</a>
+                    <a href="specs.html">SYSTEM AUDIT</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

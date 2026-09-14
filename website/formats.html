@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LITEVIEW — Format Matrix &amp; Parser Engine</title>
+    <meta name="description" content="Technical breakdown of LiteView's offline rendering engines for PDF, Microsoft Word DOCX, Excel XLSX, PPTX, and plain text.">
+    <link rel="icon" type="image/png" href="assets/app_icon.png">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Top Navigation -->
+    <header class="top-nav" id="top-nav">
+        <div class="m-stripe-divider"></div>
+        <div class="container nav-inner">
+            <a href="index.html" class="brand-wrapper">
+                <div class="brand-m-stripe">
+                    <span class="s1"></span>
+                    <span class="s2"></span>
+                    <span class="s3"></span>
+                </div>
+                <img src="assets/app_icon.png" alt="LiteView Emblem" class="brand-logo-img">
+                <span class="brand-title">LITEVIEW</span>
+            </a>
+
+            <nav>
+                <ul class="nav-menu">
+                    <li><a href="index.html" class="nav-item-link">OVERVIEW</a></li>
+                    <li><a href="features.html" class="nav-item-link">FEATURES</a></li>
+                    <li><a href="scanner.html" class="nav-item-link">SCANNER</a></li>
+                    <li><a href="formats.html" class="nav-item-link active">FORMATS</a></li>
+                    <li><a href="specs.html" class="nav-item-link">SPECS</a></li>
+                    <li><a href="guide.html" class="nav-item-link">GUIDE</a></li>
+                    <li><a href="changelog.html" class="nav-item-link">CHANGELOG</a></li>
+                    <li><a href="privacy.html" class="nav-item-link">PRIVACY</a></li>
+                </ul>
+            </nav>
+
+            <div class="nav-action">
+                <a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank" rel="noopener noreferrer" class="button-primary">GET THE APP</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Page Hero Section -->
+    <section class="page-hero-section">
+        <div class="container">
+            <div class="hero-tagline">
+                <span class="m-stripe-badge"></span>
+                <span class="label-uppercase">PARSER ARCHITECTURE • ZERO EXTERNAL DEPENDENCIES</span>
+            </div>
+            <h1 class="display-lg" style="margin-top: 12px; margin-bottom: 24px;">
+                UNIVERSAL FORMAT MATRIX &amp; <br>
+                HIGH-FIDELITY PARSERS.
+            </h1>
+            <p class="body-lead" style="max-width: 820px; margin-bottom: 32px;">
+                From complex 100MB financial spreadsheets to vector-dense architectural blueprints, LiteView utilizes isolated, sandboxed rendering pipelines designed for sub-second opening times.
+            </p>
+        </div>
+    </section>
+
+    <!-- Deep-Dive Format Grid -->
+    <section class="content-band surface-soft">
+        <div class="container">
+            <div class="format-tech-grid reveal">
+                <!-- PDF Engine -->
+                <div class="format-tech-card">
+                    <div class="format-icon-header">
+                        <img src="assets/ic_pdf.png" alt="PDF Format Emblem" class="format-icon-img">
+                        <div>
+                            <span class="label-uppercase" style="color: var(--m-red);">PORTABLE DOCUMENT FORMAT</span>
+                            <h3 class="display-sm">PDF 1.7 / 2.0 &amp; ISO-32000</h3>
+                        </div>
+                    </div>
+                    <p class="body-base" style="margin-bottom: 12px;">
+                        Native C++ vectorized rendering with tile-based memory pooling. Supports continuous vertical scrolling, horizontal flip mode, night-mode inversion, and multi-layer vector stylus annotations.
+                    </p>
+                    <div class="meta-tag">BENCHMARK: 1,000 PAGES LOADED IN 140MS</div>
+                    <img src="assets/3.jpg" alt="PDF Viewer and Annotation Engine" class="format-screenshot-preview">
+                </div>
+
+                <!-- Excel / Spreadsheet Engine -->
+                <div class="format-tech-card">
+                    <div class="format-icon-header">
+                        <img src="assets/ic_excel.png" alt="Excel Format Emblem" class="format-icon-img">
+                        <div>
+                            <span class="label-uppercase" style="color: #059669;">CALCULATION MATRICES</span>
+                            <h3 class="display-sm">XLSX, XLS &amp; CSV WORKBOOKS</h3>
+                        </div>
+                    </div>
+                    <p class="body-base" style="margin-bottom: 12px;">
+                        Virtual grid virtualizer rendering only visible cells to maintain 60 FPS scrolling on tables exceeding 50,000 rows. Preserves cell formulas, conditional styling, and multi-sheet tabs.
+                    </p>
+                    <div class="meta-tag">MEMORY OVERHEAD: &lt; 28MB FOR 100K CELLS</div>
+                    <img src="assets/4.jpg" alt="Spreadsheet Calculation Viewer" class="format-screenshot-preview">
+                </div>
+
+                <!-- Word & Doc Engine -->
+                <div class="format-tech-card">
+                    <div class="format-icon-header">
+                        <img src="assets/ic_word.png" alt="Word Format Emblem" class="format-icon-img">
+                        <div>
+                            <span class="label-uppercase" style="color: var(--m-blue-dark);">OFFICE WORD PROCESSOR</span>
+                            <h3 class="display-sm">DOCX, DOC &amp; RTF DOCUMENTS</h3>
+                        </div>
+                    </div>
+                    <p class="body-base" style="margin-bottom: 12px;">
+                        Full XML DOM tokenizer that maps Microsoft OpenXML element hierarchies into crisp hardware-accelerated text views with font substitution fallback and table preservation.
+                    </p>
+                    <div class="meta-tag">PARSER SPEED: 5MB DOCX IN 95MS</div>
+                    <img src="assets/1.jpg" alt="Document Explorer List" class="format-screenshot-preview">
+                </div>
+
+                <!-- Plain Text & Corrupted Stream Handling -->
+                <div class="format-tech-card">
+                    <div class="format-icon-header">
+                        <img src="assets/ic_txt.png" alt="Text Format Emblem" class="format-icon-img">
+                        <div>
+                            <span class="label-uppercase" style="color: var(--body);">CODE &amp; TEXT STREAMS</span>
+                            <h3 class="display-sm">TXT, LOG, XML &amp; RAW STREAMS</h3>
+                        </div>
+                    </div>
+                    <p class="body-base" style="margin-bottom: 12px;">
+                        Zero-copy byte streaming with automatic UTF-8 / ASCII / UTF-16 endian detection. Fault-tolerant sandbox isolates corrupted files without crashing the application.
+                    </p>
+                    <div class="meta-tag">SAFETY: ISOLATED PROCESS SANDBOX</div>
+                    <img src="assets/img_empty_unsupported.png" alt="Unsupported File Safety Sandbox" class="format-screenshot-preview" style="object-fit: contain; padding: 24px;">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Technical Format Comparison Table -->
+    <section class="content-band">
+        <div class="container">
+            <div class="section-header-row">
+                <div>
+                    <span class="label-uppercase" style="color: var(--m-blue-dark);">ENGINE CAPABILITIES</span>
+                    <h2 class="display-md">FORMAT BENCHMARK MATRIX</h2>
+                </div>
+                <p class="section-desc">
+                    Comprehensive comparison of format parser specifications, rendering speeds, and offline capabilities in LiteView.
+                </p>
+            </div>
+
+            <div style="overflow-x: auto; margin-top: 32px;">
+                <table class="benchmark-table">
+                    <thead>
+                        <tr>
+                            <th>FORMAT SPEC</th>
+                            <th>EXTENSIONS</th>
+                            <th>PARSER ENGINE</th>
+                            <th>AVG LATENCY</th>
+                            <th>MEMORY PEAK</th>
+                            <th>OFFLINE INTEGRITY</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="font-bold">PDF Vector</td>
+                            <td>.pdf</td>
+                            <td>Native C++ / Skia Pipeline</td>
+                            <td>&lt; 140 ms</td>
+                            <td>32 MB</td>
+                            <td><span class="status-badge-verified">100% AIR-GAPPED</span></td>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">Excel Spreadsheets</td>
+                            <td>.xlsx, .xls, .csv</td>
+                            <td>Virtual Cell Matrix Engine</td>
+                            <td>&lt; 190 ms</td>
+                            <td>28 MB</td>
+                            <td><span class="status-badge-verified">100% AIR-GAPPED</span></td>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">Word Documents</td>
+                            <td>.docx, .doc</td>
+                            <td>OpenXML Fast Tokenizer</td>
+                            <td>&lt; 110 ms</td>
+                            <td>22 MB</td>
+                            <td><span class="status-badge-verified">100% AIR-GAPPED</span></td>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">PowerPoint Slides</td>
+                            <td>.pptx, .ppt</td>
+                            <td>Presentation Slide Rasterizer</td>
+                            <td>&lt; 220 ms</td>
+                            <td>36 MB</td>
+                            <td><span class="status-badge-verified">100% AIR-GAPPED</span></td>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">Plain Text / Logs</td>
+                            <td>.txt, .log, .json</td>
+                            <td>Zero-Copy UTF Stream Reader</td>
+                            <td>&lt; 18 ms</td>
+                            <td>4 MB</td>
+                            <td><span class="status-badge-verified">100% AIR-GAPPED</span></td>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">HD Scanner Output</td>
+                            <td>.pdf (Multi-page)</td>
+                            <td>Canny Quad + Homography Warp</td>
+                            <td>&lt; 280 ms</td>
+                            <td>42 MB</td>
+                            <td><span class="status-badge-verified">100% AIR-GAPPED</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Download CTA Band -->
+    <section class="download-cta-band">
+        <div class="container text-center">
+            <span class="m-stripe-badge" style="margin: 0 auto 16px auto;"></span>
+            <h2 class="display-lg" style="margin-bottom: 16px;">READY TO EXPERIENCE RAW SPEED?</h2>
+            <p class="body-lead" style="max-width: 680px; margin: 0 auto 32px auto;">
+                Download LiteView from Google Play and open any document in milliseconds.
+            </p>
+            <div class="cta-button-group">
+                <a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank" rel="noopener noreferrer" class="button-primary-large">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.5,12.92 20.16,13.19L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/></svg>
+                    DOWNLOAD FROM GOOGLE PLAY
+                </a>
+                <a href="specs.html" class="button-primary-outline">VIEW HARDWARE AUDIT</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Site Footer -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-grid-4col">
+                <div class="footer-col brand-col">
+                    <div class="footer-brand-title">LITEVIEW</div>
+                    <div class="m-stripe-divider" style="max-width: 120px; margin-bottom: 16px;"></div>
+                    <p class="footer-desc">
+                        Engineered with German precision. The ultimate 100% offline document and scanner workstation for Android.
+                    </p>
+                </div>
+                <div class="footer-col">
+                    <div class="footer-heading">NAVIGATION</div>
+                    <ul class="footer-link-list">
+                        <li><a href="index.html">Overview</a></li>
+                        <li><a href="features.html">Features</a></li>
+                        <li><a href="scanner.html">Scanner Engine</a></li>
+                        <li><a href="formats.html">Format Matrix</a></li>
+                        <li><a href="specs.html">Tech Specs</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <div class="footer-heading">DOCUMENTATION</div>
+                    <ul class="footer-link-list">
+                        <li><a href="guide.html">User Guide</a></li>
+                        <li><a href="changelog.html">Release Notes</a></li>
+                        <li><a href="privacy.html">Privacy Specification</a></li>
+                        <li><a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank" rel="noopener noreferrer">Google Play Store</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <div class="footer-heading">ENGINEERING</div>
+                    <p class="footer-desc">Architecture: Kotlin Coroutines • OpenCV • Canny Quad • Zero Telemetry.</p>
+                </div>
+            </div>
+            <div class="footer-bottom-row">
+                <div class="copyright-text">© 2026 NEXUS CORE TECHNOLOGIES. ALL RIGHTS RESERVED.</div>
+                <div class="footer-bottom-links">
+                    <a href="privacy.html">PRIVACY POLICY</a>
+                    <a href="specs.html">SYSTEM AUDIT</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

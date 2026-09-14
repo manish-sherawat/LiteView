@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="LiteView Features — Detailed breakdown of our PDF Reader, HD Camera Scanner, Office Viewer, and Air-Gapped Privacy Engine.">
+    <title>FEATURES — LITEVIEW DOCUMENT ENGINE</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="assets/app_icon.png">
+    <link rel="apple-touch-icon" href="assets/app_icon.png">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
+
+    <!-- CSS Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Top Navigation -->
+    <header class="top-nav" id="top-nav">
+        <div class="m-stripe-divider"></div>
+        <div class="container nav-inner">
+            <a href="index.html" class="brand-wrapper">
+                <div class="brand-m-stripe">
+                    <span class="s1"></span>
+                    <span class="s2"></span>
+                    <span class="s3"></span>
+                </div>
+                <img src="assets/app_icon.png" alt="LiteView Emblem" class="brand-logo-img">
+                <span class="brand-title">LITEVIEW</span>
+            </a>
+
+            <nav>
+                <ul class="nav-menu">
+                    <li><a href="index.html" class="nav-item-link">OVERVIEW</a></li>
+                    <li><a href="features.html" class="nav-item-link active">FEATURES</a></li>
+                    <li><a href="scanner.html" class="nav-item-link">SCANNER</a></li>
+                    <li><a href="formats.html" class="nav-item-link">FORMATS</a></li>
+                    <li><a href="specs.html" class="nav-item-link">SPECS</a></li>
+                    <li><a href="guide.html" class="nav-item-link">GUIDE</a></li>
+                    <li><a href="changelog.html" class="nav-item-link">CHANGELOG</a></li>
+                    <li><a href="privacy.html" class="nav-item-link">PRIVACY</a></li>
+                </ul>
+            </nav>
+
+            <div class="nav-action">
+                <a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank" rel="noopener noreferrer" class="button-primary">GET THE APP</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Features Hero Banner with Vanta Fog -->
+    <section class="hero-band">
+        <div id="vanta-bg" class="vanta-bg-canvas"></div>
+        <div class="container text-center" style="position: relative; z-index: 2; max-width: 860px; margin: 0 auto;">
+            <div class="hero-tagline" style="justify-content: center;">
+                <span class="m-stripe-badge"></span>
+                <span class="label-uppercase">SYSTEM MODULES & ARCHITECTURE</span>
+            </div>
+
+            <h1 class="display-lg hero-title">ENGINEERED FOR ABSOLUTE PRECISION</h1>
+            <p class="body-lead hero-lead" style="margin-left: auto; margin-right: auto;">
+                Every module in LiteView is built from the ground up to eliminate lag, maximize rendering fidelity, and operate with zero cloud dependency.
+            </p>
+
+            <div class="hero-cta-group" style="justify-content: center;">
+                <a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank" rel="noopener noreferrer" class="button-primary">DOWNLOAD ON PLAY STORE</a>
+                <a href="specs.html" class="button-primary-outline">VIEW BENCHMARKS →</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Deep Dive Alternating Rows Section -->
+    <section style="padding: var(--spacing-section) 0; background-color: var(--canvas);">
+        <div class="container">
+
+            <!-- Module 1: PDF Viewer & Annotations -->
+            <div class="feature-detail-row reveal">
+                <div class="feature-detail-mockup">
+                    <img src="assets/2.jpg" alt="PDF Reader & Annotations Screen">
+                </div>
+                <div class="feature-detail-text">
+                    <span class="label-uppercase"><span class="m-stripe-badge"></span>MODULE 01 • RENDERING ENGINE</span>
+                    <h2 class="display-md">PDF READER & VECTOR ANNOTATIONS</h2>
+                    <p class="body-md">
+                        Our custom vectorized PDF engine parses hundreds of complex pages in milliseconds with zero memory leaks. Add precise freehand ink markings, highlighter overlays, sticky note comments, and secure digital signatures directly on your device.
+                    </p>
+                    <ul class="feature-pill-list">
+                        <li class="feature-pill">VECTOR ZOOM & SEEK</li>
+                        <li class="feature-pill">FREEHAND INK & DRAW</li>
+                        <li class="feature-pill">DIGITAL SIGNATURES</li>
+                        <li class="feature-pill">NIGHT READING MODE</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Module 2: HD Document Scanner -->
+            <div class="feature-detail-row reversed reveal">
+                <div class="feature-detail-mockup">
+                    <img src="assets/3.jpg" alt="HD Document Scanner Screen">
+                </div>
+                <div class="feature-detail-text">
+                    <span class="label-uppercase"><span class="m-stripe-badge"></span>MODULE 02 • COMPUTER VISION</span>
+                    <h2 class="display-md">HD CAMERA SCANNER & EDGE CROPPING</h2>
+                    <p class="body-md">
+                        Turn your phone's camera into a high-precision document scanner. Real-time edge detection algorithms automatically identify paper boundaries, perspective-correct skewed angles, enhance text contrast, and assemble multi-page PDF files instantly.
+                    </p>
+                    <ul class="feature-pill-list">
+                        <li class="feature-pill">AUTO PERSPECTIVE WARP</li>
+                        <li class="feature-pill">SHADOW REMOVAL FILTER</li>
+                        <li class="feature-pill">MULTI-PAGE ASSEMBLE</li>
+                        <li class="feature-pill">100% LOCAL PROCESSING</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Module 3: Universal Office Viewer -->
+            <div class="feature-detail-row reveal">
+                <div class="feature-detail-mockup">
+                    <img src="assets/4.jpg" alt="Universal Office & Spreadsheet Viewer">
+                </div>
+                <div class="feature-detail-text">
+                    <span class="label-uppercase"><span class="m-stripe-badge"></span>MODULE 03 • UNIFIED COMPATIBILITY</span>
+                    <h2 class="display-md">WORD, EXCEL & SPREADSHEET ENGINE</h2>
+                    <p class="body-md">
+                        Open Microsoft Word (.docx, .doc), Excel spreadsheets (.xlsx, .xls), and PowerPoint presentations with zero formatting distortion. Easily inspect complex formula sheets, switch between tabs, and scroll thousands of rows seamlessly.
+                    </p>
+                    <ul class="feature-pill-list">
+                        <li class="feature-pill">NATIVE .DOCX PARSER</li>
+                        <li class="feature-pill">MULTI-SHEET SPREADSHEETS</li>
+                        <li class="feature-pill">NO CLOUD CONVERSION</li>
+                        <li class="feature-pill">LIGHT & DARK CELL MODES</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Module 4: Tag Manager & Local Categories -->
+            <div class="feature-detail-row reversed reveal">
+                <div class="feature-detail-mockup">
+                    <img src="assets/6.jpg" alt="Tag Manager Screen">
+                </div>
+                <div class="feature-detail-text">
+                    <span class="label-uppercase"><span class="m-stripe-badge"></span>MODULE 04 • LOCAL ORGANIZATION</span>
+                    <h2 class="display-md">PRECISION TAG MANAGEMENT</h2>
+                    <p class="body-md">
+                        Organize your documents with custom color-coded tags and category labels. Group tax receipts, legal contracts, project blueprints, and personal notes for instant 1-tap filtering across your entire local storage repository.
+                    </p>
+                    <ul class="feature-pill-list">
+                        <li class="feature-pill">CUSTOM COLOR PALETTES</li>
+                        <li class="feature-pill">CROSS-FOLDER TAGGING</li>
+                        <li class="feature-pill">INSTANT FILTER VIEW</li>
+                        <li class="feature-pill">ZERO SYNC OVERHEAD</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Module 5: Instant Search Index -->
+            <div class="feature-detail-row reveal">
+                <div class="feature-detail-mockup">
+                    <img src="assets/5.jpg" alt="Instant Search & Filter Screen">
+                </div>
+                <div class="feature-detail-text">
+                    <span class="label-uppercase"><span class="m-stripe-badge"></span>MODULE 05 • LOCAL SEARCH INDEX</span>
+                    <h2 class="display-md">INSTANT FULL-TEXT INDEXING</h2>
+                    <p class="body-md">
+                        Execute lightning-fast keyword searches across your documents and files. Jump straight to matching lines and exact phrases without having to manually scan through hundreds of pages.
+                    </p>
+                    <ul class="feature-pill-list">
+                        <li class="feature-pill">REGEX & EXACT MATCH</li>
+                        <li class="feature-pill">REAL-TIME HIGHLIGHTING</li>
+                        <li class="feature-pill">FILE-METADATA SEARCH</li>
+                        <li class="feature-pill">SUB-MILLISECOND RETRIEVAL</li>
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Pre-Footer CTA Band -->
+    <section class="cta-band" id="download">
+        <div class="m-stripe-divider" style="position: absolute; top: 0; left: 0;"></div>
+        <div class="container cta-band-inner reveal">
+            <img src="assets/app_icon.png" alt="LiteView Emblem" class="cta-icon">
+            <h2 class="display-md">GET LITEVIEW FOR ANDROID</h2>
+            <p class="body-md" style="max-width: 600px;">
+                Download the high-precision document viewer and scanner. 100% offline. Zero tracking.
+            </p>
+            <a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank" rel="noopener noreferrer" class="button-primary">
+                DOWNLOAD ON GOOGLE PLAY
+            </a>
+        </div>
+    </section>
+
+    <!-- Site Footer -->
+    <footer class="site-footer">
+        <div class="m-stripe-divider" style="margin-bottom: 48px;"></div>
+        <div class="container reveal">
+            <div class="footer-grid-4col">
+                <div>
+                    <h4 class="footer-col-title">PAGES</h4>
+                    <ul class="footer-col-links">
+                        <li><a href="index.html" class="footer-link">OVERVIEW</a></li>
+                        <li><a href="features.html" class="footer-link">FEATURES</a></li>
+                        <li><a href="scanner.html" class="footer-link">SCANNER</a></li>
+                        <li><a href="specs.html" class="footer-link">SPECIFICATIONS</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="footer-col-title">MODULES</h4>
+                    <ul class="footer-col-links">
+                        <li><a href="features.html" class="footer-link">PDF ENGINE</a></li>
+                        <li><a href="features.html" class="footer-link">OFFICE VIEWER</a></li>
+                        <li><a href="scanner.html" class="footer-link">HD SCANNER</a></li>
+                        <li><a href="features.html" class="footer-link">TAG MANAGER</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="footer-col-title">LEGAL & PRIVACY</h4>
+                    <ul class="footer-col-links">
+                        <li><a href="privacy.html" class="footer-link">PRIVACY POLICY</a></li>
+                        <li><a href="privacy.html#permissions" class="footer-link">PERMISSIONS SPEC</a></li>
+                        <li><a href="privacy.html#storage" class="footer-link">DATA RETENTION</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="footer-col-title">SUPPORT</h4>
+                    <ul class="footer-col-links">
+                        <li><a href="mailto:sherawat003@gmail.com" class="footer-link">SHERAWAT003@GMAIL.COM</a></li>
+                        <li><a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank" rel="noopener noreferrer" class="footer-link">GOOGLE PLAY STORE</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom-row">
+                <span class="footer-disclaimer">© 2026 LITEVIEW. ALL RIGHTS RESERVED. PRECISION OFFLINE RUNTIME.</span>
+                <span class="footer-disclaimer">RELEASE VERSION 2.5.3</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Three.js & Vanta Fog Animated Background Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
