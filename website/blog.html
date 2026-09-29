@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="LiteView Privacy Policy — Technical architecture and data protection guidelines. 100% offline local on-device processing.">
-    <title>PRIVACY POLICY — LITEVIEW DOCUMENT ENGINE</title>
+    <title>BLOG — LITEVIEW</title>
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="assets/app_icon.png">
@@ -36,7 +36,7 @@
                     <li><a href="formats.html" class="nav-item-link">FORMATS</a></li>
                     <li><a href="specs.html" class="nav-item-link">SPECS</a></li>
                     <li><a href="guide.html" class="nav-item-link">GUIDE</a></li>
-                    <li><a href="blog.html" class="nav-item-link">BLOG</a></li>
+                    <li><a href="blog.html" class="nav-item-link active">BLOG</a></li>
                     <li><a href="contact.html" class="nav-item-link">CONTACT</a></li>
                 </ul>
             </nav>
@@ -51,93 +51,37 @@
     </header>
 
     <!-- Privacy Policy Section -->
+    
+    <!-- Blog Page Section -->
     <main class="privacy-page-wrap">
         <div id="vanta-bg" class="vanta-bg-canvas"></div>
         <div class="container">
             <div class="section-head-wrap text-left reveal" style="margin-bottom: 48px;">
-                <span class="label-uppercase"><span class="m-stripe-badge"></span>DATA ARCHITECTURE</span>
-                <h1 class="display-lg" style="margin-top: 8px;">PRIVACY POLICY</h1>
+                <span class="label-uppercase"><span class="m-stripe-badge"></span>NEWS & UPDATES</span>
+                <h1 class="display-lg" style="margin-top: 8px;">LITEVIEW BLOG</h1>
                 <p class="body-lead" style="max-width: 760px; margin-top: 12px;">
-                    Technical data protection guidelines for LiteView. All document parsing, rendering, and camera operations execute locally on your physical Android hardware with zero cloud telemetry.
+                    Read about the latest feature releases, engineering updates, and company news.
                 </p>
             </div>
 
-            <!-- Policy Article Container -->
             <article class="privacy-article reveal stagger-1">
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--hairline); padding-bottom: 16px;">
-                    <span class="label-uppercase" style="color: var(--muted);">EFFECTIVE DATE: AUGUST 2026</span>
-                    <span class="label-uppercase" style="color: var(--on-dark);">VERSION 2.5.3</span>
+                <div class="privacy-section-block" style="border-bottom: 1px solid var(--hairline); padding-bottom: 24px;">
+                    <span class="label-uppercase" style="color: var(--muted);">AUGUST 24, 2026</span>
+                    <h2>INTRODUCING LITEVIEW 2.5</h2>
+                    <p>We've completely rewritten our PDF rendering engine to be 40% faster while using less memory on older devices. This update brings true hardware-accelerated vectors to the Android platform.</p>
+                    <a href="#" class="text-link" style="margin-top: 12px;">READ FULL POST <span class="arrow">→</span></a>
                 </div>
 
-                <div class="privacy-section-block">
-                    <h2>01. OVERVIEW & PRIVACY COMMITMENT</h2>
-                    <p>
-                        LiteView is engineered as an air-gapped, zero-telemetry utility application for Android. We believe personal documents, digital notes, and camera scans must never be accessible to unauthorized remote services.
-                    </p>
-                    <p>
-                        LiteView does not collect, record, transmit, monetize, or profile any personal information, usage metrics, or document contents.
-                    </p>
-                </div>
-
-                <div class="privacy-section-block">
-                    <h2>02. DATA COLLECTION ARCHITECTURE</h2>
-                    <p>
-                        Because LiteView functions entirely within the local Android OS sandbox without external cloud connections:
-                    </p>
-                    <ul class="privacy-spec-list">
-                        <li class="privacy-spec-item">
-                            <span class="privacy-spec-title">NO USER IDENTITY TRACKING</span>
-                            <span class="privacy-spec-desc">No accounts, passwords, email addresses, or phone numbers are ever required or stored.</span>
-                        </li>
-                        <li class="privacy-spec-item">
-                            <span class="privacy-spec-title">NO CLOUD UPLOADS</span>
-                            <span class="privacy-spec-desc">All PDF, Word, Excel, and Text files are rendered strictly in volatile device memory and local storage.</span>
-                        </li>
-                        <li class="privacy-spec-item">
-                            <span class="privacy-spec-title">ZERO TELEMETRY BEACONS</span>
-                            <span class="privacy-spec-desc">The application includes zero third-party advertising frameworks, analytics SDKs, or background pinging routines.</span>
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="privacy-section-block" id="permissions">
-                    <h2>03. ANDROID SYSTEM PERMISSIONS SPECIFICATION</h2>
-                    <p>
-                        To execute document rendering and optical camera scanning, LiteView requests only minimal, necessary Android system permissions:
-                    </p>
-
-                    <ul class="privacy-spec-list">
-                        <li class="privacy-spec-item">
-                            <span class="privacy-spec-title">STORAGE & FILE ACCESS (READ/WRITE)</span>
-                            <span class="privacy-spec-desc">Used strictly to discover, open, and save document files located on your internal flash storage or SD card.</span>
-                        </li>
-                        <li class="privacy-spec-item">
-                            <span class="privacy-spec-title">CAMERA ACCESS (HARDWARE SENSOR)</span>
-                            <span class="privacy-spec-desc">Used exclusively during active HD Document Scanner capture sessions to convert physical documents to local PDFs.</span>
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="privacy-section-block" id="storage">
-                    <h2>04. LOCAL DATA RETENTION & CONTROL</h2>
-                    <p>
-                        All user annotations, highlights, digital signatures, bookmarks, and scans created in LiteView are stored exclusively on your device. You retain 100% control to edit, backup, export, or permanently delete any file at any time.
-                    </p>
-                </div>
-
-                <div class="privacy-section-block">
-                    <h2>05. DEVELOPER CONTACT</h2>
-                    <p>
-                        For technical inquiries, audit requests, or feedback regarding LiteView's offline architecture, contact our engineering team:
-                    </p>
-                    <div class="contact-card">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                        <span>SHERAWAT003@GMAIL.COM</span>
-                    </div>
+                <div class="privacy-section-block" style="border-bottom: 1px solid var(--hairline); padding-bottom: 24px; padding-top: 24px;">
+                    <span class="label-uppercase" style="color: var(--muted);">JULY 12, 2026</span>
+                    <h2>WHY WE CHOSE AIR-GAPPED SECURITY</h2>
+                    <p>In a world where every app requires a cloud login, we decided to build a high-performance scanner that operates entirely offline. Discover the engineering challenges we faced.</p>
+                    <a href="#" class="text-link" style="margin-top: 12px;">READ FULL POST <span class="arrow">→</span></a>
                 </div>
             </article>
         </div>
     </main>
+
 
     <!-- Site Footer -->
     <footer class="site-footer">
