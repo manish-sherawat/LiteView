@@ -406,6 +406,12 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 <div align="center">
 
+<a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank">
+  <img src="assets/playstore_download.png" width="180" alt="Download LiteView on Google Play" />
+</a>
+
+<br/><br/>
+
 Made with ❤️ by **Manish Sherawat**
 
 **[GitHub](https://github.com/manish-sherawat) · [Report a Bug](https://github.com/manish-sherawat/LiteView/issues) · [Request a Feature](https://github.com/manish-sherawat/LiteView/issues)**

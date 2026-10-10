@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="260" height="76" viewBox="0 0 260 76" fill="none">
+  <!-- Background with subtle dark glass gradient & border -->
+  <defs>
+    <linearGradient id="btn_bg" x1="0" y1="0" x2="260" y2="76" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0d111a"/>
+      <stop offset="100%" stop-color="#080c14"/>
+    </linearGradient>
+    <linearGradient id="btn_border" x1="0" y1="0" x2="260" y2="76" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2a354c"/>
+      <stop offset="100%" stop-color="#1e2738"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="1" y="1" width="258" height="74" rx="16" fill="url(#btn_bg)" stroke="url(#btn_border)" stroke-width="1.5"/>
+
+  <!-- Google Play 4-Color Icon -->
+  <g>
+    <!-- Cyan (left-top) -->
+    <polygon points="24,17 24,38 41.5,38 48.5,29.6" fill="#00C3FF"/>
+    <!-- Coral Red (left-bottom) -->
+    <polygon points="24,38 24,59 48.5,46.4 41.5,38" fill="#FF3366"/>
+    <!-- Green (top-right) -->
+    <polygon points="48.5,29.6 41.5,38 59,38" fill="#00E676"/>
+    <!-- Yellow (bottom-right) -->
+    <polygon points="41.5,38 48.5,46.4 59,38" fill="#FFD600"/>
+  </g>
+
+  <!-- Typography -->
+  <text x="76" y="27" fill="#A0AFCA" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" letter-spacing="0.08em">GET IT ON</text>
+  <text x="76" y="52" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="21" font-weight="700">Google Play</text>
+</svg>
