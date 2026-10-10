@@ -13,7 +13,15 @@
 
 <div align="center">
 
-<img src="assets/logo/icon_x192.png" width="120" alt="LiteView Logo" />
+<img src="assets/logo/icon_x512.png" width="180" style="border-radius: 20px;" alt="LiteView Logo" />
+
+</div>
+
+---
+
+<div align="center">
+
+<img src="assets/Banner_1024x500.png" width="100%" style="border-radius: 20px;" alt="LiteView Banner" />
 
 </div>
 
@@ -64,7 +72,7 @@ View PDFs, Office files, PowerPoint presentations, and text documents. Annotate 
 
 | Home & Dashboard | PDF Reader & Annotations | Word (DOCX) Reader | Excel (XLSX) Sheets |
 |:---:|:---:|:---:|:---:|
-| <img src="assets/screenshots/home.png" width="220" alt="Home Dashboard"/> | <img src="assets/screenshots/pdf_screen.png" width="220" alt="PDF Reader"/> | <img src="assets/screenshots/doc_screen.png" width="220" alt="Word Document Reader"/> | <img src="assets/screenshots/excel_screen.png" width="220" alt="Excel Spreadsheet Viewer"/> |
+| <img src="assets/screenshots/home.png" width="220" style="border-radius: 16px;" alt="Home Dashboard"/> | <img src="assets/screenshots/pdf_screen.png" width="220" style="border-radius: 16px;" alt="PDF Reader"/> | <img src="assets/screenshots/doc_screen.png" width="220" style="border-radius: 16px;" alt="Word Document Reader"/> | <img src="assets/screenshots/excel_screen.png" width="220" style="border-radius: 16px;" alt="Excel Spreadsheet Viewer"/> |
 | *Smart file list, search, tags & recent history* | *High-fidelity viewer with edge-docked annotations* | *Clean typographic layout with mobile view* | *Full spreadsheet grid with formula & sheet navigation* |
 
 </div>
