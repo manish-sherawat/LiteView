@@ -1,9 +1,10 @@
 <div align="center">
 
 <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" />
+<a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs"><img src="https://img.shields.io/badge/Google%20Play-Available-34A853?style=for-the-badge&logo=googleplay&logoColor=white" /></a>
 <img src="https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" />
-<img src="https://img.shields.io/badge/Jetpack%20Compose-2024.12-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" />
-<img src="https://img.shields.io/badge/Version-3.1.1-orange?style=for-the-badge" />
+<img src="https://img.shields.io/badge/Jetpack%20Compose-BOM%202025.06-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" />
+<img src="https://img.shields.io/badge/Version-3.2.0-orange?style=for-the-badge" />
 <img src="https://img.shields.io/badge/Min%20SDK-26%20(Android%208.0)-blue?style=for-the-badge" />
 <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" />
 
@@ -33,6 +34,12 @@
 
 **A fast, elegant, and feature-rich Android document reader & annotation workspace.**
 View PDFs, Office files, PowerPoint presentations, and text documents. Annotate PDFs with stamps, text boxes, and precision measurement rulers. Scan physical documents directly with your camera.
+
+<br/>
+
+<a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank">
+  <img src="assets/playstore_download.png" width="220" alt="Get LiteView on Google Play" />
+</a>
 
 </div>
 
@@ -212,28 +219,51 @@ class node_scanner,node_pdfgen toneRose
 class node_preferences,node_theme,node_updater,node_github,node_mlkit toneIndigo
 ```
 
-### Tech Stack
+### 🏛️ Architectural Principles
 
-| Layer | Library / Tool |
-|---|---|
-| **Language** | Kotlin 2.0.21 |
-| **UI** | Jetpack Compose BOM 2024.12, Material 3 |
-| **Architecture** | MVVM, multi-module, Clean Architecture |
-| **Dependency Injection** | Hilt 2.53.1 |
-| **Navigation** | Navigation Compose 2.8.5 |
-| **Database** | Room 2.6.1 (recent documents, tags, trash history) |
-| **Preferences** | DataStore Preferences 1.1.1 |
-| **Async** | Kotlin Coroutines 1.9.0 + StateFlow |
-| **PDF Engine** | MuPDF (fitz) 1.23.0 |
-| **Office & PPT Engine** | Apache POI 5.2.5 + Native LibreOfficeKit Bridge |
-| **ML / AI** | Google ML Kit — Document Scanner & Text Recognition |
-| **Image Loading** | Coil 2.6.0 |
-| **Animations** | Jetpack Compose Animation + Shared Element Transitions |
-| **Permissions** | Accompanist Permissions 0.36.0 |
+LiteView follows Google's recommended Modern Android Architecture (MVI / MVVM with Clean Architecture):
+
+- **Unidirectional Data Flow (UDF)** — State flows down via immutable Kotlin Coroutines `StateFlow`, while user actions flow up through typed UI events.
+- **Strict Multi-Module Decoupling** — Feature modules (`feature:reader-pdf`, `feature:reader-presentation`, etc.) never depend on each other. Navigation and reader launches are resolved via the `DocumentReaderRouter` interface in `:core`.
+- **Hybrid High-Performance Rendering** — Pairs native C/C++ NDK engines (MuPDF 1.23 and LibreOfficeKit) for high-speed document rasterization with Jetpack Compose Canvas overlays for smooth vector drawing, annotations, and blueprint measurement.
+- **Offline-First & Zero-Telemetry** — 100% on-device local storage (Room SQLite + DataStore), ML Kit on-device models, and privacy-respecting offline document manipulation.
+
+### 🛠️ Tech Stack
+
+| Layer | Library / Tool | Version | Purpose & Details |
+|---|---|---|---|
+| **Language** | Kotlin | `2.0.21` | Modern, concise, null-safe language targeting JVM 17 |
+| **Compiler & Codegen** | Kotlin KSP | `2.0.21-1.0.28` | High-performance annotation processing for Room & Hilt |
+| **Build System** | Android Gradle Plugin (AGP) | `8.10.0` | Multi-module build optimization and R8 resource shrinking |
+| **UI Toolkit** | Jetpack Compose | BOM `2025.06.00` | Declarative UI framework with Material Design 3 |
+| **Glassmorphism** | ChrisBanes Haze | `1.3.0` | Hardware-accelerated frosted glass backdrop blurs |
+| **Dependency Injection** | Dagger Hilt | `2.55` | Compile-time dependency injection across modules |
+| **Navigation** | Navigation Compose | `2.8.5` | Type-safe declarative in-app navigation routes |
+| **Database & Cache** | Room SQLite | `2.6.1` | Local persistence for recents, custom tags & trash history |
+| **Preferences** | DataStore Preferences | `1.1.1` | Asynchronous key-value user preferences storage |
+| **Concurrency & Async** | Coroutines & Flow | `1.9.0` | Reactive state management with `StateFlow` and structured concurrency |
+| **Lifecycle** | AndroidX Lifecycle | `2.8.7` | `collectAsStateWithLifecycle` & ViewModel lifecycle scopes |
+| **PDF Engine** | MuPDF (fitz) | `1.23.0` | Ultra-fast native C/C++ vector PDF rasterization engine |
+| **PDF Tooling** | PDFBox-Android | `2.0.27.0` | Blueprint scale calculations and PDF document utilities |
+| **Office Suite Parser** | Apache POI | `5.2.5` | Offline DOCX, XLSX, and PPTX document parsing (`aalto-xml 1.3.2`) |
+| **Presentation Engine** | LibreOfficeKit Bridge | Native NDK | C++ JNI bridge (`libnexus_presentation_engine.so`) for desktop slide fidelity |
+| **Vision & ML** | Google ML Kit | `16.0.0` / `19.0.0` | Document Scanner edge detection & on-device Text OCR |
+| **Image Loading** | Coil | `3.0.0` | High-performance image loading, thumbnail caching & SVG support |
+| **Animations** | Jetpack Compose + Lottie | `6.6.2` | Spring-physics micro-interactions and vector animations |
+| **Permissions** | Accompanist Permissions | `0.36.0` | Seamless runtime storage and camera permission management |
+
 
 ---
 
 ## 🚀 Getting Started
+
+<div align="center">
+
+<a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs" target="_blank">
+  <img src="assets/playstore_download.png" width="220" alt="Get LiteView on Google Play" />
+</a>
+
+</div>
 
 ### Prerequisites
 
