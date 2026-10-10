@@ -84,7 +84,7 @@ object PdfGenerator {
             )
             return@withContext Uri.fromFile(outputFile)
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("PdfGenerator", "Failed to add PDF images to document", e)
             return@withContext null
         } finally {
             pdfDocument.close()

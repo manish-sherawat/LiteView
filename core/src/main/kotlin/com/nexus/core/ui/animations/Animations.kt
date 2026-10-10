@@ -12,16 +12,24 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
@@ -33,6 +41,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
@@ -148,21 +157,21 @@ enum class HapticPattern {
 val EmphasizedEasing: Easing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 
 /** 
- * Decelerate — elements arriving on-screen slow to a natural stop. 
+ * Decelerate — elements arriving on-screen slow to a natural, fluid stop. 
  * Use for incoming elements.
  */
-val EmphasizedDecelerateEasing: Easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+val EmphasizedDecelerateEasing: Easing = CubicBezierEasing(0.05f, 0.9f, 0.1f, 1f)
 
 /** 
  * Accelerate — elements leaving pick up speed and exit decisively.
  * Use for outgoing elements.
  */
-val EmphasizedAccelerateEasing: Easing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
+val EmphasizedAccelerateEasing: Easing = CubicBezierEasing(0.3f, 0f, 0.7f, 0.1f)
 
 /** 
  * Standard — subtle non-spatial transitions (fades, color changes).
  */
-val StandardEasing: Easing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
+val StandardEasing: Easing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 
 /** 
  * EaseInOutSine — looping / shimmer animations.
@@ -182,13 +191,13 @@ const val DurationFastRipple = 200       // Fast ripple (formerly DurationShort4
 // Navigation & Transitions
 const val DurationScreenBack = 250       // Back button (faster) (formerly DurationMedium1)
 const val DurationScreenExit = 300       // Screen disappears (formerly DurationMedium2)
-const val DurationScreenEnter = 350      // New screen appears (formerly DurationMedium3)
-const val DurationComplexTransition = 400 // Complex transition (formerly DurationMedium4)
+const val DurationScreenEnter = 320      // New screen appears (harmonized with exit)
+const val DurationComplexTransition = 380 // Complex transition (formerly DurationMedium4)
 
 // Content Animations
-const val DurationFadeIn = 300           // Fade in element
-const val DurationSlideIn = 350          // Slide in element
-const val DurationScaleIn = 300          // Scale in element
+const val DurationFadeIn = 280           // Fade in element
+const val DurationSlideIn = 320          // Slide in element
+const val DurationScaleIn = 280          // Scale in element
 
 // Looping Animations
 const val DurationShimmer = ShimmerConfig.SHIMMER_DURATION_MS
@@ -196,12 +205,12 @@ const val DurationPulse = 2000           // Pulse effect loop
 const val DurationSpin = 1000            // Rotating icon
 
 // Dialog & Modal
-const val DurationDialogEnter = 300      // Dialog appears
+const val DurationDialogEnter = 280      // Dialog appears
 const val DurationDialogExit = 200       // Dialog disappears
 
 // Long Transitions
-const val DurationLongEnter = 450        // (formerly DurationLong1)
-const val DurationExtraLong = 500        // (formerly DurationLong2)
+const val DurationLongEnter = 400        // (formerly DurationLong1)
+const val DurationExtraLong = 480        // (formerly DurationLong2)
 
 // ════════════════════════════════════════════════════════════════════
 // SECTION 4: SPRING PHYSICS CONFIGURATIONS
@@ -210,58 +219,55 @@ const val DurationExtraLong = 500        // (formerly DurationLong2)
 /**
  * Spring configuration for press-down button feedback.
  * 
- * Produces a snappy, responsive press with a subtle micro-bounce.
- * Ideal for immediate tactile feedback on button clicks.
+ * Produces an immediate, tactile depression with crisp, silky recovery (no jelly wobbly oscillations).
  * 
- * @return Spring animation with medium-low stiffness and medium-bouncy damping
- * 
- * @see springBounceClick for usage example
+ * @return Spring animation with snappy stiffness and controlled damping
  */
 fun <T> pressSpring() = spring<T>(
-    stiffness = Spring.StiffnessMediumLow,
-    dampingRatio = Spring.DampingRatioMediumBouncy
+    stiffness = 550f,
+    dampingRatio = 0.78f
 )
 
-/** Smooth enter/exit: no overshoot (nav bar, card arrival) */
+/** Smooth enter/exit: critically damped, silky arrival without sluggishness */
 fun <T> entrySpring() = spring<T>(
-    stiffness = Spring.StiffnessLow,
-    dampingRatio = Spring.DampingRatioNoBouncy
+    stiffness = 380f,
+    dampingRatio = 0.92f
 )
 
-/** Tab/icon selection: medium stiffness with a subtle organic bounce */
+/** Tab/icon selection: refined pop with a subtle organic micro-bounce */
 fun <T> selectionSpring() = spring<T>(
-    stiffness = Spring.StiffnessMedium,
-    dampingRatio = Spring.DampingRatioMediumBouncy
+    stiffness = 450f,
+    dampingRatio = 0.72f
 )
 
-/** Color/alpha transitions: feels instant but still interpolated */
+/** Color/alpha transitions: critically damped for silky interpolation */
 fun <T> colorSpring() = spring<T>(
-    stiffness = Spring.StiffnessMediumLow,
-    dampingRatio = Spring.DampingRatioNoBouncy
+    stiffness = 400f,
+    dampingRatio = 1.0f
 )
 
-/** Modal surfaces: gentle landing bounce */
+/** Modal surfaces: gentle, premium landing */
 fun <T> dialogSpring() = spring<T>(
-    stiffness = Spring.StiffnessMediumLow,
-    dampingRatio = Spring.DampingRatioLowBouncy
+    stiffness = 380f,
+    dampingRatio = 0.85f
 )
 
-/** Floating nav pill: fluid, organic collapse/expand with gentle deceleration */
+/** Floating nav pill: fluid, organic gliding motion with gentle deceleration */
 fun <T> navPillSpring() = spring<T>(
-    stiffness = 320f,
-    dampingRatio = 0.82f
+    stiffness = 380f,
+    dampingRatio = 0.86f
 )
 
-/** Scale animations: quick pop-out or grow effect */
+/** Scale animations: quick, refined pop */
 fun <T> scaleSpring() = spring<T>(
-    stiffness = Spring.StiffnessMedium,
-    dampingRatio = Spring.DampingRatioMediumBouncy
+    stiffness = 420f,
+    dampingRatio = 0.75f
 )
 
 /** Expansion animations: sheet slides up, menu expands */
 fun <T> expansionSpring() = spring<T>(
-    stiffness = Spring.StiffnessLow,
-    dampingRatio = Spring.DampingRatioNoBouncy
+    stiffness = 380f,
+    dampingRatio = 0.92f
 )
 
 /** Drag feedback: responsive to finger movement */
@@ -273,7 +279,7 @@ fun <T> dragSpring() = spring<T>(
 /** Scroll bounce: subtle bounce at edges */
 fun <T> scrollBounceSpring() = spring<T>(
     stiffness = Spring.StiffnessHigh,
-    dampingRatio = 0.6f
+    dampingRatio = 0.72f
 )
 
 // ════════════════════════════════════════════════════════════════════
@@ -372,7 +378,7 @@ fun remoteMotionSettings(): Boolean {
  */
 fun Modifier.springBounceClick(
     enabled: Boolean = true,
-    scaleDown: Float = 0.92f,
+    scaleDown: Float = 0.95f,
     hapticPattern: HapticPattern = HapticPattern.LIGHT,
     onClick: () -> Unit
 ): Modifier = composed {
@@ -405,7 +411,7 @@ fun Modifier.springBounceClick(
             indication        = null,
             enabled           = enabled,
             onClick           = {
-                if (hapticFeedbackEnabled && haptic != null) {
+                if (hapticFeedbackEnabled) {
                     try {
                         haptic.performHapticFeedback(hapticType)
                     } catch (e: Exception) {
@@ -420,7 +426,7 @@ fun Modifier.springBounceClick(
 @androidx.compose.foundation.ExperimentalFoundationApi
 fun Modifier.springBounceCombinedClick(
     enabled: Boolean = true,
-    scaleDown: Float = 0.92f,
+    scaleDown: Float = 0.95f,
     hapticPattern: HapticPattern = HapticPattern.LIGHT,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null
@@ -452,7 +458,7 @@ fun Modifier.springBounceCombinedClick(
             indication        = null,
             enabled           = enabled,
             onClick           = {
-                if (hapticFeedbackEnabled && haptic != null) {
+                if (hapticFeedbackEnabled) {
                     try {
                         haptic.performHapticFeedback(hapticTypeClick)
                     } catch (e: Exception) {
@@ -463,7 +469,7 @@ fun Modifier.springBounceCombinedClick(
             },
             onLongClick       = onLongClick?.let {
                 {
-                    if (hapticFeedbackEnabled && haptic != null) {
+                    if (hapticFeedbackEnabled) {
                         try {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         } catch (e: Exception) {
@@ -496,7 +502,7 @@ fun Modifier.springBounceCombinedClick(
  */
 fun Modifier.fadeSlideIn(
     delay: Int = 0,
-    offsetY: Dp = 30.dp
+    offsetY: Dp = 16.dp
 ): Modifier = composed {
     val cappedDelay = minOf(delay, 1000)
     
@@ -535,7 +541,7 @@ fun Modifier.fadeSlideIn(delay: Int = 0, offsetY: Float): Modifier =
  */
 fun Modifier.fadeSlideInAccessible(
     delay: Int = 0,
-    offsetY: Dp = 30.dp
+    offsetY: Dp = 16.dp
 ): Modifier = composed {
     val shouldReduceMotion = remoteMotionSettings()
     
@@ -555,7 +561,7 @@ fun Modifier.shimmerEffect(): Modifier = composed {
         initialValue = -1f, // Start completely offscreen to the left
         targetValue  = 2f,  // Go completely offscreen to the right
         animationSpec = infiniteRepeatable(
-            animation  = tween(durationMillis = 1200, easing = androidx.compose.animation.core.LinearEasing),
+            animation  = tween(durationMillis = 1400, easing = androidx.compose.animation.core.LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "shimmerX"
@@ -577,5 +583,232 @@ fun Modifier.shimmerEffect(): Modifier = composed {
             end    = Offset(offset + size.width * 0.7f, size.height) // Added height to create an angled effect
         )
         drawRect(brush = gradient, size = size)
+    }
+}
+
+/**
+ * Organic breathing pulse animation for highlighted badges, live status indicators, and empty states.
+ */
+fun Modifier.breathePulse(
+    enabled: Boolean = true,
+    minScale: Float = 0.96f,
+    maxScale: Float = 1.04f,
+    durationMs: Int = 1800
+): Modifier = composed {
+    if (!enabled) return@composed this
+    val transition = rememberInfiniteTransition(label = "breathePulse")
+    val pulseScale by transition.animateFloat(
+        initialValue = minScale,
+        targetValue = maxScale,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = durationMs, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "breatheScale"
+    )
+    this.graphicsLayer {
+        scaleX = pulseScale
+        scaleY = pulseScale
+    }
+}
+
+/**
+ * Snappy pop-in entrance scaling from scaleStart to 1.0f with an energetic spring bounce.
+ */
+fun Modifier.scalePopIn(
+    delay: Int = 0,
+    scaleStart: Float = 0.88f,
+    dampingRatio: Float = 0.72f,
+    stiffness: Float = 450f
+): Modifier = composed {
+    var visible by remember { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (delay > 0) kotlinx.coroutines.delay(delay.toLong())
+        visible = true
+    }
+    val scale by animateFloatAsState(
+        targetValue = if (visible) 1f else scaleStart,
+        animationSpec = spring(dampingRatio = dampingRatio, stiffness = stiffness),
+        label = "popScale"
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = 200),
+        label = "popAlpha"
+    )
+    this.graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+        this.alpha = alpha
+    }
+}
+
+/**
+ * Staggered slide and fade-in for list and grid items.
+ */
+fun Modifier.staggeredSlideFadeIn(
+    index: Int,
+    baseDelayMs: Int = 20,
+    maxDelayMs: Int = 240,
+    offsetY: Dp = 14.dp
+): Modifier = composed {
+    val calculatedDelay = (index * baseDelayMs).coerceAtMost(maxDelayMs)
+    fadeSlideIn(delay = calculatedDelay, offsetY = offsetY)
+}
+
+/**
+ * Shimmer light sheen across cards and headers.
+ */
+fun Modifier.shimmerGlow(
+    accentColor: Color = Color.White,
+    durationMs: Int = 2400
+): Modifier = composed {
+    val transition = rememberInfiniteTransition(label = "shimmerGlow")
+    val glowProgress by transition.animateFloat(
+        initialValue = -1.5f,
+        targetValue = 2.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = durationMs, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "glowProgress"
+    )
+
+    this.drawWithContent {
+        drawContent()
+        val offset = glowProgress * size.width
+        val glowGradient = Brush.linearGradient(
+            colors = listOf(
+                Color.Transparent,
+                accentColor.copy(alpha = 0.08f),
+                accentColor.copy(alpha = 0.16f),
+                accentColor.copy(alpha = 0.08f),
+                Color.Transparent
+            ),
+            start = Offset(offset, 0f),
+            end = Offset(offset + size.width * 0.6f, size.height)
+        )
+        drawRect(brush = glowGradient, size = size)
+    }
+}
+
+/**
+ * Draws a soft radial ambient bloom/halo behind the content.
+ */
+fun Modifier.ambientGlow(
+    color: Color,
+    alpha: Float = 0.22f,
+    radiusMultiplier: Float = 0.85f
+): Modifier = this.drawWithContent {
+    val center = Offset(size.width / 2f, size.height / 2f)
+    val radius = (size.minDimension / 2f) * radiusMultiplier
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(
+                color.copy(alpha = alpha),
+                color.copy(alpha = alpha * 0.4f),
+                Color.Transparent
+            ),
+            center = center,
+            radius = radius.coerceAtLeast(1f)
+        ),
+        radius = radius,
+        center = center
+    )
+    drawContent()
+}
+
+/**
+ * Premium micro-interaction for star / favorite toggles.
+ * Features a spring bounce, rotation flourish, and expanding golden halo ring.
+ */
+@Composable
+fun NexusStarBurst(
+    isStarred: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 28.dp,
+    iconSize: Dp = 17.dp,
+    activeTint: Color = Color(0xFFFFB300),
+    inactiveTint: Color = Color(0xFF9E9E9E)
+) {
+    val haptic = LocalHapticFeedback.current
+    val hapticEnabled = LocalHapticFeedbackEnabled.current
+    
+    val scale by animateFloatAsState(
+        targetValue = if (isStarred) 1.15f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = 0.60f,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "starBurstScale"
+    )
+    
+    val rotation by animateFloatAsState(
+        targetValue = if (isStarred) 0f else -15f,
+        animationSpec = spring(
+            dampingRatio = 0.65f,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "starBurstRotation"
+    )
+
+    var triggerBurst by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(isStarred) {
+        if (isStarred) {
+            triggerBurst = true
+            kotlinx.coroutines.delay(400)
+            triggerBurst = false
+        }
+    }
+
+    val burstProgress by animateFloatAsState(
+        targetValue = if (triggerBurst) 1f else 0f,
+        animationSpec = tween(durationMillis = 350, easing = EmphasizedDecelerateEasing),
+        label = "burstProgress"
+    )
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                if (hapticEnabled && haptic != null) {
+                    try {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    } catch (_: Exception) {}
+                }
+                onToggle()
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        if (burstProgress > 0f && burstProgress < 1f) {
+            Box(
+                modifier = Modifier
+                    .size(size * (0.8f + burstProgress * 0.6f))
+                    .clip(CircleShape)
+                    .background(activeTint.copy(alpha = (1f - burstProgress) * 0.35f))
+            )
+        }
+
+        Image(
+            painter = painterResource(
+                id = if (isStarred) com.nexus.core.R.drawable.ic_star_filled else com.nexus.core.R.drawable.ic_star
+            ),
+            contentDescription = if (isStarred) "Starred" else "Not starred",
+            modifier = Modifier
+                .size(iconSize)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    rotationZ = if (isStarred) rotation else 0f
+                },
+            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(
+                if (isStarred) activeTint else inactiveTint
+            )
+        )
     }
 }

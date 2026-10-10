@@ -101,6 +101,7 @@ fun FileListItem(
             DocumentType.PDF  -> DocumentAccentColors.PDF
             DocumentType.DOCX -> DocumentAccentColors.DOCX
             DocumentType.XLSX -> DocumentAccentColors.XLSX
+            DocumentType.PPTX -> DocumentAccentColors.PPTX
             DocumentType.TXT  -> DocumentAccentColors.TXT
             else              -> DocumentAccentColors.UNKNOWN
         }
@@ -140,7 +141,7 @@ fun FileListItem(
 
     val selectionScale by animateFloatAsState(
         targetValue = if (isSelected) 1f else 0.8f,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f),
+        animationSpec = spring(dampingRatio = 0.76f, stiffness = 420f),
         label = "selectionScale"
     )
     val selectionAlpha by animateFloatAsState(
@@ -151,93 +152,18 @@ fun FileListItem(
 
     val scale by animateFloatAsState(
         targetValue = if (isSelected) 0.97f else 1f,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f),
+        animationSpec = spring(dampingRatio = 0.76f, stiffness = 420f),
         label = "scale"
     )
 
-    var isDismissHandled by remember { mutableStateOf(false) }
-    val dismissState = rememberSwipeToDismissBoxState(
-        positionalThreshold = { totalDistance -> totalDistance * 0.68f },
-        confirmValueChange = { value ->
-            when (value) {
-                SwipeToDismissBoxValue.EndToStart -> {
-                    if (!isDismissHandled) {
-                        isDismissHandled = true
-                        onRemove()
-                        true
-                    } else true
-                }
-                SwipeToDismissBoxValue.StartToEnd -> {
-                    onShare()
-                    false
-                }
-                else -> false
-            }
-        }
-    )
+    val sharedScope = LocalSharedTransitionScope.current
+    val animatedScope = LocalAnimatedVisibilityScope.current
 
-    SwipeToDismissBox(
-        state = dismissState,
-        enableDismissFromStartToEnd = !isSelected,
-        enableDismissFromEndToStart = !isSelected,
-        backgroundContent = {
-            val direction = dismissState.dismissDirection
-            val color by androidx.compose.animation.animateColorAsState(
-                targetValue = when (dismissState.targetValue) {
-                    SwipeToDismissBoxValue.EndToStart -> NexusTheme.colors.error
-                    SwipeToDismissBoxValue.StartToEnd -> NexusTheme.colors.primary
-                    SwipeToDismissBoxValue.Settled -> Color.Transparent
-                },
-                animationSpec = tween(150),
-                label = "dismissColor"
-            )
-
-            val iconScale by animateFloatAsState(
-                targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.Settled) 0.5f else 1.2f,
-                animationSpec = spring(dampingRatio = 0.5f, stiffness = 300f),
-                label = "iconScale"
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(vertical = 2.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(color)
-                    .padding(horizontal = 24.dp),
-                contentAlignment = when (direction) {
-                    SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
-                    SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
-                    else -> Alignment.Center
-                }
-            ) {
-                if (direction == SwipeToDismissBoxValue.StartToEnd) {
-                    Image(
-                        painter = painterResource(id = com.nexus.core.R.drawable.ic_share),
-                        contentDescription = "Share",
-                        modifier = Modifier.size(28.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale },
-                        colorFilter = ColorFilter.tint(Color.White)
-                    )
-                } else if (direction == SwipeToDismissBoxValue.EndToStart) {
-                    Image(
-                        painter = painterResource(id = com.nexus.core.R.drawable.ic_delete),
-                        contentDescription = "Remove",
-                        modifier = Modifier.size(28.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale },
-                        colorFilter = ColorFilter.tint(Color.White)
-                    )
-                }
-            }
-        },
-        modifier = modifier.fillMaxWidth()
-    ) {
-        val sharedScope = LocalSharedTransitionScope.current
-        val animatedScope = LocalAnimatedVisibilityScope.current
-
-        // ─── Main Modern Paper Card ───────────────────────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 2.dp)
+    // ─── Main Modern Paper Card ───────────────────────────────────────────
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
@@ -245,16 +171,16 @@ fun FileListItem(
                 }
                 .shadow(
                     elevation = if (isSelected) 3.dp else 1.dp,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = NexusTheme.shapes.medium,
                     ambientColor = NexusTheme.colors.textPrimary.copy(alpha = 0.04f),
                     spotColor = NexusTheme.colors.textPrimary.copy(alpha = 0.08f)
                 )
-                .clip(RoundedCornerShape(14.dp))
+                .clip(NexusTheme.shapes.medium)
                 .background(NexusTheme.colors.surface)
                 .border(
                     width = if (isSelected) 2.dp else 1.dp,
                     color = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.divider.copy(alpha = 0.65f),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = NexusTheme.shapes.medium
                 )
                 .springBounceCombinedClick(
                     enabled = true,
@@ -263,7 +189,7 @@ fun FileListItem(
                     onClick = onClick,
                     onLongClick = onLongClick
                 )
-                .padding(12.dp)
+                .padding(NexusTheme.spacing.sm)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -277,7 +203,7 @@ fun FileListItem(
                 if (sharedScope != null && animatedScope != null) {
                     with(sharedScope) {
                         thumbnailModifier = thumbnailModifier.sharedElement(
-                            state = rememberSharedContentState(key = "thumb_${doc.uri}"),
+                            sharedContentState = rememberSharedContentState(key = "thumb_${doc.uri}"),
                             animatedVisibilityScope = animatedScope,
                             boundsTransform = { _, _ -> tween(300) }
                         )
@@ -336,7 +262,7 @@ fun FileListItem(
                             contentDescription = stringResource(id = R.string.cd_selected),
                             modifier = Modifier
                                 .align(Alignment.TopStart)
-                                .padding(3.dp)
+                                .padding(NexusTheme.spacing.xxs)
                                 .size(18.dp)
                                 .graphicsLayer {
                                     scaleX = selectionScale
@@ -344,7 +270,7 @@ fun FileListItem(
                                     alpha = selectionAlpha
                                 }
                                 .background(NexusTheme.colors.primary, CircleShape)
-                                .padding(3.dp),
+                                .padding(NexusTheme.spacing.xxs),
                             colorFilter = ColorFilter.tint(NexusTheme.colors.onPrimary)
                         )
                     }
@@ -356,10 +282,10 @@ fun FileListItem(
                             contentDescription = "Missing",
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
-                                .padding(3.dp)
+                                .padding(NexusTheme.spacing.xxs)
                                 .size(16.dp)
                                 .background(NexusTheme.colors.error, CircleShape)
-                                .padding(2.5.dp),
+                                .padding(NexusTheme.spacing.xxs),
                             colorFilter = ColorFilter.tint(Color.White)
                         )
                     }
@@ -372,7 +298,7 @@ fun FileListItem(
                     modifier = Modifier
                         .weight(1f)
                         .padding(vertical = 1.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
                 ) {
                     // Row 1: Document Title + Quick Actions
                     Row(
@@ -380,11 +306,11 @@ fun FileListItem(
                         verticalAlignment = Alignment.Top,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        var titleModifier: Modifier = Modifier.weight(1f).padding(end = 4.dp)
+                        var titleModifier: Modifier = Modifier.weight(1f).padding(end = NexusTheme.spacing.xxs)
                         if (sharedScope != null && animatedScope != null) {
                             with(sharedScope) {
                                 titleModifier = titleModifier.sharedElement(
-                                    state = rememberSharedContentState(key = "title_${doc.uri}"),
+                                    sharedContentState = rememberSharedContentState(key = "title_${doc.uri}"),
                                     animatedVisibilityScope = animatedScope,
                                     boundsTransform = { _, _ -> tween(300) }
                                 )
@@ -409,26 +335,13 @@ fun FileListItem(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            // 1-Tap Star Button
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .clickable { onToggleStarred() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Image(
-                                    painter = painterResource(
-                                        id = if (isStarred) com.nexus.core.R.drawable.ic_star_filled
-                                        else com.nexus.core.R.drawable.ic_star
-                                    ),
-                                    contentDescription = stringResource(id = R.string.cd_starred),
-                                    modifier = Modifier.size(17.dp),
-                                    colorFilter = ColorFilter.tint(
-                                        if (isStarred) Color(0xFFFFB300) else NexusTheme.colors.textSecondary.copy(alpha = 0.7f)
-                                    )
-                                )
-                            }
+                            // 1-Tap Star Button with Spring Burst Animation
+                            NexusStarBurst(
+                                isStarred = isStarred,
+                                onToggle = onToggleStarred,
+                                size = 28.dp,
+                                iconSize = 17.dp
+                            )
 
                             // Kebab Menu or Loading Progress
                             Box(
@@ -464,7 +377,7 @@ fun FileListItem(
                     // Row 2: Format Tag • Size • Relative Timestamp • Pages
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xxs)
                     ) {
                         NexusText(
                             text = docType.name,
@@ -514,14 +427,14 @@ fun FileListItem(
                     // Row 3: Folder Breadcrumb Capsule
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(NexusTheme.shapes.small)
                             .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.55f))
-                            .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 7.dp, vertical = 3.5.dp)
+                            .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.5f), NexusTheme.shapes.small)
+                            .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xxs)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xxs)
                         ) {
                             Image(
                                 painter = painterResource(id = com.nexus.core.R.drawable.ic_folder),
@@ -532,21 +445,18 @@ fun FileListItem(
                             NexusText(
                                 text = folderRoot,
                                 color = NexusTheme.colors.textSecondary,
-                                style = NexusTheme.typography.caption.copy(fontSize = 10.5.sp),
+                                style = NexusTheme.typography.labelXs,
                                 maxLines = 1
                             )
                             NexusText(
                                 text = "/",
                                 color = NexusTheme.colors.divider,
-                                style = NexusTheme.typography.caption.copy(fontSize = 10.5.sp)
+                                style = NexusTheme.typography.labelXs
                             )
                             NexusText(
                                 text = folderName,
                                 color = NexusTheme.colors.textPrimary,
-                                style = NexusTheme.typography.caption.copy(
-                                    fontSize = 10.5.sp,
-                                    fontWeight = FontWeight.Medium
-                                ),
+                                style = NexusTheme.typography.labelXs,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -556,7 +466,7 @@ fun FileListItem(
                     // Row 4: Custom Tags (if assigned)
                     if (tags.isNotEmpty()) {
                         androidx.compose.foundation.lazy.LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xxs),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             items(tags) { tagModel ->
@@ -570,7 +480,7 @@ fun FileListItem(
                                             color = tagColor.copy(alpha = 0.45f),
                                             shape = CircleShape
                                         )
-                                        .padding(horizontal = 7.dp, vertical = 2.dp)
+                                        .padding(horizontal = NexusTheme.spacing.xs, vertical = 2.dp)
                                 ) {
                                     NexusText(
                                         text = tagModel.chipLabel,
@@ -663,38 +573,52 @@ fun FileListItem(
             }
         }
     }
-}
 
 @Composable
 private fun StylizedPaperGraphic(docType: DocumentType, accentColor: Color) {
+    val iconRes = when (docType) {
+        DocumentType.PDF  -> com.nexus.core.R.drawable.ic_file_pdf_new
+        DocumentType.DOCX -> com.nexus.core.R.drawable.ic_file_word_new
+        DocumentType.XLSX -> com.nexus.core.R.drawable.ic_file_sheet_new
+        DocumentType.TXT  -> com.nexus.core.R.drawable.ic_file_txt_new
+        else              -> com.nexus.core.R.drawable.ic_file_gen_new
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier.padding(6.dp)
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(NexusTheme.spacing.xxs)
     ) {
-        // Document lines graphic
-        Column(
-            verticalArrangement = Arrangement.spacedBy(3.5.dp),
-            modifier = Modifier.width(36.dp).padding(bottom = 6.dp)
+        // Ambient Glowing Format Icon
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .ambientGlow(color = accentColor, alpha = 0.35f, radiusMultiplier = 0.95f),
+            contentAlignment = Alignment.Center
         ) {
-            Box(modifier = Modifier.fillMaxWidth().height(2.5.dp).clip(CircleShape).background(accentColor.copy(alpha = 0.35f)))
-            Box(modifier = Modifier.fillMaxWidth(0.8f).height(2.5.dp).clip(CircleShape).background(accentColor.copy(alpha = 0.35f)))
-            Box(modifier = Modifier.fillMaxWidth(0.9f).height(2.5.dp).clip(CircleShape).background(accentColor.copy(alpha = 0.35f)))
-            Box(modifier = Modifier.fillMaxWidth(0.6f).height(2.5.dp).clip(CircleShape).background(accentColor.copy(alpha = 0.20f)))
+            Image(
+                painter = painterResource(id = iconRes),
+                contentDescription = docType.name,
+                modifier = Modifier.size(32.dp)
+            )
         }
+
+        Spacer(modifier = Modifier.height(4.dp))
 
         // Format Badge Pill
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
+                .clip(NexusTheme.shapes.extraSmall)
                 .background(accentColor)
-                .padding(horizontal = 5.dp, vertical = 1.5.dp)
+                .padding(horizontal = NexusTheme.spacing.xs, vertical = 2.dp)
         ) {
             NexusText(
                 text = docType.name,
                 color = Color.White,
                 style = NexusTheme.typography.caption.copy(
-                    fontSize = 8.5.sp,
+                    fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
                     letterSpacing = 0.5.sp

@@ -42,6 +42,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -181,14 +186,19 @@ fun NexusSearchBar(
             if (query.isNotEmpty()) {
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .clickable(role = Role.Button) { onClear() }
                         .semantics { contentDescription = "Clear search" },
                     contentAlignment = Alignment.Center
                 ) {
                     Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(NexusTheme.colors.surface), contentAlignment = Alignment.Center) {
-                        NexusText("x", style = NexusTheme.typography.caption)
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_close),
+                            contentDescription = "Clear",
+                            tint = NexusTheme.colors.textPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
             }
@@ -213,7 +223,8 @@ fun NexusButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val isFocused by interactionSource.collectIsFocusedAsState()
-    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val hapticEnabled = com.nexus.core.theme.LocalHapticFeedbackEnabled.current
     
     val scale by animateFloatAsState(
         targetValue = when {
@@ -248,12 +259,9 @@ fun NexusButton(
                 enabled = enabled && !isLoading, 
                 role = Role.Button,
                 onClick = {
-                    try {
-                        val vibrator = context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
-                        if (vibrator.hasVibrator()) {
-                            vibrator.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_CLICK))
-                        }
-                    } catch (e: Exception) { }
+                    if (hapticEnabled) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
                     onClick()
                 }
             )
@@ -302,11 +310,12 @@ fun NexusSwitch(
     onCheckedChange: ((Boolean) -> Unit)?,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val hapticEnabled = com.nexus.core.theme.LocalHapticFeedbackEnabled.current
     val springSpec = remember { 
         androidx.compose.animation.core.spring<androidx.compose.ui.unit.Dp>(
-            dampingRatio = 0.65f,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+            dampingRatio = 0.78f,
+            stiffness = 500f
         )
     }
     
@@ -343,12 +352,9 @@ fun NexusSwitch(
                         value = checked,
                         role = Role.Switch,
                         onValueChange = { newValue ->
-                            try {
-                                val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
-                                if (vibrator.hasVibrator()) {
-                                    vibrator.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_TICK))
-                                }
-                            } catch (e: Exception) { }
+                            if (hapticEnabled) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
                             onCheckedChange(newValue)
                         }
                     )
@@ -382,7 +388,6 @@ fun <T> NexusTabRow(
     optionLabel: (T) -> String,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     val listState = rememberLazyListState()
     
     LazyRow(
@@ -396,7 +401,7 @@ fun <T> NexusTabRow(
     ) {
         items(
             items = options,
-            key = { option -> option.hashCode() }
+            key = { option -> optionLabel(option) }
         ) { option ->
             val isSelected = option == selectedOption
             
@@ -418,12 +423,6 @@ fun <T> NexusTabRow(
                     .clip(NexusTheme.shapes.pill)
                     .background(bgColor)
                     .springBounceClick {
-                        try {
-                            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
-                            if (vibrator.hasVibrator()) {
-                                vibrator.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_TICK))
-                            }
-                        } catch (e: Exception) { }
                         onOptionSelected(option)
                     }
                     .padding(vertical = 8.dp)
@@ -452,7 +451,8 @@ fun NexusSlider(
     valueRange: ClosedFloatingPointRange<Float> = 0f..1f
 ) {
     var isDragging by remember { mutableStateOf(false) }
-    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val hapticEnabled = com.nexus.core.theme.LocalHapticFeedbackEnabled.current
     val fraction = ((value - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
     
     BoxWithConstraints(
@@ -463,12 +463,9 @@ fun NexusSlider(
                 detectHorizontalDragGestures(
                     onDragStart = { offset ->
                         isDragging = true
-                        try {
-                            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
-                            if (vibrator.hasVibrator()) {
-                                vibrator.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_TICK))
-                            }
-                        } catch (e: Exception) { }
+                        if (hapticEnabled) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        }
                         val percent = (offset.x / size.width).coerceIn(0f, 1f)
                         onValueChange(valueRange.start + percent * (valueRange.endInclusive - valueRange.start))
                     },
@@ -479,12 +476,9 @@ fun NexusSlider(
                     },
                     onDragEnd = {
                         isDragging = false
-                        try {
-                            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
-                            if (vibrator.hasVibrator()) {
-                                vibrator.vibrate(android.os.VibrationEffect.createOneShot(20, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
-                            }
-                        } catch (e: Exception) { }
+                        if (hapticEnabled) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        }
                     }
                 )
             }
@@ -496,6 +490,15 @@ fun NexusSlider(
             }
             .semantics {
                 this.contentDescription = "Slider"
+                this.stateDescription = "${(((value - valueRange.start) / (valueRange.endInclusive - valueRange.start)) * 100).toInt()}%"
+                this.progressBarRangeInfo = androidx.compose.ui.semantics.ProgressBarRangeInfo(
+                    current = value,
+                    range = valueRange
+                )
+                this.setProgress { targetValue ->
+                    onValueChange(targetValue.coerceIn(valueRange.start, valueRange.endInclusive))
+                    true
+                }
             },
         contentAlignment = Alignment.CenterStart
     ) {
@@ -644,6 +647,155 @@ fun NexusIconButton(
             contentAlignment = Alignment.Center
         ) {
             content()
+        }
+    }
+}
+
+@Composable
+fun NexusStatBox(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .clip(NexusTheme.shapes.medium)
+            .background(NexusTheme.colors.surfaceElevated.copy(alpha = 0.6f))
+            .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.3f), NexusTheme.shapes.medium)
+            .padding(vertical = NexusTheme.spacing.sm, horizontal = NexusTheme.spacing.sm)
+    ) {
+        NexusText(
+            text = label,
+            style = NexusTheme.typography.labelXs,
+            color = NexusTheme.colors.textSecondary
+        )
+        NexusText(
+            text = value,
+            style = NexusTheme.typography.bodySmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+            color = NexusTheme.colors.textPrimary,
+            modifier = Modifier.padding(top = NexusTheme.spacing.xxs)
+        )
+    }
+}
+
+@Composable
+fun NexusDiscreteTrack(
+    steps: Int,
+    selectedIndex: Int,
+    onIndexSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    trackColor: Color = NexusTheme.colors.surfaceVariant,
+    progressColor: Color = NexusTheme.colors.primary,
+) {
+    val targetPosition = if (steps > 1) selectedIndex.toFloat() / (steps - 1) else 0f
+    val reduceMotion = com.nexus.core.ui.animations.AnimationConfig.RESPECT_MOTION_PREFERENCES && com.nexus.core.ui.animations.remoteMotionSettings()
+    val animatedPosition by animateFloatAsState(
+        targetValue = targetPosition,
+        animationSpec = if (reduceMotion) androidx.compose.animation.core.snap() else androidx.compose.animation.core.spring(dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy, stiffness = androidx.compose.animation.core.Spring.StiffnessLow),
+        label = "thumb_pos"
+    )
+    
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(NexusTheme.shapes.extraLarge)
+            .background(NexusTheme.colors.surfaceGradient)
+            .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.3f), NexusTheme.shapes.extraLarge)
+            .padding(NexusTheme.spacing.md)
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+        ) {
+            val maxWidth = maxWidth
+            val trackWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
+            val thumbWidth = 40.dp
+            val thumbWidthPx = with(LocalDensity.current) { thumbWidth.toPx() }
+            
+            var isDragging by remember { mutableStateOf(false) }
+            var dragOffset by remember { mutableStateOf(0f) }
+            
+            // Track
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(NexusTheme.shapes.large)
+                    .background(trackColor)
+                    .pointerInput(steps) {
+                        detectTapGestures { offset ->
+                            val fraction = (offset.x / trackWidthPx).coerceIn(0f, 1f)
+                            val closestIndex = kotlin.math.round(fraction * (steps - 1)).toInt().coerceIn(0, steps - 1)
+                            onIndexSelected(closestIndex)
+                        }
+                    }
+            ) {
+                // Progress
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(fraction = animatedPosition)
+                        .clip(NexusTheme.shapes.large)
+                        .background(progressColor)
+                )
+                
+                // Snap Markers
+                List(steps) { it }.forEach { index ->
+                    val pos = if (steps > 1) index.toFloat() / (steps - 1) else 0f
+                    val isActive = selectedIndex == index
+                    val markerScale by animateFloatAsState(
+                        targetValue = if (isActive) 0.65f else 1f, 
+                        animationSpec = if (reduceMotion) androidx.compose.animation.core.snap() else androidx.compose.animation.core.spring(),
+                        label = "marker"
+                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            // center a 48dp touch target over the visual 5dp center
+                            .offset(x = (maxWidth - 5.dp) * pos - 21.5.dp)
+                            .size(48.dp)
+                            .clickable(
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null
+                            ) { onIndexSelected(index) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .scale(markerScale)
+                                .clip(CircleShape)
+                                .background(NexusTheme.colors.surface.copy(alpha = 0.9f))
+                        )
+                    }
+                }
+            }
+            
+            // Thumb
+            val thumbOffsetPx = if (isDragging) dragOffset.coerceIn(0f, trackWidthPx - thumbWidthPx) else animatedPosition * (trackWidthPx - thumbWidthPx)
+            Box(
+                modifier = Modifier
+                    .offset { androidx.compose.ui.unit.IntOffset(thumbOffsetPx.toInt(), 0) }
+                    .size(thumbWidth, 48.dp)
+                    .padding(vertical = 4.dp)
+                    .shadow(4.dp, CircleShape)
+                    .clip(CircleShape)
+                    .background(NexusTheme.colors.surface)
+                    .pointerInput(steps) {
+                        detectHorizontalDragGestures(
+                            onDragStart = { 
+                                isDragging = true 
+                                dragOffset = animatedPosition * (trackWidthPx - thumbWidthPx)
+                            },
+                            onDragEnd = { isDragging = false },
+                            onDragCancel = { isDragging = false }
+                        ) { change, dragAmount ->
+                            change.consume()
+                            dragOffset += dragAmount
+                            val fraction = (dragOffset / (trackWidthPx - thumbWidthPx)).coerceIn(0f, 1f)
+                            val newIndex = kotlin.math.round(fraction * (steps - 1)).toInt().coerceIn(0, steps - 1)
+                            if (newIndex != selectedIndex) {
+                                onIndexSelected(newIndex)
+                            }
+                        }
+                    }
+            )
         }
     }
 }

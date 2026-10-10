@@ -1,5 +1,7 @@
 package com.nexus.feature.dashboard
 
+import com.nexus.core.theme.*
+
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -63,7 +65,6 @@ import com.nexus.core.ui.components.NexusDialog
 import com.nexus.core.ui.components.NexusIconButton
 import com.nexus.core.ui.components.NexusSwitch
 import com.nexus.core.ui.components.NexusTopBar
-import com.nexus.core.updater.UpdateState
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.ui.graphics.Brush
@@ -79,25 +80,20 @@ import com.nexus.core.ui.animations.EaseInOutSine
 fun SettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    onChangelogVisibilityChanged: (Boolean) -> Unit = {},
+    onNavigateToRecycleBin: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState        by viewModel.uiState.collectAsStateWithLifecycle()
-    val updateState    by viewModel.updateState.collectAsStateWithLifecycle()
     val availableTags  by viewModel.availableTags.collectAsStateWithLifecycle()
     val documents      by viewModel.documents.collectAsStateWithLifecycle()
-    val changelogState by viewModel.changelogState.collectAsStateWithLifecycle()
     val context        = LocalContext.current
 
     var showClearCacheDialog by remember { mutableStateOf(false) }
-    var showChangelogDialog  by remember { mutableStateOf(false) }
     var showThemeDialog      by remember { mutableStateOf(false) }
     var showLicensesDialog   by remember { mutableStateOf(false) }
     var showTagManagerScreen by remember { mutableStateOf(false) }
+    var showRetentionDialog  by remember { mutableStateOf(false) }
 
-    LaunchedEffect(showChangelogDialog) {
-        onChangelogVisibilityChanged(showChangelogDialog)
-    }
 
     // ── Storage permission helpers ────────────────────────────────────────────
     val checkStoragePermission = {
@@ -202,7 +198,7 @@ fun SettingsScreen(
                     modifier           = Modifier
                         .clip(CircleShape)
                         .springBounceClick { onBack() }
-                        .padding(12.dp)
+                        .padding(NexusTheme.spacing.sm)
                         .size(24.dp),
                     colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
                 )
@@ -219,7 +215,7 @@ fun SettingsScreen(
                 top    = 16.dp,
                 bottom = 120.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.sm)
         ) {
 
             // ── Appearance ───────────────────────────────────────────────────
@@ -299,6 +295,20 @@ fun SettingsScreen(
                         onClick  = { showTagManagerScreen = true }
                     )
                     SettingsDivider()
+                    SettingsNavRow(
+                        iconRes  = R.drawable.ic_delete,
+                        title    = "Recycle Bin",
+                        value    = uiState.trashedSizeText,
+                        onClick  = onNavigateToRecycleBin
+                    )
+                    SettingsDivider()
+                    SettingsNavRow(
+                        iconRes  = R.drawable.ic_save,
+                        title    = "Trash Retention",
+                        value    = if (uiState.trashRetentionDays <= 0) "Never" else "${uiState.trashRetentionDays} days",
+                        onClick  = { showRetentionDialog = true }
+                    )
+                    SettingsDivider()
                     SettingsDestructiveRow(
                         iconRes  = R.drawable.ic_delete,
                         title    = "Clear Cache",
@@ -334,31 +344,7 @@ fun SettingsScreen(
                         title    = "App Version",
                         value    = uiState.appVersion
                     )
-                    SettingsDivider()
-                    SettingsNavRow(
-                        iconRes  = R.drawable.ic_changelog,
-                        title    = "Changelog",
-                        value    = "What's new",
-                        onClick  = {
-                            viewModel.fetchChangelog()
-                            showChangelogDialog = true
-                        }
-                    )
-                    SettingsDivider()
-                    SettingsNavRow(
-                        iconRes  = R.drawable.ic_update_progress,
-                        title    = "Check for Updates",
-                        value    = when (updateState) {
-                            is UpdateState.Checking    -> "Checking…"
-                            is UpdateState.Downloading -> "Downloading…"
-                            is UpdateState.Available   -> "Update available"
-                            is UpdateState.UpToDate    -> "Up to date"
-                            is UpdateState.Error       -> "Update failed"
-                            else                       -> "Tap to check"
-                        },
-                        onClick = { viewModel.checkForUpdates() }
-                    )
-                    SettingsDivider()
+
                     SettingsNavRow(
                         iconRes  = R.drawable.ic_lock,
                         title    = "Privacy Policy",
@@ -409,33 +395,6 @@ fun SettingsScreen(
         )
     }
 
-    androidx.compose.animation.AnimatedVisibility(
-        visible = showChangelogDialog,
-        enter   = androidx.compose.animation.slideInVertically(initialOffsetY = { it }) + androidx.compose.animation.fadeIn(),
-        exit    = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) + androidx.compose.animation.fadeOut()
-    ) {
-        ChangelogFullScreen(
-            state     = changelogState,
-            onDismiss = { showChangelogDialog = false },
-            onRetry   = { viewModel.fetchChangelog() }
-        )
-    }
-
-    var showUpdateDialog by remember(updateState, uiState.isManualUpdateCheck) {
-        mutableStateOf(
-            updateState is UpdateState.Available ||
-            (uiState.isManualUpdateCheck && (updateState is UpdateState.UpToDate || updateState is UpdateState.Error))
-        )
-    }
-
-    if (showUpdateDialog) {
-        UpdateDialog(
-            updateState = updateState,
-            onDismiss   = { showUpdateDialog = false; viewModel.resetUpdateState() },
-            onDownload  = { url, version -> showUpdateDialog = false; viewModel.downloadAndInstallUpdate(url, version) },
-            onRetry     = { showUpdateDialog = false; viewModel.checkForUpdates() }
-        )
-    }
 
     if (showThemeDialog) {
         ThemeSelectionDialog(
@@ -445,8 +404,112 @@ fun SettingsScreen(
         )
     }
 
+    if (showRetentionDialog) {
+        TrashRetentionDialog(
+            currentDays = uiState.trashRetentionDays,
+            onDaysSelected = { viewModel.setTrashRetentionDays(it) },
+            onDismiss = { showRetentionDialog = false }
+        )
+    }
+
     if (showLicensesDialog) {
         LicensesDialog(onDismiss = { showLicensesDialog = false })
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun TrashRetentionDialog(
+    currentDays: Int,
+    onDaysSelected: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val options = listOf(
+        30 to "30 Days (Recommended)",
+        15 to "15 Days",
+        7 to "7 Days",
+        -1 to "Never (Keep indefinitely)"
+    )
+
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = NexusTheme.colors.surface,
+        contentColor = NexusTheme.colors.textPrimary,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(bottom = NexusTheme.spacing.xl)
+                .padding(horizontal = NexusTheme.spacing.md)
+        ) {
+            NexusText(
+                text = "Trash Retention Period",
+                style = NexusTheme.typography.title,
+                color = NexusTheme.colors.textPrimary
+            )
+            NexusText(
+                text = "Documents moved to Recycle Bin will be automatically and permanently purged after this duration.",
+                style = NexusTheme.typography.caption,
+                color = NexusTheme.colors.textSecondary,
+                modifier = Modifier.padding(top = NexusTheme.spacing.xxs, bottom = NexusTheme.spacing.md)
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)) {
+                options.forEach { (days, label) ->
+                    val isSelected = (currentDays == days) || (days == -1 && currentDays <= 0)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(NexusTheme.shapes.medium)
+                            .background(
+                                if (isSelected) NexusTheme.colors.primary.copy(alpha = 0.12f)
+                                else NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f)
+                            )
+                            .border(
+                                width = if (isSelected) 1.2.dp else 0.6.dp,
+                                color = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.divider.copy(alpha = 0.5f),
+                                shape = NexusTheme.shapes.medium
+                            )
+                            .springBounceClick {
+                                onDaysSelected(days)
+                                onDismiss()
+                            }
+                            .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        NexusText(
+                            text = label,
+                            style = NexusTheme.typography.body.copy(
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 14.sp
+                            ),
+                            color = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textPrimary
+                        )
+                        if (isSelected) {
+                            Box(
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .background(NexusTheme.colors.primary),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_check),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(13.dp),
+                                    colorFilter = ColorFilter.tint(NexusTheme.colors.onPrimary)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -463,7 +526,7 @@ private fun SettingsSectionGroup(
         // Section label
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+            modifier = Modifier.padding(start = NexusTheme.spacing.xxs, bottom = NexusTheme.spacing.xs)
         ) {
             NexusText(
                 text     = label,
@@ -478,9 +541,9 @@ private fun SettingsSectionGroup(
                 Spacer(modifier = Modifier.width(6.dp))
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(NexusTheme.shapes.small)
                         .background(NexusTheme.colors.primary.copy(alpha = 0.15f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                        .padding(horizontal = NexusTheme.spacing.xs, vertical = 2.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     NexusText(
@@ -534,13 +597,13 @@ private fun SettingsNavRow(
         modifier = Modifier
             .fillMaxWidth()
             .springBounceClick(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.sm),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
                 .size(38.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(NexusTheme.shapes.medium)
                 .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.7f)),
             contentAlignment = Alignment.Center
         ) {
@@ -585,13 +648,13 @@ private fun SettingsSwitchRow(
         modifier = Modifier
             .fillMaxWidth()
             .springBounceClick { onCheckedChange(!checked) }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.sm),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
                 .size(38.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(NexusTheme.shapes.medium)
                 .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.7f)),
             contentAlignment = Alignment.Center
         ) {
@@ -632,13 +695,13 @@ private fun SettingsDestructiveRow(
         modifier = Modifier
             .fillMaxWidth()
             .springBounceClick(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.sm),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
                 .size(38.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(NexusTheme.shapes.medium)
                 .background(iconTint.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
         ) {
@@ -680,13 +743,13 @@ private fun SettingsPermissionRow(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.springBounceClick(onClick = onClick) else Modifier)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.sm),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
                 .size(38.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(NexusTheme.shapes.medium)
                 .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.7f)),
             contentAlignment = Alignment.Center
         ) {
@@ -715,9 +778,9 @@ private fun SettingsPermissionRow(
         // Status indicator pill
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(50))
+                .clip(NexusTheme.shapes.pill)
                 .background(statusColor.copy(alpha = 0.10f))
-                .padding(horizontal = 10.dp, vertical = 4.dp),
+                .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xxs),
             contentAlignment = Alignment.Center
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -751,13 +814,13 @@ private fun SettingsInfoRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.sm),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
                 .size(38.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(NexusTheme.shapes.medium)
                 .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.7f)),
             contentAlignment = Alignment.Center
         ) {
@@ -789,7 +852,7 @@ private fun SettingsDivider() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 68.dp)
+            .padding(start = NexusTheme.spacing.xxl)
             .height(0.8.dp)
             .background(NexusTheme.colors.divider.copy(alpha = 0.6f))
     )
@@ -805,7 +868,10 @@ private fun ThemeSelectionDialog(
     onDismiss:       () -> Unit
 ) {
     val options = listOf(
+        Triple(ThemeMode.SYSTEM, "System Default", R.drawable.ic_theme),
         Triple(ThemeMode.LIGHT,  "Light",          R.drawable.ic_theme_light),
+        Triple(ThemeMode.DARK,   "Dark",           R.drawable.ic_theme_dark),
+        Triple(ThemeMode.AMOLED, "AMOLED Black",   R.drawable.ic_theme_dark),
         Triple(ThemeMode.SEPIA,  "Sepia",          R.drawable.ic_theme_sepia),
         Triple(ThemeMode.FOREST, "Forest",         R.drawable.ic_theme_forest),
         Triple(ThemeMode.SUNSET, "Sunset",         R.drawable.ic_theme_sunset)
@@ -822,12 +888,12 @@ private fun ThemeSelectionDialog(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 32.dp)
-                .padding(horizontal = 16.dp)
+                .padding(bottom = NexusTheme.spacing.xl)
+                .padding(horizontal = NexusTheme.spacing.md)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 12.dp, start = 4.dp, end = 4.dp)
+                modifier = Modifier.padding(bottom = NexusTheme.spacing.sm, start = NexusTheme.spacing.xxs, end = NexusTheme.spacing.xxs)
             ) {
                 Box(
                     modifier = Modifier
@@ -860,18 +926,22 @@ private fun ThemeSelectionDialog(
             options.forEach { (mode, label, iconRes) ->
                 val isSelected  = currentTheme == mode
                 val accentColor = when (mode) {
-                    ThemeMode.LIGHT  -> Color(0xFF2563EB)
-                    ThemeMode.SEPIA  -> Color(0xFFD97706)
-                    ThemeMode.FOREST -> Color(0xFF10B981)
-                    ThemeMode.SUNSET -> Color(0xFFF43F5E)
+                    ThemeMode.LIGHT  -> lightNexusColors.primary
+                    ThemeMode.DARK   -> darkNexusColors.primary
+                    ThemeMode.AMOLED -> amoledNexusColors.primary
+                    ThemeMode.SEPIA  -> sepiaNexusColors.primary
+                    ThemeMode.FOREST -> forestNexusColors.primary
+                    ThemeMode.SUNSET -> sunsetNexusColors.primary
                     else             -> NexusTheme.colors.primary
                 }
 
                 val swatchColor = when (mode) {
-                    ThemeMode.LIGHT  -> Color(0xFFF8F9FA)
-                    ThemeMode.SEPIA  -> Color(0xFFF4ECD8)
-                    ThemeMode.FOREST -> Color(0xFF1F2E20)
-                    ThemeMode.SUNSET -> Color(0xFF2E1C2B)
+                    ThemeMode.LIGHT  -> lightNexusColors.background
+                    ThemeMode.DARK   -> darkNexusColors.background
+                    ThemeMode.AMOLED -> amoledNexusColors.background
+                    ThemeMode.SEPIA  -> sepiaNexusColors.background
+                    ThemeMode.FOREST -> forestNexusColors.background
+                    ThemeMode.SUNSET -> sunsetNexusColors.background
                     else             -> NexusTheme.colors.background
                 }
 
@@ -893,7 +963,7 @@ private fun ThemeSelectionDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp)
+                        .padding(vertical = NexusTheme.spacing.xxs)
                         .clip(NexusTheme.shapes.medium)
                         .background(if (isSelected) accentColor.copy(alpha = 0.08f) else NexusTheme.colors.surface)
                         .border(
@@ -902,15 +972,15 @@ private fun ThemeSelectionDialog(
                             shape = NexusTheme.shapes.medium
                         )
                         .springBounceClick { onThemeSelected(mode) }
-                        .padding(vertical = 12.dp, horizontal = 16.dp),
+                        .padding(vertical = NexusTheme.spacing.sm, horizontal = NexusTheme.spacing.md),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
                             .size(38.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(NexusTheme.shapes.medium)
                             .background(swatchColor)
-                            .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
+                            .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.3f), NexusTheme.shapes.medium),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
@@ -970,16 +1040,16 @@ private fun LicensesDialog(onDismiss: () -> Unit) {
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
             ) {
                 libraries.forEach { (name, desc) ->
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(NexusTheme.shapes.small)
                             .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.6f))
-                            .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
-                            .padding(12.dp)
+                            .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.6f), NexusTheme.shapes.small)
+                            .padding(NexusTheme.spacing.sm)
                     ) {
                         NexusText(
                             text = name,
@@ -1005,326 +1075,3 @@ private fun LicensesDialog(onDismiss: () -> Unit) {
     )
 }
 
-// ─── Changelog full-screen ────────────────────────────────────────────────────
-
-@Composable
-private fun ChangelogFullScreen(
-    state:     ChangelogState,
-    onDismiss: () -> Unit,
-    onRetry:   () -> Unit
-) {
-    BackHandler { onDismiss() }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(NexusTheme.colors.background)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication        = null,
-                onClick           = {}
-            )
-    ) {
-        NexusTopBar(
-            title          = "Changelog",
-            navigationIcon = {
-                Image(
-                    painter            = painterResource(id = R.drawable.ic_back),
-                    contentDescription = "Back",
-                    modifier           = Modifier
-                        .clip(CircleShape)
-                        .springBounceClick { onDismiss() }
-                        .padding(16.dp)
-                        .size(24.dp),
-                    colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
-                )
-            }
-        )
-
-        Box(
-            modifier         = Modifier.weight(1f).fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            AnimatedContent(
-                targetState = state,
-                transitionSpec = {
-                    androidx.compose.animation.fadeIn(animationSpec = tween(300)) togetherWith
-                    androidx.compose.animation.fadeOut(animationSpec = tween(300))
-                },
-                label = "ChangelogState"
-            ) { targetState ->
-                when (targetState) {
-                    is ChangelogState.Idle, is ChangelogState.Loading -> {
-                        NexusText("Loading…", color = NexusTheme.colors.primary, style = NexusTheme.typography.body)
-                    }
-                    is ChangelogState.Error -> {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            NexusText(
-                                text      = targetState.message,
-                                color     = NexusTheme.colors.error,
-                                style     = NexusTheme.typography.body,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            NexusButton(text = "Retry", onClick = onRetry)
-                        }
-                    }
-                    is ChangelogState.Success -> {
-                        androidx.compose.foundation.lazy.LazyColumn(
-                            modifier       = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp)
-                        ) {
-                            items(targetState.releases.size) { index ->
-                                TimelineItem(
-                                    release = targetState.releases[index],
-                                    isLast  = index == targetState.releases.size - 1
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ─── Timeline item ────────────────────────────────────────────────────────────
-
-@Composable
-private fun TimelineItem(
-    release: com.nexus.core.updater.GithubRelease,
-    isLast:  Boolean
-) {
-    val pulseTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseAlpha by pulseTransition.animateFloat(
-        initialValue  = 0.3f,
-        targetValue   = 0.8f,
-        animationSpec = infiniteRepeatable(
-            animation  = tween(1000, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseAlpha"
-    )
-
-    Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier            = Modifier.width(24.dp).fillMaxHeight()
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier         = Modifier.padding(top = 6.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(18.dp)
-                        .clip(CircleShape)
-                        .background(NexusTheme.colors.primary.copy(alpha = pulseAlpha))
-                )
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(NexusTheme.colors.primary)
-                )
-            }
-            if (!isLast) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = 4.dp, bottom = 4.dp)
-                        .width(2.dp)
-                        .weight(1f)
-                        .background(NexusTheme.colors.primary.copy(alpha = 0.3f))
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f).padding(bottom = 24.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                NexusText(
-                    text  = release.version,
-                    style = NexusTheme.typography.title,
-                    color = NexusTheme.colors.primary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Box(
-                    modifier = Modifier
-                        .clip(NexusTheme.shapes.small)
-                        .background(NexusTheme.colors.primary.copy(alpha = 0.10f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    NexusText(
-                        text  = release.date,
-                        style = NexusTheme.typography.caption,
-                        color = NexusTheme.colors.primary
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(NexusTheme.shapes.medium)
-                    .background(NexusTheme.colors.primary.copy(alpha = 0.05f))
-                    .padding(12.dp)
-            ) {
-                release.body.split('\n').forEach { line ->
-                    val trimmed = line.trim()
-                    when {
-                        trimmed.isEmpty() -> Spacer(modifier = Modifier.height(8.dp))
-                        trimmed.startsWith("* ") || trimmed.startsWith("- ") -> {
-                            val content = trimmed.removePrefix("* ").removePrefix("- ").trim()
-                            Row(modifier = Modifier.padding(bottom = 6.dp)) {
-                                NexusText("•", style = NexusTheme.typography.body, color = NexusTheme.colors.primary, modifier = Modifier.padding(end = 8.dp))
-                                NexusText(text = content, style = NexusTheme.typography.body, color = NexusTheme.colors.textSecondary)
-                            }
-                        }
-                        trimmed.startsWith("### ") -> NexusText(trimmed.removePrefix("### "), style = NexusTheme.typography.title,   color = NexusTheme.colors.textPrimary, modifier = Modifier.padding(vertical = 4.dp))
-                        trimmed.startsWith("## ")  -> NexusText(trimmed.removePrefix("## "),  style = NexusTheme.typography.h2,      color = NexusTheme.colors.textPrimary, modifier = Modifier.padding(vertical = 4.dp))
-                        trimmed.startsWith("# ")   -> NexusText(trimmed.removePrefix("# "),   style = NexusTheme.typography.h1,      color = NexusTheme.colors.textPrimary, modifier = Modifier.padding(vertical = 4.dp))
-                        else -> NexusText(text = trimmed, style = NexusTheme.typography.body, color = NexusTheme.colors.textSecondary, modifier = Modifier.padding(bottom = 4.dp))
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ─── Update dialog ────────────────────────────────────────────────────────────
-
-@Composable
-internal fun UpdateDialog(
-    updateState: UpdateState,
-    onDismiss:   () -> Unit,
-    onDownload:  (String, String) -> Unit,
-    onRetry:     () -> Unit
-) {
-    var isVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { isVisible = true }
-    val handleDismiss = { isVisible = false }
-
-    Dialog(
-        onDismissRequest = handleDismiss,
-        properties       = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = if (isVisible) 0.5f else 0f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication        = null,
-                    onClick           = handleDismiss
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            androidx.compose.animation.AnimatedVisibility(
-                visible  = isVisible,
-                enter    = androidx.compose.animation.slideInVertically(initialOffsetY = { it }, animationSpec = tween(300)) + androidx.compose.animation.fadeIn(),
-                exit     = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }, animationSpec = tween(300)) + androidx.compose.animation.fadeOut(),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                NexusSurface(
-                    shape     = RoundedCornerShape(0.dp),
-                    elevation = 0.dp,
-                    color     = NexusTheme.colors.surface,
-                    modifier  = Modifier
-                        .fillMaxSize()
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication        = null,
-                            onClick           = {}
-                        )
-                ) {
-                    Column(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
-                        Box(
-                            modifier         = Modifier.fillMaxWidth().padding(top = 12.dp, end = 12.dp),
-                            contentAlignment = Alignment.CenterEnd
-                        ) {
-                            NexusIconButton(
-                                onClick        = handleDismiss,
-                                elevation      = 0.dp,
-                                containerColor = Color.Transparent
-                            ) {
-                                Image(
-                                    painter            = painterResource(id = R.drawable.ic_close),
-                                    contentDescription = "Close",
-                                    colorFilter        = ColorFilter.tint(NexusTheme.colors.textPrimary),
-                                    modifier           = Modifier.size(24.dp)
-                                )
-                            }
-                        }
-
-                        Column(
-                            modifier            = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState())
-                                .padding(horizontal = 24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            val iconRes  = when (updateState) { is UpdateState.Available -> R.drawable.ic_update_progress; is UpdateState.UpToDate -> R.drawable.ic_check; is UpdateState.Error -> R.drawable.ic_info; else -> R.drawable.ic_update_progress }
-                            val iconTint = when (updateState) { is UpdateState.Available -> NexusTheme.colors.primary; is UpdateState.UpToDate -> NexusTheme.colors.success; is UpdateState.Error -> NexusTheme.colors.error; else -> NexusTheme.colors.primary }
-
-                            Box(
-                                modifier = Modifier.size(64.dp).clip(CircleShape).background(iconTint.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Image(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.size(32.dp), colorFilter = ColorFilter.tint(iconTint))
-                            }
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            when (val state = updateState) {
-                                is UpdateState.Available -> {
-                                    NexusText("Update Available", style = NexusTheme.typography.h2)
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    NexusText("Version ${state.version} is now available.", style = NexusTheme.typography.body, color = NexusTheme.colors.textSecondary, textAlign = TextAlign.Center)
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Box(modifier = Modifier.fillMaxWidth().background(NexusTheme.colors.surfaceVariant, NexusTheme.shapes.medium).padding(16.dp)) {
-                                        NexusText(state.releaseNotes, style = NexusTheme.typography.caption)
-                                    }
-                                }
-                                is UpdateState.UpToDate -> {
-                                    NexusText("Up to Date", style = NexusTheme.typography.h2)
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    NexusText("You are using the latest version of LiteView.", style = NexusTheme.typography.body, color = NexusTheme.colors.textSecondary, textAlign = TextAlign.Center)
-                                }
-                                is UpdateState.Error -> {
-                                    NexusText("Update Error", style = NexusTheme.typography.h2)
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    NexusText(state.message, style = NexusTheme.typography.body, color = NexusTheme.colors.textSecondary, textAlign = TextAlign.Center)
-                                }
-                                else -> {}
-                            }
-                        }
-
-                        Box(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 64.dp)) {
-                            when (val state = updateState) {
-                                is UpdateState.Available -> Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                    NexusButton(text = "Later",   isOutlined = true, onClick = handleDismiss,                                      modifier = Modifier.weight(1f))
-                                    NexusButton(text = "Install", onClick = { onDownload(state.downloadUrl, state.version) }, modifier = Modifier.weight(1f))
-                                }
-                                is UpdateState.UpToDate -> NexusButton(text = "Awesome", onClick = handleDismiss, modifier = Modifier.fillMaxWidth())
-                                is UpdateState.Error    -> Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                    NexusButton(text = "Cancel", isOutlined = true, onClick = handleDismiss, modifier = Modifier.weight(1f))
-                                    NexusButton(text = "Retry",  onClick = onRetry,        modifier = Modifier.weight(1f))
-                                }
-                                else -> {}
-                            }
-                        }
-                    }
-                }
-            }
-
-            LaunchedEffect(isVisible) {
-                if (!isVisible) {
-                    kotlinx.coroutines.delay(300)
-                    onDismiss()
-                }
-            }
-        }
-    }
-}

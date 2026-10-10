@@ -11,14 +11,16 @@ import androidx.room.RoomDatabase
         RecentDocument::class,
         DocumentBookmark::class,
         DocumentTag::class,
-        TagDefinition::class
+        TagDefinition::class,
+        TrashedDocument::class
     ],
-    version = 6,
-    exportSchema = false
+    version = 7,
+    exportSchema = true
 )
 abstract class NexusDatabase : RoomDatabase() {
     abstract fun recentDocumentDao(): RecentDocumentDao
     abstract fun documentBookmarkDao(): DocumentBookmarkDao
     abstract fun documentTagDao(): DocumentTagDao
     abstract fun tagDefinitionDao(): TagDefinitionDao
+    abstract fun trashedDocumentDao(): TrashedDocumentDao
 }

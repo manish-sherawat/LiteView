@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.nexus.feature.dashboard"
-    compileSdk = 35
+    compileSdk = 37
     defaultConfig {
         minSdk = 26
         consumerProguardFiles("consumer-rules.pro")
@@ -17,11 +17,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+
     buildFeatures { compose = true }
 }
 
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
 
 dependencies {
     implementation(project(":core"))
@@ -30,7 +33,7 @@ dependencies {
     implementation(composeBom)
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
-
+    implementation(libs.coil.compose)
 
     implementation(libs.compose.animation)
     implementation(libs.compose.foundation)

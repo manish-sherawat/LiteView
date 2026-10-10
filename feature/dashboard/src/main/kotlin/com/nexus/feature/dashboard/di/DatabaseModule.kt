@@ -9,6 +9,7 @@ import com.nexus.feature.dashboard.data.RecentDocumentDao
 import com.nexus.feature.dashboard.data.DocumentBookmarkDao
 import com.nexus.feature.dashboard.data.DocumentTagDao
 import com.nexus.feature.dashboard.data.TagDefinitionDao
+import com.nexus.feature.dashboard.data.TrashedDocumentDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -57,6 +58,31 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP TABLE IF EXISTS trashed_documents")
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS trashed_documents (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    originalUri TEXT NOT NULL,
+                    originalPath TEXT NOT NULL,
+                    fileName TEXT NOT NULL,
+                    fileSizeBytes INTEGER NOT NULL,
+                    mimeType TEXT,
+                    documentType TEXT NOT NULL,
+                    trashedAt INTEGER NOT NULL,
+                    quarantinePath TEXT,
+                    attachedTagsJson TEXT,
+                    isQuarantined INTEGER NOT NULL,
+                    lastScrollIndex INTEGER NOT NULL,
+                    lastScrollOffset INTEGER NOT NULL
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_trashed_documents_trashedAt ON trashed_documents(trashedAt)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_trashed_documents_originalUri ON trashed_documents(originalUri)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideNexusDatabase(
@@ -65,7 +91,7 @@ object DatabaseModule {
         context,
         NexusDatabase::class.java,
         "nexus_docs.db"
-    ).addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+    ).addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
      .fallbackToDestructiveMigration()
      .build()
 
@@ -84,4 +110,8 @@ object DatabaseModule {
     @Provides
     fun provideTagDefinitionDao(db: NexusDatabase): TagDefinitionDao =
         db.tagDefinitionDao()
+
+    @Provides
+    fun provideTrashedDocumentDao(db: NexusDatabase): TrashedDocumentDao =
+        db.trashedDocumentDao()
 }

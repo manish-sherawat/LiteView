@@ -30,7 +30,7 @@ fun FileListItemShimmer(modifier: Modifier = Modifier) {
     NexusCard(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xxs)
             .shadow(
                 elevation = 2.dp, 
                 shape = NexusTheme.shapes.large,
@@ -41,7 +41,7 @@ fun FileListItemShimmer(modifier: Modifier = Modifier) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(NexusTheme.spacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -54,7 +54,7 @@ fun FileListItemShimmer(modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.width(12.dp))
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
             ) {
                 Box(
                     modifier = Modifier
@@ -105,8 +105,8 @@ fun FileGridItemShimmer(modifier: Modifier = Modifier) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xs),
+                verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xxs)
             ) {
                 Box(
                     modifier = Modifier

@@ -9,8 +9,36 @@
     <!-- Android 13+ granular media permissions -->
     <!-- Removed READ_MEDIA_IMAGES and READ_MEDIA_VIDEO as only documents are read -->
 
-    <!-- All files access for scanning documents on Android 11+ -->
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
+    <!--
+        MANAGE_EXTERNAL_STORAGE — Android 11+ (API 30+) — REQUIRED for core functionality.
+
+        Justification: NexusDocsViewer is a document manager that must enumerate, open,
+        rename, move, and soft-delete files across ALL directories of external storage
+        (Downloads, Documents, arbitrary folders chosen by the user). The SAF
+        (Storage Access Framework) cannot satisfy this use-case because:
+          1. SAF requires the user to pick every folder individually via a system picker,
+             making automated "scan all documents" impossible without granting hundreds of
+             individual trees.
+          2. MediaStore does not expose files in app-private dirs or non-standard folder
+             layouts used by many file managers.
+          3. The Recycle Bin feature moves files to an internal quarantine directory and
+             restores them to their original location — impossible without full-path access.
+
+        Play Store Compliance:
+          - This app MUST submit a "Permissions Declaration" form in the Play Console
+            (Policy → App Content → Sensitive Permissions) each time it is submitted.
+          - Declaration category: "File Manager" or "Backup & Restore" (whichever fits best).
+          - The tools:ignore="ScopedStorage" below suppresses the Android Studio lint
+            warning ONLY — it does NOT replace the Play Console declaration form.
+
+        READ_EXTERNAL_STORAGE (maxSdkVersion=32 below) covers API 29–32 (Android 10–12L).
+        On API 33+ (Android 13+), no additional permission is required beyond this one
+        because MANAGE_EXTERNAL_STORAGE implicitly grants read access.
+    -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
     
     <!-- Camera for scanning documents -->
     <uses-permission android:name="android.permission.CAMERA" />
@@ -76,6 +104,15 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                <data android:mimeType="application/vnd.ms-excel" />
+            </intent-filter>
+
+            <!-- PPTX and PPT intent filters -->
+            <intent-filter android:priority="1" tools:ignore="AppLinkUrlError">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.presentation" />
+                <data android:mimeType="application/vnd.ms-powerpoint" />
             </intent-filter>
 
 

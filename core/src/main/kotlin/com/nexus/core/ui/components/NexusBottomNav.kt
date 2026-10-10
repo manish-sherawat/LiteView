@@ -31,6 +31,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import dev.chrisbanes.haze.hazeChild
+import dev.chrisbanes.haze.HazeStyle
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -38,6 +40,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -58,9 +61,7 @@ import com.nexus.core.preferences.HomeStyle
 import com.nexus.core.theme.NexusTheme
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.animations.*
-import com.nexus.core.ui.utils.LocalGlassEffectConfig
-import com.nexus.core.ui.utils.liquidGlass
-import com.nexus.core.ui.utils.glassBackground
+import com.nexus.core.ui.utils.readerNavGlassConfig
 import kotlinx.coroutines.launch
 
 // ─── Screen Navigation Sealed Class ──────────────────────────────────────────
@@ -137,18 +138,17 @@ fun AppFloatingNavBar(
     onItemClick: (Screens, Int) -> Unit,
     modifier: Modifier = Modifier,
     scrollConnection: NestedScrollConnection? = null,
-    visible: Boolean = true
+    visible: Boolean = true,
+    homeStyle: HomeStyle = HomeStyle.APPLE_GLASSMORPHIC
 ) {
-    val convertedItems = remember(navigationItems) {
-        navigationItems.map { screen ->
-            NexusNavItem(
-                label = "",
-                selectedIconRes = screen.iconIdActive,
-                unselectedIconRes = screen.iconIdInactive,
-                animRawRes = screen.animRawRes,
-                route = screen.route
-            )
-        }
+    val convertedItems = navigationItems.map { screen ->
+        NexusNavItem(
+            label = stringResource(id = screen.titleId),
+            selectedIconRes = screen.iconIdActive,
+            unselectedIconRes = screen.iconIdInactive,
+            animRawRes = screen.animRawRes,
+            route = screen.route
+        )
     }
 
     NexusFloatingBottomNav(
@@ -159,7 +159,7 @@ fun AppFloatingNavBar(
             val screen = navigationItems.getOrNull(index) ?: Screens.Home
             onItemClick(screen, if (index >= 0) index else 0)
         },
-        homeStyle = HomeStyle.APPLE_GLASSMORPHIC,
+        homeStyle = homeStyle,
         modifier = modifier,
         visible = visible
     )
@@ -183,7 +183,7 @@ fun NexusFloatingBottomNav(
     val isCapsuleSelected = selectedIndex >= 0
 
     // ── Dynamic Dimensions & Fluid Spring Specs ───────────────────────────────
-    val morphSpring = remember { spring<Dp>(dampingRatio = 0.85f, stiffness = 380f) }
+    val morphSpring = remember { spring<Dp>(dampingRatio = 0.86f, stiffness = 380f) }
 
     val animCapsuleHeight by animateDpAsState(
         targetValue   = if (isCollapsed) 48.dp else 60.dp,
@@ -191,8 +191,8 @@ fun NexusFloatingBottomNav(
         label         = "capsuleH"
     )
 
-    // Comfortable ergonomic tab width (wider for natural left-to-center thumb reach)
-    val baseTabWidth = if (isCollapsed) 68.dp else 96.dp
+    // Comfortable ergonomic tab width (calibrated dynamically for 2 or 3 tabs)
+    val baseTabWidth = if (isCollapsed) 68.dp else (if (items.size <= 2) 112.dp else 96.dp)
     val animTabWidth by animateDpAsState(
         targetValue   = baseTabWidth,
         animationSpec = morphSpring,
@@ -251,8 +251,8 @@ fun NexusFloatingBottomNav(
             tabFraction.animateTo(
                 targetValue = selectedIndex.toFloat(),
                 animationSpec = spring(
-                    dampingRatio = 0.80f,
-                    stiffness = 380f
+                    dampingRatio = 0.84f,
+                    stiffness = 360f
                 )
             )
         }
@@ -268,12 +268,31 @@ fun NexusFloatingBottomNav(
     val indicatorStroke = primaryColor.copy(alpha = 0.18f)
 
     // ── Solid opaque background shell modifier ────────────────────────────────
+    val backdrop = com.nexus.core.ui.utils.LocalAppBackdrop.current
+    val appleSurfaceOpacity = if (isDark) 0.12f else 0.35f
+    val appleSurfaceTint = if (isDark) Color(0xFF1E1E1E) else Color(0xFFFFFFFF)
+    val appleBgAlpha = if (isDark) 0.25f else 0.15f
+    val appleBorderAlpha = if (isDark) 0.15f else 0.3f
+
+    val hazeState = com.nexus.core.ui.utils.LocalHazeState.current
     val backgroundShellModifier = Modifier
         .clip(pillShape)
-        .background(NexusTheme.colors.surface)
+        .then(
+            if (hazeState != null && hazeState.areas.isNotEmpty()) {
+                Modifier.hazeChild(
+                    state = hazeState,
+                    style = dev.chrisbanes.haze.HazeStyle(
+                        backgroundColor = NexusTheme.colors.surface,
+                        tint = dev.chrisbanes.haze.HazeTint(appleSurfaceTint.copy(alpha = appleSurfaceOpacity)),
+                        blurRadius = 32.dp
+                    )
+                )
+            } else Modifier
+        )
+        .background(NexusTheme.colors.surface.copy(alpha = appleBgAlpha))
         .border(
-            width = 1.dp,
-            color = NexusTheme.colors.divider.copy(alpha = 0.8f),
+            width = 0.5.dp,
+            color = NexusTheme.colors.divider.copy(alpha = appleBorderAlpha),
             shape = pillShape
         )
 
@@ -406,276 +425,6 @@ fun NexusFloatingBottomNav(
     }
 }
 
-// ─── Regular Nav Icon + Animated Label ───────────────────────────────────────
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun NexusNavIconWithLabel(
-    item: NexusNavItem,
-    isSelected: Boolean,
-    isCollapsed: Boolean,
-    iconSize: Dp = 22.dp,
-    onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null
-) {
-    val haptic = LocalHapticFeedback.current
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-
-    // Tactile press squish spring
-    val pressScale by animateFloatAsState(
-        targetValue   = if (isPressed) 0.88f else 1f,
-        animationSpec = spring(dampingRatio = 0.65f, stiffness = 600f),
-        label         = "navPressScale"
-    )
-
-    // Selection pop-in bounce spring
-    val selectionScale = remember { Animatable(if (isSelected) 1f else 0.94f) }
-    LaunchedEffect(isSelected) {
-        if (isSelected) {
-            selectionScale.snapTo(0.80f)
-            selectionScale.animateTo(
-                targetValue   = 1f,
-                animationSpec = spring(
-                    dampingRatio = 0.48f, // energetic, delightful pop
-                    stiffness    = 420f
-                )
-            )
-        } else {
-            selectionScale.animateTo(
-                targetValue   = 0.94f,
-                animationSpec = spring(
-                    dampingRatio = 0.85f,
-                    stiffness    = 380f
-                )
-            )
-        }
-    }
-
-    val iconTint by animateColorAsState(
-        targetValue   = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textSecondary,
-        animationSpec = tween(durationMillis = 200, easing = EmphasizedDecelerateEasing),
-        label         = "iconTint"
-    )
-
-    val labelAlpha by animateFloatAsState(
-        targetValue   = if (isCollapsed) 0f else if (isSelected) 1f else 0.85f,
-        animationSpec = tween(
-            durationMillis = if (isCollapsed) 140 else 200,
-            easing         = if (isCollapsed) FastOutLinearInEasing else LinearOutSlowInEasing
-        ),
-        label         = "labelAlpha"
-    )
-    val labelHeight by animateDpAsState(
-        targetValue   = if (isCollapsed) 0.dp else if (item.label.isEmpty()) 0.dp else 16.dp,
-        animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
-        label         = "labelHeight"
-    )
-
-    val totalIconScale = pressScale * selectionScale.value
-    val hasIcon = item.selectedIconRes != null || item.unselectedIconRes != null || item.animRawRes != null || item.selectedIconText.isNotEmpty()
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .clip(CircleShape)
-            .combinedClickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onClick()
-                },
-                onLongClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onLongClick?.invoke()
-                }
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        if (hasIcon) {
-            // Icon with crossfade + badge pop-in
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.size(iconSize)
-            ) {
-                NavIcon(
-                    item       = item,
-                    isSelected = isSelected,
-                    tint       = iconTint,
-                    scale      = totalIconScale,
-                    iconSize   = iconSize
-                )
-                // Badge: shown/hidden with pop-in scale animation inside BadgeDot
-                if (item.badge > 0) {
-                    BadgeDot(count = item.badge)
-                }
-            }
-
-            // Animated label (collapses cleanly when collapsed)
-            if (labelHeight > 0.dp && item.label.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .clipToBounds()
-                    .graphicsLayer { alpha = labelAlpha }
-                    .height(labelHeight)
-                    .padding(top = 2.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                NexusText(
-                    text  = item.label,
-                    color = iconTint,
-                    style = NexusTheme.typography.caption.copy(
-                        fontSize      = 11.sp,
-                        fontWeight    = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                        letterSpacing = 0.2.sp
-                    ),
-                    maxLines = 1
-                )
-            }
-        }
-        } else {
-            NexusText(
-                text  = item.label,
-                color = iconTint,
-                style = NexusTheme.typography.body.copy(
-                    fontSize      = if (isSelected) 14.5.sp else 14.sp,
-                    fontWeight    = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                    letterSpacing = 0.3.sp
-                ),
-                maxLines = 1
-            )
-        }
-    }
-}
-
-// ─── Shared Icon Renderer — with Crisp Vector Crossfade ──────────────────────
-
-@Composable
-private fun NavIcon(
-    item: NexusNavItem,
-    isSelected: Boolean,
-    tint: Color,
-    scale: Float,
-    iconSize: Dp = 24.dp
-) {
-    val iconModifier = Modifier
-        .size(iconSize)
-        .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        }
-
-    val iconRes = if (isSelected) (item.selectedIconRes ?: item.unselectedIconRes) else (item.unselectedIconRes ?: item.selectedIconRes)
-
-    if (iconRes != null) {
-        Crossfade(
-            targetState   = isSelected,
-            animationSpec = tween(durationMillis = 200, easing = EmphasizedDecelerateEasing),
-            label         = "iconCrossfade"
-        ) { selected ->
-            val res = if (selected) (item.selectedIconRes ?: iconRes) else (item.unselectedIconRes ?: iconRes)
-            Image(
-                painter            = painterResource(id = res),
-                contentDescription = item.label,
-                modifier           = iconModifier,
-                colorFilter        = ColorFilter.tint(tint)
-            )
-        }
-    } else if (item.animRawRes != null) {
-        LottieNavIcon(
-            animRes = item.animRawRes,
-            isSelected = isSelected,
-            tint = tint,
-            modifier = iconModifier
-        )
-    } else {
-        NexusText(
-            text     = if (isSelected) item.selectedIconText else item.unselectedIconText,
-            color    = tint,
-            style    = NexusTheme.typography.h2,
-            modifier = Modifier.graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-        )
-    }
-}
-
-@Composable
-private fun LottieNavIcon(
-    @RawRes animRes: Int,
-    isSelected: Boolean,
-    tint: Color,
-    modifier: Modifier = Modifier
-) {
-    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(animRes))
-    val animatable = rememberLottieAnimatable()
-
-    val colorFilter = remember(tint) {
-        PorterDuffColorFilter(tint.toArgb(), PorterDuff.Mode.SRC_ATOP)
-    }
-    val dynamicProperties = rememberLottieDynamicProperties(
-        rememberLottieDynamicProperty(
-            property = LottieProperty.COLOR_FILTER,
-            value = colorFilter,
-            keyPath = arrayOf("**")
-        )
-    )
-
-    LaunchedEffect(isSelected, composition) {
-        val comp = composition ?: return@LaunchedEffect
-        if (isSelected) {
-            animatable.animate(
-                composition = comp,
-                iterations = 1,
-                speed = 1.25f,
-                initialProgress = 0f
-            )
-        } else {
-            animatable.snapTo(comp, 0f)
-        }
-    }
-
-    LottieAnimation(
-        composition = composition,
-        progress = { animatable.progress },
-        dynamicProperties = dynamicProperties,
-        modifier = modifier
-    )
-}
-
-// ─── Badge Dot — with scale pop-in animation ──────────────────────────────────
-
-@Composable
-private fun BadgeDot(count: Int) {
-    val scale = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        scale.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 480f))
-    }
-    Box(
-        modifier = Modifier
-            .offset(x = 6.dp, y = (-3).dp)
-            .size(15.dp)
-            .graphicsLayer { scaleX = scale.value; scaleY = scale.value }
-            .clip(CircleShape)
-            .background(NexusTheme.colors.error),
-        contentAlignment = Alignment.Center
-    ) {
-        if (count > 0) {
-            NexusText(
-                text     = if (count > 9) "9+" else count.toString(),
-                color    = Color.White,
-                style    = NexusTheme.typography.caption.copy(
-                    fontSize   = 7.5.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                maxLines = 1
-            )
-        }
-    }
-}
 
 // ─── Normal Bottom Nav (delegates to Floating) ────────────────────────────────
 

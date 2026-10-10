@@ -41,6 +41,10 @@ fun fileTypeStyleFor(type: DocumentType): FileTypeStyle {
             accentColor = Color(0xFF388E3C),
             containerColor = Color(0xFF388E3C).copy(alpha = 0.12f)
         )
+        DocumentType.PPTX -> FileTypeStyle(
+            accentColor = Color(0xFFF57C00),
+            containerColor = Color(0xFFF57C00).copy(alpha = 0.12f)
+        )
         DocumentType.TXT -> FileTypeStyle(
             accentColor = Color(0xFF616161),
             containerColor = Color(0xFF616161).copy(alpha = 0.12f)
@@ -66,6 +70,7 @@ fun FileTypeIcon(
             DocumentType.PDF -> com.nexus.core.R.drawable.ic_file_pdf_new
             DocumentType.DOCX -> com.nexus.core.R.drawable.ic_file_word_new
             DocumentType.XLSX -> com.nexus.core.R.drawable.ic_file_sheet_new
+            DocumentType.PPTX -> com.nexus.core.R.drawable.ic_file_ppt_new
             DocumentType.TXT -> com.nexus.core.R.drawable.ic_file_txt_new
             else -> com.nexus.core.R.drawable.ic_file_gen_new
         }

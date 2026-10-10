@@ -35,7 +35,12 @@ data class NexusTypography(
     val body: TextStyle,
     val label: TextStyle,
     val caption: TextStyle,
-    val buttonLabel: TextStyle
+    val buttonLabel: TextStyle,
+    val titleLarge: TextStyle,
+    val titleXl: TextStyle,
+    val display2: TextStyle,
+    val bodySmall: TextStyle,
+    val labelXs: TextStyle
 )
 
 val LocalNexusTypography = staticCompositionLocalOf {
@@ -47,7 +52,12 @@ val LocalNexusTypography = staticCompositionLocalOf {
         body = TextStyle.Default,
         label = TextStyle.Default,
         caption = TextStyle.Default,
-        buttonLabel = TextStyle.Default
+        buttonLabel = TextStyle.Default,
+        titleLarge = TextStyle.Default,
+        titleXl = TextStyle.Default,
+        display2 = TextStyle.Default,
+        bodySmall = TextStyle.Default,
+        labelXs = TextStyle.Default
     )
 }
 
@@ -107,5 +117,40 @@ val defaultNexusTypography = NexusTypography(
         fontSize = 14.sp,
         letterSpacing = 0.5.sp,
         lineHeight = 20.sp
+    ),
+    titleLarge = TextStyle(
+        fontFamily = NexusFontFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = 22.sp,
+        letterSpacing = 0.sp,
+        lineHeight = 28.sp
+    ),
+    titleXl = TextStyle(
+        fontFamily = NexusFontFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = 26.sp,
+        letterSpacing = 0.sp,
+        lineHeight = 32.sp
+    ),
+    display2 = TextStyle(
+        fontFamily = NexusFontFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = 24.sp,
+        letterSpacing = 0.sp,
+        lineHeight = 30.sp
+    ),
+    bodySmall = TextStyle(
+        fontFamily = NexusFontFamily,
+        fontWeight = FontWeight.Normal,
+        fontSize = 13.sp,
+        letterSpacing = 0.25.sp,
+        lineHeight = 18.sp
+    ),
+    labelXs = TextStyle(
+        fontFamily = NexusFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 10.sp,
+        letterSpacing = 0.8.sp,
+        lineHeight = 14.sp
     )
 )

@@ -27,9 +27,12 @@ import com.nexus.core.ui.animations.EmphasizedDecelerateEasing
 // ─── Feature Imports ───────────────────────────────────────────────
 import com.nexus.feature.dashboard.DashboardScreen
 import com.nexus.feature.dashboard.DashboardViewModel
+import com.nexus.feature.dashboard.RecycleBinScreen
 import com.nexus.feature.dashboard.SettingsScreen
+import com.nexus.feature.dashboard.ToolsScreen
 import com.nexus.feature.reader.office.OfficeReaderScreen
 import com.nexus.feature.reader.pdf.PdfReaderScreen
+import com.nexus.feature.reader.presentation.ui.PresentationReaderScreen
 import com.nexus.feature.reader.text.TextReaderScreen
 import com.nexus.feature.scanner.ui.ScannerScreen
 import com.nexus.nexusdocs.ui.splash.NexusSplashScreen
@@ -48,28 +51,28 @@ import java.net.URLDecoder
 
 object NavConstants {
     // ─── Animation Durations (milliseconds) ─────────────────────────
-    const val DURATION_SPLASH_ENTER = 400
-    const val DURATION_SPLASH_EXIT = 300
+    const val DURATION_SPLASH_ENTER = 380
+    const val DURATION_SPLASH_EXIT = 280
     
-    const val DURATION_DASHBOARD_ENTER = 400
+    const val DURATION_DASHBOARD_ENTER = 320
     const val DURATION_DASHBOARD_EXIT = 300
     const val DURATION_DASHBOARD_BACK = 300
     
-    const val DURATION_SETTINGS_ENTER = 350
-    const val DURATION_SETTINGS_EXIT = 250
+    const val DURATION_SETTINGS_ENTER = 320
+    const val DURATION_SETTINGS_EXIT = 300
     const val DURATION_SETTINGS_BACK = 300
     
-    const val DURATION_SCANNER_ENTER = 400
-    const val DURATION_SCANNER_EXIT = 300
-    const val DURATION_SCANNER_BACK = 300
+    const val DURATION_SCANNER_ENTER = 320
+    const val DURATION_SCANNER_EXIT = 280
+    const val DURATION_SCANNER_BACK = 280
     
-    const val DURATION_READER_ENTER = 400
-    const val DURATION_READER_EXIT = 350
-    const val DURATION_READER_BACK = 350
+    const val DURATION_READER_ENTER = 340
+    const val DURATION_READER_EXIT = 300
+    const val DURATION_READER_BACK = 300
     
-    const val DURATION_UNSUPPORTED_ENTER = 400
-    const val DURATION_UNSUPPORTED_EXIT = 300
-    const val DURATION_UNSUPPORTED_BACK = 350
+    const val DURATION_UNSUPPORTED_ENTER = 320
+    const val DURATION_UNSUPPORTED_EXIT = 280
+    const val DURATION_UNSUPPORTED_BACK = 280
     
     // ─── Default Values ─────────────────────────────────────────────
     const val DEFAULT_FILE_NAME = "Document"
@@ -82,9 +85,9 @@ object NavConstants {
     const val OFFSET_SLIDE_DASHBOARD = 200
     
     // ─── Scale Values ───────────────────────────────────────────────
-    const val SCALE_SCANNER_ENTER = 0.8f
-    const val SCALE_SCANNER_EXIT = 0.8f
-    const val SCALE_SPLASH_EXIT = 0.95f
+    const val SCALE_SCANNER_ENTER = 0.92f
+    const val SCALE_SCANNER_EXIT = 0.94f
+    const val SCALE_SPLASH_EXIT = 0.96f
     const val SCALE_NORMAL = 1.0f
 }
 
@@ -155,20 +158,20 @@ sealed class NavTransitionSpec(
 fun splashEnterTransition(): EnterTransition = fadeIn(
     animationSpec = tween(NavConstants.DURATION_SPLASH_ENTER, easing = EmphasizedDecelerateEasing)
 ) + slideInVertically(
-    initialOffsetY = { 100 },
+    initialOffsetY = { 60 },
     animationSpec = tween(NavConstants.DURATION_SPLASH_ENTER, easing = EmphasizedDecelerateEasing)
 ) + scaleIn(
-    initialScale = 0.95f,
+    initialScale = 0.96f,
     animationSpec = tween(NavConstants.DURATION_SPLASH_ENTER, easing = EmphasizedDecelerateEasing)
 )
 
 fun splashExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_SPLASH_EXIT, easing = EmphasizedAccelerateEasing)
 ) + slideOutVertically(
-    targetOffsetY = { -100 },
+    targetOffsetY = { -60 },
     animationSpec = tween(NavConstants.DURATION_SPLASH_EXIT, easing = EmphasizedAccelerateEasing)
 ) + scaleOut(
-    targetScale = 0.95f,
+    targetScale = NavConstants.SCALE_SPLASH_EXIT,
     animationSpec = tween(NavConstants.DURATION_SPLASH_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
@@ -176,21 +179,21 @@ fun splashExitTransition(): ExitTransition = fadeOut(
 fun dashboardEnterTransition(): EnterTransition = fadeIn(
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_ENTER, easing = EmphasizedDecelerateEasing)
 ) + slideInHorizontally(
-    initialOffsetX = { fullWidth -> -fullWidth / 4 },
+    initialOffsetX = { fullWidth -> -fullWidth / 5 },
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_ENTER, easing = EmphasizedDecelerateEasing)
 )
 
 fun dashboardExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_EXIT, easing = EmphasizedAccelerateEasing)
 ) + slideOutHorizontally(
-    targetOffsetX = { fullWidth -> -fullWidth / 4 },
+    targetOffsetX = { fullWidth -> -fullWidth / 5 },
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
 fun dashboardBackEnterTransition(): EnterTransition = fadeIn(
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_BACK, easing = EmphasizedDecelerateEasing)
 ) + slideInHorizontally(
-    initialOffsetX = { fullWidth -> -fullWidth / 4 },
+    initialOffsetX = { fullWidth -> -fullWidth / 5 },
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_BACK, easing = EmphasizedDecelerateEasing)
 )
 
@@ -212,14 +215,14 @@ fun settingsEnterTransition(): EnterTransition = fadeIn(
 fun settingsExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedAccelerateEasing)
 ) + slideOutHorizontally(
-    targetOffsetX = { fullWidth -> -fullWidth / 4 },
+    targetOffsetX = { fullWidth -> -fullWidth / 5 },
     animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
 fun settingsBackEnterTransition(): EnterTransition = fadeIn(
     animationSpec = tween(NavConstants.DURATION_SETTINGS_BACK, easing = EmphasizedDecelerateEasing)
 ) + slideInHorizontally(
-    initialOffsetX = { fullWidth -> -fullWidth / 4 },
+    initialOffsetX = { fullWidth -> -fullWidth / 5 },
     animationSpec = tween(NavConstants.DURATION_SETTINGS_BACK, easing = EmphasizedDecelerateEasing)
 )
 
@@ -227,35 +230,35 @@ fun settingsBackExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedAccelerateEasing)
 ) + slideOutHorizontally(
     targetOffsetX = { fullWidth -> fullWidth },
-    animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedDecelerateEasing)
+    animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
 // ─── SCANNER SCREEN ANIMATIONS ───────────────────────────────────────
 fun scannerEnterTransition(): EnterTransition = fadeIn(
     animationSpec = tween(NavConstants.DURATION_SCANNER_ENTER, easing = EmphasizedDecelerateEasing)
 ) + scaleIn(
-    initialScale = 0.8f,
+    initialScale = NavConstants.SCALE_SCANNER_ENTER,
     animationSpec = tween(NavConstants.DURATION_SCANNER_ENTER, easing = EmphasizedDecelerateEasing)
 )
 
 fun scannerExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_SCANNER_EXIT, easing = EmphasizedAccelerateEasing)
 ) + scaleOut(
-    targetScale = 0.8f,
+    targetScale = NavConstants.SCALE_SCANNER_EXIT,
     animationSpec = tween(NavConstants.DURATION_SCANNER_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
 fun scannerBackEnterTransition(): EnterTransition = fadeIn(
     animationSpec = tween(NavConstants.DURATION_SCANNER_BACK, easing = EmphasizedDecelerateEasing)
 ) + scaleIn(
-    initialScale = 0.95f,
+    initialScale = 0.96f,
     animationSpec = tween(NavConstants.DURATION_SCANNER_BACK, easing = EmphasizedDecelerateEasing)
 )
 
 fun scannerBackExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_SCANNER_EXIT, easing = EmphasizedAccelerateEasing)
 ) + scaleOut(
-    targetScale = 0.8f,
+    targetScale = NavConstants.SCALE_SCANNER_EXIT,
     animationSpec = tween(NavConstants.DURATION_SCANNER_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
@@ -270,14 +273,14 @@ fun readerEnterTransition(): EnterTransition = fadeIn(
 fun readerExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedAccelerateEasing)
 ) + slideOutHorizontally(
-    targetOffsetX = { fullWidth -> -fullWidth / 4 },
+    targetOffsetX = { fullWidth -> -fullWidth / 5 },
     animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
 fun readerBackEnterTransition(): EnterTransition = fadeIn(
     animationSpec = tween(NavConstants.DURATION_READER_BACK, easing = EmphasizedDecelerateEasing)
 ) + slideInHorizontally(
-    initialOffsetX = { fullWidth -> -fullWidth / 4 },
+    initialOffsetX = { fullWidth -> -fullWidth / 5 },
     animationSpec = tween(NavConstants.DURATION_READER_BACK, easing = EmphasizedDecelerateEasing)
 )
 
@@ -285,35 +288,35 @@ fun readerBackExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedAccelerateEasing)
 ) + slideOutHorizontally(
     targetOffsetX = { fullWidth -> fullWidth },
-    animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedDecelerateEasing)
+    animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
 // ─── UNSUPPORTED FILE SCREEN ANIMATIONS ──────────────────────────────
 fun unsupportedEnterTransition(): EnterTransition = fadeIn(
     animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_ENTER, easing = EmphasizedDecelerateEasing)
 ) + slideInVertically(
-    initialOffsetY = { -50 },
-    animationSpec = tween(200, easing = EmphasizedAccelerateEasing)
+    initialOffsetY = { 60 },
+    animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_ENTER, easing = EmphasizedDecelerateEasing)
 )
 
 fun unsupportedExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_EXIT, easing = EmphasizedAccelerateEasing)
 ) + slideOutVertically(
-    targetOffsetY = { 100 },
+    targetOffsetY = { 60 },
     animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
 fun unsupportedBackEnterTransition(): EnterTransition = fadeIn(
     animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_BACK, easing = EmphasizedDecelerateEasing)
 ) + slideInVertically(
-    initialOffsetY = { 100 },
+    initialOffsetY = { 60 },
     animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_BACK, easing = EmphasizedDecelerateEasing)
 )
 
 fun unsupportedBackExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_EXIT, easing = EmphasizedAccelerateEasing)
 ) + slideOutVertically(
-    targetOffsetY = { 100 },
+    targetOffsetY = { 60 },
     animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
@@ -439,14 +442,44 @@ private fun AnimatedVisibilityScope.DashboardRoute(router: DocumentReaderRouter)
 
 @Composable
 private fun AnimatedVisibilityScope.SettingsRoute(
-    router: DocumentReaderRouter,
-    onChangelogVisibilityChanged: (Boolean) -> Unit = {}
+    router: DocumentReaderRouter
 ) {
     AnimatedScreen {
         SettingsScreen(
             onBack = { router.navigateBack() },
-            onChangelogVisibilityChanged = onChangelogVisibilityChanged
+            onNavigateToRecycleBin = { router.navigateToRecycleBin() }
         )
+    }
+}
+
+@Composable
+private fun AnimatedVisibilityScope.ToolsRoute(router: DocumentReaderRouter) {
+    AnimatedScreen {
+        ToolsScreen(
+            onNavigateToTool = { router.navigateToToolAction(it) },
+            onBack = { router.navigateBack() }
+        )
+    }
+}
+
+@Composable
+private fun AnimatedVisibilityScope.ToolActionRoute(
+    backStackEntry: NavBackStackEntry,
+    router: DocumentReaderRouter
+) {
+    AnimatedScreen {
+        val toolId = with(NavArgumentExtensions) { backStackEntry.getStringArgument(NexusRoute.ToolAction.ARG_TOOL_ID) }
+        com.nexus.feature.dashboard.ToolActionScreen(
+            toolId = toolId,
+            onBack = { router.navigateBack() }
+        )
+    }
+}
+
+@Composable
+private fun AnimatedVisibilityScope.RecycleBinRoute(router: DocumentReaderRouter) {
+    AnimatedScreen {
+        RecycleBinScreen(onBack = { router.navigateBack() })
     }
 }
 
@@ -498,6 +531,28 @@ private fun AnimatedVisibilityScope.OfficeReaderRoute(
                 fileName = fileName,
                 docType = docType,
                 onBack = { router.navigateBack() }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AnimatedVisibilityScope.PresentationReaderRoute(
+    backStackEntry: NavBackStackEntry,
+    router: DocumentReaderRouter
+) {
+    AnimatedScreen {
+        val encodedUri = with(NavArgumentExtensions) { backStackEntry.getDecodedUri(NexusRoute.PresentationReader.ARG_URI) }
+        val fileName = with(NavArgumentExtensions) { backStackEntry.getFileNameArgument(NexusRoute.PresentationReader.ARG_FILE_NAME) }
+
+        if (encodedUri.isBlank()) {
+            Log.w("PresentationReader", "No URI provided, showing unsupported screen")
+            UnsupportedFileScreen(fileName = fileName, onBack = { router.navigateBack() })
+        } else {
+            PresentationReaderScreen(
+                encodedUri = encodedUri,
+                fileName = fileName,
+                onNavigateBack = { router.navigateBack() }
             )
         }
     }
@@ -567,7 +622,6 @@ fun NexusNavHost(
     router: DocumentReaderRouter,
     startDestination: String,
     onFirstLaunchComplete: () -> Unit = {},
-    onChangelogVisibilityChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     SharedTransitionLayout {
@@ -625,7 +679,40 @@ fun NexusNavHost(
                     popEnterTransition = { settingsBackEnterTransition() },
                     popExitTransition = { settingsBackExitTransition() }
                 ) {
-                    SettingsRoute(router, onChangelogVisibilityChanged)
+                    SettingsRoute(router)
+                }
+
+                // ─── Tools Screen ────────────────────────────────────────
+                composable(
+                    route = NexusRoute.Tools.route,
+                    enterTransition = { dashboardEnterTransition() },
+                    exitTransition = { dashboardExitTransition() },
+                    popEnterTransition = { dashboardBackEnterTransition() },
+                    popExitTransition = { dashboardBackExitTransition() }
+                ) {
+                    ToolsRoute(router)
+                }
+
+                // ─── Tool Action Screen ──────────────────────────────────
+                composable(
+                    route = NexusRoute.ToolAction.ROUTE,
+                    enterTransition = { settingsEnterTransition() },
+                    exitTransition = { settingsExitTransition() },
+                    popEnterTransition = { settingsBackEnterTransition() },
+                    popExitTransition = { settingsBackExitTransition() }
+                ) { backStackEntry ->
+                    ToolActionRoute(backStackEntry, router)
+                }
+
+                // ─── Recycle Bin Screen ───────────────────────────────────
+                composable(
+                    route = NexusRoute.RecycleBin.route,
+                    enterTransition = { settingsEnterTransition() },
+                    exitTransition = { settingsExitTransition() },
+                    popEnterTransition = { settingsBackEnterTransition() },
+                    popExitTransition = { settingsBackExitTransition() }
+                ) {
+                    RecycleBinRoute(router)
                 }
 
                 // ─── Scanner Screen ──────────────────────────────────────
@@ -659,6 +746,17 @@ fun NexusNavHost(
                     popExitTransition = { readerBackExitTransition() }
                 ) { backStackEntry ->
                     OfficeReaderRoute(backStackEntry, router)
+                }
+
+                // ─── Presentation Reader Screen (PPTX, PPT) ───────────────
+                composable(
+                    route = NexusRoute.PresentationReader.ROUTE,
+                    enterTransition = { readerEnterTransition() },
+                    exitTransition = { readerExitTransition() },
+                    popEnterTransition = { readerBackEnterTransition() },
+                    popExitTransition = { readerBackExitTransition() }
+                ) { backStackEntry ->
+                    PresentationReaderRoute(backStackEntry, router)
                 }
 
                 // ─── Text Reader Screen ───────────────────────────────────

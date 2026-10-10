@@ -126,7 +126,7 @@ fun ScannerScreen(
             ) {
                 androidx.compose.foundation.layout.Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(NexusTheme.spacing.md)
                 ) {
                     NexusText(
                         text = "Saving PDF...",

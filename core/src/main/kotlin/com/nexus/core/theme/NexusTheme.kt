@@ -24,6 +24,11 @@ object NexusTheme {
         @Composable
         @ReadOnlyComposable
         get() = LocalNexusShapes.current
+
+    val spacing: NexusSpacing
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalNexusSpacing.current
 }
 
 val LocalHapticFeedbackEnabled = androidx.compose.runtime.staticCompositionLocalOf { true }
@@ -43,6 +48,10 @@ fun animateNexusColorsAsState(targetColors: NexusColors): NexusColors {
     val success by animateColorAsState(targetColors.success, animationSpec = colorSpring(), label = "success")
     val warning by animateColorAsState(targetColors.warning, animationSpec = colorSpring(), label = "warning")
     val searchHighlight by animateColorAsState(targetColors.searchHighlight, animationSpec = colorSpring(), label = "searchHighlight")
+    val surfaceElevated by animateColorAsState(targetColors.surfaceElevated, animationSpec = colorSpring(), label = "surfaceElevated")
+    val surfaceGlass by animateColorAsState(targetColors.surfaceGlass, animationSpec = colorSpring(), label = "surfaceGlass")
+    val onSurface by animateColorAsState(targetColors.onSurface, animationSpec = colorSpring(), label = "onSurface")
+    val trackBackground by animateColorAsState(targetColors.trackBackground, animationSpec = colorSpring(), label = "trackBackground")
 
     return NexusColors(
         background = background,
@@ -56,7 +65,13 @@ fun animateNexusColorsAsState(targetColors: NexusColors): NexusColors {
         error = error,
         success = success,
         warning = warning,
-        searchHighlight = searchHighlight
+        searchHighlight = searchHighlight,
+        surfaceElevated = surfaceElevated,
+        surfaceGlass = surfaceGlass,
+        onSurface = onSurface,
+        trackBackground = trackBackground,
+        surfaceGradient = targetColors.surfaceGradient,
+        primaryGradient = targetColors.primaryGradient
     )
 }
 
@@ -82,6 +97,7 @@ fun NexusDocsViewerTheme(
         LocalNexusColors provides animatedColors,
         LocalNexusTypography provides defaultNexusTypography,
         LocalNexusShapes provides defaultNexusShapes,
+        LocalNexusSpacing provides defaultNexusSpacing,
         LocalHapticFeedbackEnabled provides hapticFeedbackEnabled,
         content = content
     )

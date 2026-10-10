@@ -17,14 +17,14 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.nexus.nexusdocs"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.nexus.nexusdocs"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 311
-        versionName = "3.1.1"
+        targetSdk = 36
+        versionCode = 405
+        versionName = "4.0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -67,13 +67,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-        freeCompilerArgs = freeCompilerArgs + listOf(
-            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi"
-        )
-    }
+
 
     buildFeatures {
         compose = true
@@ -83,6 +77,7 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        jniLibs.useLegacyPackaging = true
     }
 }
 
@@ -95,6 +90,7 @@ dependencies {
     implementation(project(":feature:reader-pdf"))
     implementation(project(":feature:reader-office"))
     implementation(project(":feature:reader-text"))
+    implementation(project(":feature:reader-presentation"))
     implementation(project(":feature:scanner"))
 
     // AndroidX Core
@@ -112,6 +108,7 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
 
+
     implementation(libs.compose.animation)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
@@ -123,6 +120,7 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
+
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
@@ -136,3 +134,14 @@ dependencies {
 }
 
 tasks.withType<JavaCompile>().configureEach { exclude("**/byRounds/**") }
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        freeCompilerArgs.addAll(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi"
+        )
+    }
+}
+

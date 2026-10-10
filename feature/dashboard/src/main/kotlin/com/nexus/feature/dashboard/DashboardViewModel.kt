@@ -8,10 +8,16 @@ import androidx.lifecycle.viewModelScope
 import com.nexus.core.navigation.DocumentType
 import com.nexus.feature.dashboard.data.RecentDocument
 import com.nexus.feature.dashboard.data.RecentDocumentRepository
+import com.nexus.feature.dashboard.data.TrashRepository
+import com.nexus.feature.dashboard.data.TrashedDocument
 import com.nexus.core.preferences.UserPreferencesRepository
 import com.nexus.core.preferences.HomeStyle
-import com.nexus.core.updater.AppUpdater
-import com.nexus.core.updater.UpdateState
+import com.nexus.core.util.*
+import com.nexus.feature.dashboard.domain.StorageScanUseCase
+import com.nexus.feature.dashboard.domain.DocumentAccessibilityChecker
+import com.nexus.feature.dashboard.domain.DocumentShareHelper
+import com.nexus.feature.dashboard.domain.FileOperationUseCase
+import com.nexus.feature.dashboard.domain.DashboardFilterUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,18 +25,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// â”€â”€â”€ Sort Options â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+// ─── Sort Options ─────────────────────────────────────────────────────────────
 enum class SortOrder { BY_DATE, BY_NAME, BY_TYPE, BY_SIZE }
 
-// â”€â”€â”€ Dashboard Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Dashboard Tab ────────────────────────────────────────────────────────────
 enum class DashboardTab { ALL, RECENT, STARRED }
 
 // ─── File Type Filter ────────────────────────────────────────────────────────
@@ -42,26 +51,9 @@ enum class DocumentTypeFilter(val title: String, val docType: DocumentType?) {
     TXT("Text", DocumentType.TXT)
 }
 
-data class Tuple4<out A, out B, out C, out D>(
-    val first: A,
-    val second: B,
-    val third: C,
-    val fourth: D
-) {
-    override fun toString(): String = "($first, $second, $third, $fourth)"
-}
 
-data class Tuple5<out A, out B, out C, out D, out E>(
-    val first: A,
-    val second: B,
-    val third: C,
-    val fourth: D,
-    val fifth: E
-) {
-    override fun toString(): String = "($first, $second, $third, $fourth, $fifth)"
-}
 
-// â”€â”€â”€ Dashboard UI State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Dashboard UI State ───────────────────────────────────────────────────────
 data class PendingDeletionState(
     val documents: List<RecentDocument>,
     val remainingSeconds: Int
@@ -89,15 +81,20 @@ data class DashboardUiState(
     val pendingDeletion: PendingDeletionState? = null
 )
 
-// â”€â”€â”€ Dashboard ViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Dashboard ViewModel ──────────────────────────────────────────────────────
 // Owns the recent documents list, search/sort state, and file-open logic.
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val repository: RecentDocumentRepository,
+    private val trashRepository: TrashRepository,
     private val prefsRepository: UserPreferencesRepository,
-    private val appUpdater: AppUpdater,
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val storageScanUseCase: StorageScanUseCase,
+    private val accessibilityChecker: DocumentAccessibilityChecker,
+    private val shareHelper: DocumentShareHelper,
+    private val fileOpUseCase: FileOperationUseCase,
+    private val filterUseCase: DashboardFilterUseCase
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -119,7 +116,7 @@ class DashboardViewModel @Inject constructor(
             initialValue = emptySet()
         )
     private val _sortAscending = MutableStateFlow(false)
-    val updateState: StateFlow<UpdateState> = appUpdater.updateState
+    private val _pendingDeletion = MutableStateFlow<PendingDeletionState?>(null)
 
     private val _uiEvents = kotlinx.coroutines.flow.MutableSharedFlow<String>()
     val uiEvents = _uiEvents.asSharedFlow()
@@ -146,11 +143,12 @@ class DashboardViewModel @Inject constructor(
             _inaccessibleUris,
             repository.observeAllTags(),
             repository.observeAllTagDefinitions(),
-            ::Tuple5
+            trashRepository.observeAllTrashed(),
+            ::Tuple6
         ),
         combine(
             _isLoading,
-            _searchQuery,
+            @OptIn(kotlinx.coroutines.FlowPreview::class) _searchQuery.debounce(150),
             _sortOrder,
             ::Triple
         ),
@@ -172,134 +170,40 @@ class DashboardViewModel @Inject constructor(
             combine(_isRefreshing, _selectedFilter, _selectedTag, ::Triple),
             ::Triple
         )
-    ) { (docs, scanned, inaccessible, allTags, allTagDefs): Tuple5<List<RecentDocument>, List<RecentDocument>, Set<String>, List<com.nexus.feature.dashboard.data.DocumentTag>, List<com.nexus.feature.dashboard.data.TagDefinition>>,
+    ) { (docs, scanned, inaccessible, allTags, allTagDefs, trashedDocs): Tuple6<List<RecentDocument>, List<RecentDocument>, Set<String>, List<com.nexus.feature.dashboard.data.DocumentTag>, List<com.nexus.feature.dashboard.data.TagDefinition>, List<TrashedDocument>>,
         (loading, query, sort): Triple<Boolean, String, SortOrder>,
         (grid, tab, starred): Triple<Boolean, DashboardTab, Set<String>>,
         (selectionMode, selected, bannerDismissed): Triple<Boolean, Set<String>, Boolean>,
         (rationale, ascending, refreshingFilterAndTag): Triple<Boolean?, Boolean, Triple<Boolean, DocumentTypeFilter, String?>> ->
 
         val (refreshing, fileFilter, activeTag) = refreshingFilterAndTag
-
-        val dedupKey: (RecentDocument) -> String = { doc ->
-            val decodedUri = try { java.net.URLDecoder.decode(doc.uri, "UTF-8") } catch (_: Exception) { doc.uri }
-            if (decodedUri.startsWith("file://")) {
-                decodedUri.removePrefix("file://").lowercase()
-            } else if (doc.fileName.isNotEmpty()) {
-                "${doc.fileName.lowercase()}_${doc.documentType}"
-            } else {
-                doc.uri
-            }
-        }
-        val dedupBase = (docs + scanned).distinctBy(dedupKey)
-        val baseDocs = when (tab) {
-            DashboardTab.RECENT -> docs.distinctBy(dedupKey)
-            DashboardTab.STARRED -> dedupBase.filter { starred.contains(it.uri) }
-            DashboardTab.ALL -> dedupBase
-        }
-
-        fun isDocMatchingFilter(doc: RecentDocument, filter: DocumentTypeFilter): Boolean {
-            val type = runCatching { DocumentType.valueOf(doc.documentType) }.getOrElse {
-                DocumentType.fromUri(Uri.parse(doc.uri), doc.mimeType)
-            }
-            return when (filter) {
-                DocumentTypeFilter.ALL -> true
-                DocumentTypeFilter.PDF -> type == DocumentType.PDF || doc.fileName.endsWith(".pdf", ignoreCase = true)
-                DocumentTypeFilter.DOCX -> type == DocumentType.DOCX || doc.fileName.endsWith(".docx", ignoreCase = true) || doc.fileName.endsWith(".doc", ignoreCase = true)
-                DocumentTypeFilter.XLSX -> type == DocumentType.XLSX || doc.fileName.endsWith(".xlsx", ignoreCase = true) || doc.fileName.endsWith(".xls", ignoreCase = true)
-                DocumentTypeFilter.TXT -> type == DocumentType.TXT || DocumentType.fromUri(Uri.parse("file:///${doc.fileName}")) == DocumentType.TXT
-            }
-        }
-
-        val tagDefMap = allTagDefs.associateBy { it.name }
-        val uriToTagNamesMap: Map<String, List<String>> = allTags.groupBy({ it.documentUri }, { it.tag })
-
-        val uriToTagUiModelsMap: Map<String, List<TagUiModel>> = uriToTagNamesMap.mapValues { (_, tagNames) ->
-            tagNames.map { tagName ->
-                val def = tagDefMap[tagName]
-                TagUiModel(
-                    name = tagName,
-                    colorHex = def?.colorHex ?: TagColorPresets.getColorHexForTag(tagName),
-                    emoji = def?.emoji
-                )
-            }
-        }
-
-        val allUniqueTagNames: List<String> = (allTags.map { it.tag } + allTagDefs.map { it.name }).distinct().sorted()
-        val tagCounts: Map<String, Int> = allUniqueTagNames.associateWith { tagName ->
-            baseDocs.count { doc -> (uriToTagNamesMap[doc.uri] ?: emptyList()).contains(tagName) }
-        }
-
-        val availableTagUiModels: List<TagUiModel> = allUniqueTagNames.map { tagName ->
-            val def = tagDefMap[tagName]
-            TagUiModel(
-                name = tagName,
-                colorHex = def?.colorHex ?: TagColorPresets.getColorHexForTag(tagName),
-                emoji = def?.emoji,
-                count = tagCounts[tagName] ?: 0
-            )
-        }
-
-        val counts = mapOf(
-            DocumentTypeFilter.ALL to baseDocs.size,
-            DocumentTypeFilter.PDF to baseDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.PDF) },
-            DocumentTypeFilter.DOCX to baseDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.DOCX) },
-            DocumentTypeFilter.XLSX to baseDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.XLSX) },
-            DocumentTypeFilter.TXT to baseDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.TXT) }
+        val state = filterUseCase.filterAndSortDocuments(
+            docs = docs,
+            scanned = scanned,
+            inaccessible = inaccessible,
+            allTags = allTags,
+            allTagDefs = allTagDefs,
+            trashedDocs = trashedDocs,
+            loading = loading,
+            query = query,
+            sort = sort,
+            grid = grid,
+            tab = tab,
+            starred = starred,
+            selectionMode = selectionMode,
+            selected = selected,
+            bannerDismissed = bannerDismissed,
+            rationale = rationale,
+            ascending = ascending,
+            refreshing = refreshing,
+            fileFilter = fileFilter,
+            activeTag = activeTag
         )
 
-        val filteredDocs = baseDocs.filter { doc ->
-            val matchesType = if (fileFilter == DocumentTypeFilter.ALL) true else isDocMatchingFilter(doc, fileFilter)
-            val matchesTag = if (activeTag == null) true else (uriToTagNamesMap[doc.uri] ?: emptyList()).contains(activeTag)
-            matchesType && matchesTag
-        }
-
-        val mapped = filteredDocs
-            .filter { it.fileName.contains(query, ignoreCase = true) }
-            .map { doc ->
-                RecentDocumentUiModel(
-                    doc = doc,
-                    isAccessible = !inaccessible.contains(doc.uri),
-                    tags = uriToTagUiModelsMap[doc.uri] ?: emptyList()
-                )
-            }
-            .let { list: List<RecentDocumentUiModel> ->
-                if (ascending) {
-                    when (sort) {
-                        SortOrder.BY_DATE -> list.sortedBy { item -> item.doc.lastOpenedAt }
-                        SortOrder.BY_NAME -> list.sortedBy { item -> item.doc.fileName.lowercase() }
-                        SortOrder.BY_TYPE -> list.sortedBy { item -> item.doc.documentType }
-                        SortOrder.BY_SIZE -> list.sortedBy { item -> item.doc.fileSizeBytes }
-                    }
-                } else {
-                    when (sort) {
-                        SortOrder.BY_DATE -> list.sortedByDescending { item -> item.doc.lastOpenedAt }
-                        SortOrder.BY_NAME -> list.sortedByDescending { item -> item.doc.fileName.lowercase() }
-                        SortOrder.BY_TYPE -> list.sortedByDescending { item -> item.doc.documentType }
-                        SortOrder.BY_SIZE -> list.sortedByDescending { item -> item.doc.fileSizeBytes }
-                    }
-                }
-            }
-        DashboardUiState(
-            documents = mapped,
-            isLoading = loading,
-            isRefreshing = refreshing,
-            searchQuery = query,
-            sortOrder = sort,
-            isGridView = grid,
-            selectedTab = tab,
-            selectedFilter = fileFilter,
-            filterCounts = counts,
-            availableTags = availableTagUiModels,
-            selectedTag = activeTag,
-            tagCounts = tagCounts,
-            starredUris = starred,
-            sortAscending = ascending,
-            permissionRationaleShown = rationale ?: false,
-            permissionBannerDismissed = bannerDismissed,
-            selectedUris = selected,
-            isSelectionMode = selectionMode
-        )
-    }.stateIn(
+        // Restore pendingDeletion state
+        state.copy(pendingDeletion = _pendingDeletion.value)
+    }.flowOn(kotlinx.coroutines.Dispatchers.Default)
+    .stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = DashboardUiState()
@@ -322,8 +226,17 @@ class DashboardViewModel @Inject constructor(
             launch {
                 repository.observeRecentDocuments().collect { docs ->
                     if (!_isRefreshing.value) _isLoading.value = false
-                    updateAccessibility(docs, _scannedDocuments.value)
+                    // updateAccessibility(docs, _scannedDocuments.value) is now handled by a separate debounced flow below
                 }
+            }
+
+            launch {
+                @OptIn(kotlinx.coroutines.FlowPreview::class)
+                repository.observeRecentDocuments()
+                    .debounce(5000L) // Debounce accessibility checks
+                    .collect { docs ->
+                        updateAccessibility(docs, _scannedDocuments.value)
+                    }
             }
 
             // Starred URIs are now managed via DataStore (UserPreferencesRepository)
@@ -331,13 +244,11 @@ class DashboardViewModel @Inject constructor(
                 scanStorage()
             }
 
-            launch {
+            launch(kotlinx.coroutines.Dispatchers.IO) {
                 try {
-                    val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-                    val versionName = packageInfo.versionName ?: "1.0.0"
-                    appUpdater.checkForUpdates(versionName)
+                    trashRepository.purgeExpired()
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    android.util.Log.e("DashboardVM", "Failed to purge expired trash", e)
                 }
             }
         }
@@ -364,99 +275,16 @@ class DashboardViewModel @Inject constructor(
         scanJob?.cancel()
         scanJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
-
-                // Rescan external storage
-                val uri = android.provider.MediaStore.Files.getContentUri("external")
-                val projection = arrayOf(
-                    android.provider.MediaStore.Files.FileColumns.DATA,
-                    android.provider.MediaStore.Files.FileColumns.DISPLAY_NAME,
-                    android.provider.MediaStore.Files.FileColumns.SIZE,
-                    android.provider.MediaStore.Files.FileColumns.DATE_MODIFIED,
-                    android.provider.MediaStore.Files.FileColumns.MIME_TYPE
-                )
-
-                val supportedExtensions = listOf(
-                    "pdf", "docx", "doc", "xlsx", "xls",
-                    "txt", "log", "md", "markdown", "rst",
-                    "json", "jsonl", "geojson", "xml",
-                    "yaml", "yml", "toml", "ini", "cfg", "conf",
-                    "csv", "tsv", "html", "htm", "css", "scss", "sass", "less",
-                    "js", "mjs", "cjs", "ts", "svg",
-                    "kt", "java", "py", "c", "cpp", "h", "cs", "rb", "sh", "sql"
-                )
-
-                val selection = supportedExtensions.joinToString(" OR ") { ext ->
-                    "${android.provider.MediaStore.Files.FileColumns.DATA} LIKE '%.$ext'"
-                }
-
-                val cursor = context.contentResolver.query(
-                    uri,
-                    projection,
-                    selection,
-                    null,
-                    "${android.provider.MediaStore.Files.FileColumns.DATE_MODIFIED} DESC"
-                )
-
-                val scanned = mutableListOf<RecentDocument>()
-                cursor?.use { c ->
-                    val dataIdx = c.getColumnIndex(android.provider.MediaStore.Files.FileColumns.DATA)
-                    val nameIdx = c.getColumnIndex(android.provider.MediaStore.Files.FileColumns.DISPLAY_NAME)
-                    val sizeIdx = c.getColumnIndex(android.provider.MediaStore.Files.FileColumns.SIZE)
-                    val dateIdx = c.getColumnIndex(android.provider.MediaStore.Files.FileColumns.DATE_MODIFIED)
-                    val mimeIdx = c.getColumnIndex(android.provider.MediaStore.Files.FileColumns.MIME_TYPE)
-
-                    while (c.moveToNext()) {
-                        val path = if (dataIdx >= 0) c.getString(dataIdx) else null
-                        if (path.isNullOrEmpty()) continue
-                        val file = java.io.File(path)
-                        if (!file.exists() || !file.canRead()) continue
-
-                        val name = if (nameIdx >= 0) c.getString(nameIdx) ?: file.name else file.name
-                        val size = if (sizeIdx >= 0) c.getLong(sizeIdx) else 0L
-                        val dateModified = if (dateIdx >= 0) c.getLong(dateIdx) * 1000L else 0L
-                        val mimeType = if (mimeIdx >= 0) c.getString(mimeIdx) else null
-
-                        val ext = file.extension.lowercase()
-                        val docType = DocumentType.fromUri(Uri.fromFile(file), mimeType)
-                        if (docType == DocumentType.UNKNOWN) continue
-
-                        val resolvedMimeType = mimeType ?: when (ext) {
-                            "pdf" -> "application/pdf"
-                            "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            "doc" -> "application/msword"
-                            "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                            "xls" -> "application/vnd.ms-excel"
-                            "md", "markdown" -> "text/markdown"
-                            "json", "jsonl", "geojson" -> "application/json"
-                            "xml" -> "text/xml"
-                            "yaml", "yml" -> "text/yaml"
-                            "toml" -> "application/toml"
-                            "csv" -> "text/csv"
-                            "tsv" -> "text/tab-separated-values"
-                            "html", "htm" -> "text/html"
-                            "css", "scss", "sass", "less" -> "text/css"
-                            "js", "mjs", "cjs", "ts" -> "application/javascript"
-                            "svg" -> "image/svg+xml"
-                            else -> "text/plain"
-                        }
-
-                        scanned.add(
-                            RecentDocument(
-                                uri = Uri.fromFile(file).toString(),
-                                fileName = name,
-                                mimeType = resolvedMimeType,
-                                fileSizeBytes = if (size > 0L) size else file.length(),
-                                lastOpenedAt = if (dateModified > 0L) dateModified else file.lastModified(),
-                                documentType = docType.name
-                            )
-                        )
-                    }
-                }
-                val finalScanned = scanned.toList()
+                val trashedList = try { trashRepository.observeAllTrashed().first() } catch (_: Exception) { emptyList() }
+                
+                val finalScanned = storageScanUseCase.scanStorage(trashedList)
                 _scannedDocuments.value = finalScanned
                 updateAccessibility(repository.observeRecentDocuments().first(), finalScanned)
+            } catch (e: SecurityException) {
+                _uiEvents.emit("Storage permission was revoked — please re-grant it in Settings")
+                android.util.Log.e("DashboardVM", "Storage permission revoked", e)
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("DashboardVM", "Scan failed", e)
             } finally {
                 _isLoading.value = false
                 _isRefreshing.value = false
@@ -549,25 +377,15 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    /** Called when the user picks or opens a document URI from SAF or intent. */
-    fun onDocumentOpened(uri: Uri, mimeType: String?) {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val finalUri = if (uri.scheme == "content") {
-                com.nexus.core.utils.DocumentCache.cacheUri(context, uri)
-            } else {
-                uri
-            }
-            val meta = resolveFileMeta(finalUri, mimeType)
-            repository.recordOpen(meta)
-        }
-    }
-
     var lastDeletedDocument: RecentDocument? = null
         private set
 
-    private val processingUris = mutableSetOf<String>()
+    var lastTrashedDocs: List<TrashedDocument> = emptyList()
+        private set
 
-    /** Remove one document from the recent list without deleting the physical file from device storage. */
+    private val processingUris = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /** Move one document to the Recycle Bin (soft delete with Undo option). */
     fun removeDocument(uri: String) {
         if (processingUris.contains(uri)) return
         processingUris.add(uri)
@@ -577,15 +395,49 @@ class DashboardViewModel @Inject constructor(
                     ?: _scannedDocuments.value.find { it.uri == uri }
                 if (docToRemove != null) {
                     lastDeletedDocument = docToRemove
+                    val trashed = trashRepository.moveToTrash(docToRemove)
+                    lastTrashedDocs = listOf(trashed)
+                } else {
+                    repository.removeDocument(uri)
                 }
-                repository.removeDocument(uri)
                 _scannedDocuments.value = _scannedDocuments.value.filter { it.uri != uri }
                 val updatedSelection = _selectedUris.value - uri
                 _selectedUris.value = updatedSelection
                 if (updatedSelection.isEmpty()) _isSelectionMode.value = false
-                _uiEvents.emit("Removed from Recents")
+                _uiEvents.emit("Moved to Recycle Bin")
+            } catch (e: Exception) {
+                android.util.Log.e("DashboardVM", "Failed to move to Recycle Bin", e)
+                _uiEvents.emit("Failed to move to Recycle Bin")
             } finally {
                 processingUris.remove(uri)
+            }
+        }
+    }
+
+    /** Undo the most recent delete operation (single or batch). */
+    fun undoLastDelete() {
+        viewModelScope.launch {
+            try {
+                if (lastTrashedDocs.isNotEmpty()) {
+                    val count = lastTrashedDocs.size
+                    lastTrashedDocs.forEach { trashed ->
+                        val restored = trashRepository.restoreDocument(trashed)
+                        val currentScanned = _scannedDocuments.value.toMutableList()
+                        if (!currentScanned.any { it.uri == restored.uri }) {
+                            currentScanned.add(0, restored)
+                            _scannedDocuments.value = currentScanned
+                        }
+                    }
+                    lastTrashedDocs = emptyList()
+                    lastDeletedDocument = null
+                    _uiEvents.emit("Restored $count file${if (count > 1) "s" else ""}")
+                } else if (lastDeletedDocument != null) {
+                    restoreDocument(lastDeletedDocument!!)
+                    lastDeletedDocument = null
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("DashboardVM", "Undo failed", e)
+                _uiEvents.emit("Undo failed — file may have been permanently deleted")
             }
         }
     }
@@ -614,7 +466,7 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    // â”€â”€â”€ Multi-Select â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Multi-Select ─────────────────────────────────────────────────────────
 
     fun toggleSelection(uri: String) {
         val current = _selectedUris.value.toMutableSet()
@@ -643,163 +495,69 @@ class DashboardViewModel @Inject constructor(
         val selected = _selectedUris.value.toList()
         if (selected.isEmpty()) return
         viewModelScope.launch {
-            val count = selected.size
-            selected.forEach { uri ->
-                repository.removeDocument(uri)
+            try {
+                val allRecentDocs = repository.observeRecentDocuments().first()
+                val docsToTrash = selected.mapNotNull { uri ->
+                    allRecentDocs.find { it.uri == uri } ?: _scannedDocuments.value.find { it.uri == uri }
+                }
+                val trashed = trashRepository.moveToTrash(docsToTrash)
+                lastTrashedDocs = trashed
+                _scannedDocuments.value = _scannedDocuments.value.filter { !selected.contains(it.uri) }
+                val count = selected.size
+                clearSelection()
+                _uiEvents.emit("Moved $count file${if (count > 1) "s" else ""} to Recycle Bin")
+            } catch (e: Exception) {
+                android.util.Log.e("DashboardVM", "Failed to delete selected files", e)
+                _uiEvents.emit("Failed to delete selected files")
             }
-            _scannedDocuments.value = _scannedDocuments.value.filter { !selected.contains(it.uri) }
-            clearSelection()
-            _uiEvents.emit("Removed $count file${if (count > 1) "s" else ""} from Recents")
         }
     }
 
-    private fun deletePhysicalFile(uriStr: String) {
-        try {
-            val uri = Uri.parse(uriStr)
-            if (uri.scheme == "file") {
-                val file = java.io.File(uri.path ?: "")
-                if (file.exists()) {
-                    file.delete()
-                }
-            } else if (uri.scheme == "content") {
-                context.contentResolver.delete(uri, null, null)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
+
 
     // â”€â”€â”€ File Operations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     fun shareDocument(uriStr: String) {
-        viewModelScope.launch {
-            try {
-                val rawUri = Uri.parse(uriStr)
-                val shareUri = if (rawUri.scheme == "file") {
-                    val file = java.io.File(rawUri.path ?: "")
-                    androidx.core.content.FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        file
-                    )
-                } else {
-                    rawUri
-                }
-                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                    type = "*/*"
-                    putExtra(android.content.Intent.EXTRA_STREAM, shareUri)
-                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                val chooser = android.content.Intent.createChooser(intent, "Share File").apply {
-                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(chooser)
-            } catch (e: Exception) {
-                _uiEvents.emit("Failed to share document")
-            }
-        }
+        shareHelper.shareDocument(uriStr)
     }
 
     /** Share multiple selected documents in a single chooser sheet. */
     fun shareSelectedDocuments(uris: Set<String>) {
-        viewModelScope.launch {
-            try {
-                val shareUris = ArrayList<Uri>()
-                for (uriStr in uris) {
-                    val rawUri = Uri.parse(uriStr)
-                    val shareUri = if (rawUri.scheme == "file") {
-                        val file = java.io.File(rawUri.path ?: "")
-                        androidx.core.content.FileProvider.getUriForFile(
-                            context,
-                            "${context.packageName}.fileprovider",
-                            file
-                        )
-                    } else {
-                        rawUri
-                    }
-                    shareUris.add(shareUri)
-                }
-                if (shareUris.isEmpty()) return@launch
-
-                val intent = if (shareUris.size == 1) {
-                    // Single file â€” use ACTION_SEND for better app compatibility
-                    android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                        type = "*/*"
-                        putExtra(android.content.Intent.EXTRA_STREAM, shareUris[0])
-                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                } else {
-                    // Multiple files â€” use ACTION_SEND_MULTIPLE
-                    android.content.Intent(android.content.Intent.ACTION_SEND_MULTIPLE).apply {
-                        type = "*/*"
-                        putParcelableArrayListExtra(android.content.Intent.EXTRA_STREAM, shareUris)
-                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                }
-                val chooser = android.content.Intent.createChooser(
-                    intent,
-                    if (shareUris.size == 1) "Share File" else "Share ${shareUris.size} Files"
-                ).apply {
-                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(chooser)
-            } catch (e: Exception) {
-                _uiEvents.emit("Failed to share documents")
-            }
-        }
+        shareHelper.shareSelectedDocuments(uris)
     }
 
     fun renameDocument(uriStr: String, newName: String) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                val uri = Uri.parse(uriStr)
-                var success = false
-                var newUriStr = uriStr
+            val result = fileOpUseCase.renameDocument(uriStr, newName)
+            if (result.isSuccess) {
+                val newUriStr = result.getOrNull()!!
                 
-                if (uri.scheme == "file") {
-                    val file = java.io.File(uri.path ?: "")
-                    if (file.exists()) {
-                        val newFile = java.io.File(file.parentFile, newName)
-                        success = file.renameTo(newFile)
-                        if (success) {
-                            newUriStr = Uri.fromFile(newFile).toString()
-                        }
-                    }
-                } else if (uri.scheme == "content") {
-                    try {
-                        val newUri = android.provider.DocumentsContract.renameDocument(context.contentResolver, uri, newName)
-                        if (newUri != null) {
-                            success = true
-                            newUriStr = newUri.toString()
-                        }
-                    } catch (e: Exception) {}
+                val currentScanned = _scannedDocuments.value.toMutableList()
+                val idx = currentScanned.indexOfFirst { it.uri == uriStr }
+                if (idx >= 0) {
+                    currentScanned[idx] = currentScanned[idx].copy(uri = newUriStr, fileName = newName)
+                    _scannedDocuments.value = currentScanned
                 }
                 
-                if (success) {
-                    val currentScanned = _scannedDocuments.value.toMutableList()
-                    val idx = currentScanned.indexOfFirst { it.uri == uriStr }
-                    if (idx >= 0) {
-                        currentScanned[idx] = currentScanned[idx].copy(uri = newUriStr, fileName = newName)
-                        _scannedDocuments.value = currentScanned
-                    }
-                    
-                    val existing = uiState.value.documents.find { it.doc.uri == uriStr }?.doc
-                    if (existing != null) {
-                        repository.removeDocument(uriStr)
-                        repository.recordOpen(existing.copy(uri = newUriStr, fileName = newName))
-                    }
-                    
-                    val currentStarred = _starredUris.value.toMutableSet()
-                    if (currentStarred.contains(uriStr)) {
-                        currentStarred.remove(uriStr)
-                        currentStarred.add(newUriStr)
-                        prefsRepository.setStarredUris(currentStarred)
-                    }
-                } else {
+                val existing = uiState.value.documents.find { it.doc.uri == uriStr }?.doc
+                if (existing != null) {
+                    repository.removeDocument(uriStr)
+                    repository.recordOpen(existing.copy(uri = newUriStr, fileName = newName))
+                }
+                
+                val currentStarred = _starredUris.value.toMutableSet()
+                if (currentStarred.contains(uriStr)) {
+                    currentStarred.remove(uriStr)
+                    currentStarred.add(newUriStr)
+                    prefsRepository.setStarredUris(currentStarred)
+                }
+            } else {
+                val exception = result.exceptionOrNull()
+                if (exception?.message == "Rename failed") {
                     _uiEvents.emit("Rename failed")
+                } else {
+                    _uiEvents.emit("Rename failed: ${exception?.localizedMessage}")
                 }
-            } catch (e: Exception) {
-                _uiEvents.emit("Rename failed: ${e.localizedMessage}")
             }
         }
     }
@@ -821,21 +579,14 @@ class DashboardViewModel @Inject constructor(
 
     /** Clear the full history (called from Settings). */
     fun clearHistory() {
-        viewModelScope.launch { repository.clearAll() }
-    }
-
-    // â”€â”€â”€ Updater â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-    fun downloadUpdate(url: String, version: String) {
-        appUpdater.downloadAndInstallUpdate(url, version)
-    }
-
-    fun dismissUpdate() {
-        appUpdater.resetState()
-    }
-    
-    fun resetUpdateState() {
-        appUpdater.resetState()
+        viewModelScope.launch {
+            try {
+                repository.clearAll()
+            } catch (e: Exception) {
+                android.util.Log.e("DashboardVM", "Clear history failed", e)
+                _uiEvents.emit("Failed to clear history")
+            }
+        }
     }
 
     // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -889,24 +640,22 @@ class DashboardViewModel @Inject constructor(
         )
     }
 
-    private suspend fun isUriAccessible(uriStr: String): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        try {
-            val uri = Uri.parse(uriStr)
-            if (uri.scheme == "content") {
-                context.contentResolver.openFileDescriptor(uri, "r")?.use { true } ?: false
-            } else {
-                java.io.File(uri.path ?: "").exists()
-            }
-        } catch (_: Exception) {
-            false
-        }
-    }
-
     private fun updateAccessibility(docs: List<RecentDocument>, scanned: List<RecentDocument>) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val allDocs = docs + scanned
-            val invalid = allDocs.filter { !isUriAccessible(it.uri) }.map { it.uri }.toSet()
-            _inaccessibleUris.value = invalid
+            val currentlyInaccessible = _inaccessibleUris.value
+            
+            // Only check documents we don't already know are inaccessible (incremental check).
+            // A more comprehensive approach would periodically re-check known-inaccessible ones,
+            // but for performance, we minimize disk I/O.
+            val toCheck = allDocs.filter { it.uri !in currentlyInaccessible }
+            
+            if (toCheck.isNotEmpty()) {
+                val newInvalid = accessibilityChecker.getInaccessibleUris(toCheck)
+                if (newInvalid.isNotEmpty()) {
+                    _inaccessibleUris.value = currentlyInaccessible + newInvalid
+                }
+            }
         }
     }
 }

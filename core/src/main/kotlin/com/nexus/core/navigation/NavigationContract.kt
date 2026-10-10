@@ -8,6 +8,7 @@ enum class DocumentType {
     PDF,
     DOCX,
     XLSX,
+    PPTX,
     TXT,
     UNKNOWN;
 
@@ -54,6 +55,8 @@ enum class DocumentType {
                 path.endsWith(".doc") || mimeType == "application/msword" -> DOCX
                 path.endsWith(".xlsx") || mimeType == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> XLSX
                 path.endsWith(".xls") || mimeType == "application/vnd.ms-excel" -> XLSX
+                path.endsWith(".pptx") || mimeType == "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> PPTX
+                path.endsWith(".ppt") || mimeType == "application/vnd.ms-powerpoint" -> PPTX
                 TXT_EXTENSIONS.contains(ext) || (mimeType != null && TXT_MIME_TYPES.contains(mimeType)) -> TXT
                 mimeType?.startsWith("text/") == true -> TXT
                 else -> UNKNOWN
@@ -68,6 +71,8 @@ enum class DocumentType {
                 mimeType == "application/msword" -> DOCX
                 mimeType == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
                 mimeType == "application/vnd.ms-excel" -> XLSX
+                mimeType == "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+                mimeType == "application/vnd.ms-powerpoint" -> PPTX
                 TXT_MIME_TYPES.contains(mimeType) || mimeType.startsWith("text/") -> TXT
                 else -> UNKNOWN
             }
@@ -96,8 +101,25 @@ sealed class NexusRoute(val route: String) {
     // Settings — accessible from the dashboard
     data object Settings : NexusRoute("settings")
     
+    // Tools Screen
+    data object Tools : NexusRoute("tools")
+    
+    // Tool Action Screen
+    data class ToolAction(
+        val toolId: String
+    ) : NexusRoute("tools/action/{toolId}") {
+        companion object {
+            const val ROUTE = "tools/action/{toolId}"
+            const val ARG_TOOL_ID = "toolId"
+        }
+        fun buildRoute(): String = "tools/action/${Uri.encode(toolId)}"
+    }
+    
     // Scanner - Document Scanning Feature
     data object Scanner : NexusRoute("scanner")
+
+    // Recycle Bin - Trashed & Restorable Documents
+    data object RecycleBin : NexusRoute("recycle_bin")
 
     // PDF Reader
     data class PdfReader(
@@ -110,7 +132,7 @@ sealed class NexusRoute(val route: String) {
             const val ARG_FILE_NAME = "fileName"
         }
 
-        fun buildRoute(): String = "reader/pdf/$encodedUri/$fileName"
+        fun buildRoute(): String = "reader/pdf/$encodedUri/${Uri.encode(fileName)}"
     }
 
     // Office Reader (DOCX, XLSX, PPTX)
@@ -126,7 +148,21 @@ sealed class NexusRoute(val route: String) {
             const val ARG_DOC_TYPE = "docType"
         }
 
-        fun buildRoute(): String = "reader/office/$encodedUri/$fileName/$docType"
+        fun buildRoute(): String = "reader/office/$encodedUri/${Uri.encode(fileName)}/$docType"
+    }
+
+    // Presentation Reader (PPTX, PPT)
+    data class PresentationReader(
+        val encodedUri: String,
+        val fileName: String
+    ) : NexusRoute("reader/presentation/{encodedUri}/{fileName}") {
+        companion object {
+            const val ROUTE = "reader/presentation/{encodedUri}/{fileName}"
+            const val ARG_URI = "encodedUri"
+            const val ARG_FILE_NAME = "fileName"
+        }
+
+        fun buildRoute(): String = "reader/presentation/$encodedUri/${Uri.encode(fileName)}"
     }
 
     // Text Reader
@@ -140,7 +176,7 @@ sealed class NexusRoute(val route: String) {
             const val ARG_FILE_NAME = "fileName"
         }
 
-        fun buildRoute(): String = "reader/text/$encodedUri/$fileName"
+        fun buildRoute(): String = "reader/text/$encodedUri/${Uri.encode(fileName)}"
     }
 
     // Unsupported Format
@@ -151,7 +187,7 @@ sealed class NexusRoute(val route: String) {
             const val ROUTE = "reader/unsupported/{fileName}"
             const val ARG_FILE_NAME = "fileName"
         }
-        fun buildRoute(): String = "reader/unsupported/$fileName"
+        fun buildRoute(): String = "reader/unsupported/${Uri.encode(fileName)}"
     }
 }
 
@@ -191,4 +227,14 @@ interface DocumentReaderRouter {
      * Navigate to the Settings Screen.
      */
     fun navigateToSettings()
+
+    /**
+     * Navigate to the Recycle Bin (Trash) Screen.
+     */
+    fun navigateToRecycleBin()
+
+    /**
+     * Navigate to a specific Tool Action Screen.
+     */
+    fun navigateToToolAction(toolId: String)
 }

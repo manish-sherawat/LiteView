@@ -36,7 +36,7 @@ class RecentDocumentRepository @Inject constructor(
     /** Add a tag to a document. */
     suspend fun addTag(uri: String, tag: String) {
         val trimmed = tag.trim().removePrefix("#").trim()
-        if (trimmed.isNotEmpty()) {
+        if (trimmed.isNotEmpty() && trimmed.length <= 50) {
             tagDao.insertTag(DocumentTag(documentUri = uri, tag = trimmed))
         }
     }
@@ -49,11 +49,9 @@ class RecentDocumentRepository @Inject constructor(
 
     /** Set or replace all tags for a document. */
     suspend fun setDocumentTags(uri: String, tags: List<String>) {
-        tagDao.deleteAllTagsForDocument(uri)
-        val validTags = tags.map { it.trim().removePrefix("#").trim() }.filter { it.isNotEmpty() }.distinct()
-        if (validTags.isNotEmpty()) {
-            tagDao.insertTags(validTags.map { DocumentTag(documentUri = uri, tag = it) })
-        }
+        val validTags = tags.map { it.trim().removePrefix("#").trim() }.filter { it.isNotEmpty() && it.length <= 50 }.distinct()
+        val tagEntities = validTags.map { DocumentTag(documentUri = uri, tag = it) }
+        tagDao.replaceTags(uri, tagEntities)
     }
 
     // ── Tag Definitions (Styling, Color, Emoji, Global Rename/Delete) ─────────

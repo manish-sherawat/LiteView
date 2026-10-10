@@ -39,7 +39,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarDuration
-import com.nexus.core.updater.UpdateState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,6 +66,8 @@ import com.nexus.core.ui.NexusSurface
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.NexusTextField
 import com.nexus.core.R
+import androidx.compose.ui.graphics.Brush
+import com.nexus.core.ui.animations.*
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import android.graphics.RenderEffect
 import android.graphics.Shader
@@ -80,11 +81,9 @@ fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     
     val snackbarHostState = remember { SnackbarHostState() }
-    var dismissedUpdateInSession by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     val lazyGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
     val searchFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
@@ -92,15 +91,17 @@ fun DashboardScreen(
     LaunchedEffect(Unit) {
         launch {
             viewModel.uiEvents.collect { message ->
+                val isDeleteMessage = message.contains("Recycle Bin", ignoreCase = true) ||
+                                     message.contains("deleted", ignoreCase = true) ||
+                                     message.contains("removed", ignoreCase = true)
+                val canUndo = isDeleteMessage && (viewModel.lastTrashedDocs.isNotEmpty() || viewModel.lastDeletedDocument != null)
                 val result = snackbarHostState.showSnackbar(
                     message = message,
-                    actionLabel = if (viewModel.lastDeletedDocument != null && (message.contains("deleted", ignoreCase = true) || message.contains("removed", ignoreCase = true))) "Undo" else null,
+                    actionLabel = if (canUndo) "Undo" else null,
                     duration = SnackbarDuration.Short
                 )
                 if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-                    viewModel.lastDeletedDocument?.let { doc ->
-                        viewModel.restoreDocument(doc)
-                    }
+                    viewModel.undoLastDelete()
                 }
             }
         }
@@ -120,21 +121,6 @@ fun DashboardScreen(
         }
     }
     
-    if (updateState is UpdateState.Available && !dismissedUpdateInSession) {
-        UpdateDialog(
-            updateState = updateState,
-            onDismiss   = {
-                dismissedUpdateInSession = true
-                viewModel.dismissUpdate()
-            },
-            onDownload  = { downloadUrl, version ->
-                android.widget.Toast.makeText(context, "Downloading update v$version...", android.widget.Toast.LENGTH_LONG).show()
-                viewModel.downloadUpdate(downloadUrl, version)
-                viewModel.resetUpdateState()
-            },
-            onRetry     = { viewModel.resetUpdateState() }
-        )
-    }
 
     var isPermissionGranted by remember { mutableStateOf(viewModel.hasStoragePermission(context)) }
     var detailsDialogDoc by remember { mutableStateOf<com.nexus.feature.dashboard.data.RecentDocument?>(null) }
@@ -197,7 +183,7 @@ fun DashboardScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 24.dp, vertical = 24.dp),
+                    .padding(horizontal = NexusTheme.spacing.lg, vertical = NexusTheme.spacing.lg),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Box(
@@ -254,16 +240,16 @@ fun DashboardScreen(
                 columns = if (uiState.isGridView) GridCells.Adaptive(minSize = 135.dp) else GridCells.Fixed(1),
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = NexusTheme.spacing.md),
                 verticalArrangement = Arrangement.spacedBy(if (uiState.isGridView) 8.dp else 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs),
                 contentPadding = PaddingValues(
                     top = 0.dp, 
                     bottom = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 100.dp
                 )
             ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Column(modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(top = 16.dp)) {
+                Column(modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(top = NexusTheme.spacing.md)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -286,9 +272,15 @@ fun DashboardScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .clip(NexusTheme.shapes.pill)
-                                .background(NexusTheme.colors.primary)
+                                .background(NexusTheme.colors.primaryGradient)
+                                .shadow(
+                                    elevation = 6.dp,
+                                    shape = NexusTheme.shapes.pill,
+                                    spotColor = NexusTheme.colors.primary.copy(alpha = 0.45f),
+                                    ambientColor = NexusTheme.colors.primary.copy(alpha = 0.25f)
+                                )
                                 .springBounceClick { router.navigateToScanner() }
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.xs)
                         ) {
                             Image(
                                 painter = painterResource(id = R.drawable.ic_text_scan),
@@ -299,7 +291,10 @@ fun DashboardScreen(
                             Spacer(modifier = Modifier.width(6.dp))
                             NexusText(
                                 text = "Scan",
-                                style = NexusTheme.typography.label,
+                                style = NexusTheme.typography.label.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.3.sp
+                                ),
                                 color = NexusTheme.colors.onPrimary
                             )
                         }
@@ -334,7 +329,7 @@ fun DashboardScreen(
 
                     // ── Horizontal File Type Filter Chips ─────────────────────────
                     androidx.compose.foundation.lazy.LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs),
                         contentPadding = PaddingValues(vertical = 2.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -343,10 +338,10 @@ fun DashboardScreen(
                             val count = uiState.filterCounts[filter] ?: 0
                             val chipColor = when (filter) {
                                 DocumentTypeFilter.ALL -> NexusTheme.colors.primary
-                                DocumentTypeFilter.PDF -> Color(0xFFEF4444)
-                                DocumentTypeFilter.DOCX -> Color(0xFF2563EB)
-                                DocumentTypeFilter.XLSX -> Color(0xFF10B981)
-                                DocumentTypeFilter.TXT -> Color(0xFF8B5CF6)
+                                DocumentTypeFilter.PDF -> com.nexus.core.theme.DocumentAccentColors.PDF
+                                DocumentTypeFilter.DOCX -> com.nexus.core.theme.DocumentAccentColors.DOCX
+                                DocumentTypeFilter.XLSX -> com.nexus.core.theme.DocumentAccentColors.XLSX
+                                DocumentTypeFilter.TXT -> com.nexus.core.theme.DocumentAccentColors.TXT
                             }
 
                             val animatedBg by animateColorAsState(
@@ -381,7 +376,7 @@ fun DashboardScreen(
                                         shape = androidx.compose.foundation.shape.CircleShape
                                     )
                                     .springBounceClick { viewModel.setSelectedFilter(filter) }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    .padding(horizontal = NexusTheme.spacing.sm, vertical = NexusTheme.spacing.xs)
                             ) {
                                 if (filter != DocumentTypeFilter.ALL) {
                                     Box(
@@ -434,7 +429,7 @@ fun DashboardScreen(
                         Column {
                             Spacer(modifier = Modifier.height(8.dp))
                             androidx.compose.foundation.lazy.LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs),
                                 contentPadding = PaddingValues(vertical = 2.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -451,7 +446,7 @@ fun DashboardScreen(
                                                 shape = androidx.compose.foundation.shape.CircleShape
                                             )
                                             .springBounceClick { showTagManagerScreen = true }
-                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                            .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xs)
                                     ) {
                                         Image(
                                             painter = painterResource(id = R.drawable.ic_tag),
@@ -509,12 +504,12 @@ fun DashboardScreen(
                                                 shape = androidx.compose.foundation.shape.CircleShape
                                             )
                                             .springBounceClick { viewModel.selectTag(tagModel.name) }
-                                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                                            .padding(horizontal = NexusTheme.spacing.sm, vertical = NexusTheme.spacing.xs)
                                     ) {
                                         if (!tagModel.emoji.isNullOrBlank()) {
                                             NexusText(
                                                 text = tagModel.emoji,
-                                                style = NexusTheme.typography.caption.copy(fontSize = 12.sp)
+                                                style = NexusTheme.typography.caption
                                             )
                                             Spacer(modifier = Modifier.width(4.dp))
                                         } else {
@@ -573,7 +568,7 @@ fun DashboardScreen(
                                         .clip(NexusTheme.shapes.pill)
                                         .background(NexusTheme.colors.surfaceVariant)
                                         .springBounceClick { sortMenuExpanded = true }
-                                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                                        .padding(horizontal = NexusTheme.spacing.sm, vertical = NexusTheme.spacing.xs)
                                 ) {
                                     val sortLabel = when (uiState.sortOrder) {
                                         SortOrder.BY_DATE -> "Date"
@@ -609,14 +604,14 @@ fun DashboardScreen(
                                         )
                                     ) {
                                         NexusSurface(
-                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                                            shape = com.nexus.core.theme.NexusTheme.shapes.medium,
                                             color = NexusTheme.colors.surface,
                                             modifier = Modifier
                                                 .width(180.dp)
                                                 .border(
                                                     width = 1.dp,
                                                     color = NexusTheme.colors.divider.copy(alpha = 0.6f),
-                                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp)
+                                                    shape = com.nexus.core.theme.NexusTheme.shapes.medium
                                                 )
                                         ) {
                                             Column(
@@ -625,9 +620,9 @@ fun DashboardScreen(
                                                         blurRadius = 24f,
                                                         fallbackColor = NexusTheme.colors.surface,
                                                         alpha = 0.9f,
-                                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp)
+                                                        shape = com.nexus.core.theme.NexusTheme.shapes.medium
                                                     )
-                                                    .padding(6.dp)
+                                                    .padding(NexusTheme.spacing.xs)
                                             ) {
                                                 SortOrder.entries.forEach { order ->
                                                     val isSelected = uiState.sortOrder == order
@@ -640,7 +635,7 @@ fun DashboardScreen(
                                                     Row(
                                                         modifier = Modifier
                                                             .fillMaxWidth()
-                                                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                                                            .clip(com.nexus.core.theme.NexusTheme.shapes.medium)
                                                             .background(
                                                                 if (isSelected) NexusTheme.colors.primary.copy(alpha = 0.12f)
                                                                 else Color.Transparent
@@ -649,7 +644,7 @@ fun DashboardScreen(
                                                                 viewModel.setSortOrder(order)
                                                                 sortMenuExpanded = false
                                                             }
-                                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                                            .padding(horizontal = NexusTheme.spacing.sm, vertical = NexusTheme.spacing.xs),
                                                         verticalAlignment = Alignment.CenterVertically,
                                                         horizontalArrangement = Arrangement.SpaceBetween
                                                     ) {
@@ -700,7 +695,7 @@ fun DashboardScreen(
                                     .clip(androidx.compose.foundation.shape.CircleShape)
                                     .background(NexusTheme.colors.surfaceVariant)
                                     .springBounceClick { viewModel.toggleSortDirection() }
-                                    .padding(8.dp),
+                                    .padding(NexusTheme.spacing.xs),
                                 colorFilter = ColorFilter.tint(NexusTheme.colors.textSecondary)
                             )
                         }
@@ -716,7 +711,7 @@ fun DashboardScreen(
                                     .clip(androidx.compose.foundation.shape.CircleShape)
                                     .background(if (!uiState.isGridView) NexusTheme.colors.primary.copy(alpha = 0.2f) else Color.Transparent)
                                     .springBounceClick { if (uiState.isGridView) viewModel.toggleGridView() }
-                                    .padding(8.dp)
+                                    .padding(NexusTheme.spacing.xs)
                             ) {
                                 Image(
                                     painter = painterResource(id = R.drawable.ic_view_list),
@@ -730,7 +725,7 @@ fun DashboardScreen(
                                     .clip(androidx.compose.foundation.shape.CircleShape)
                                     .background(if (uiState.isGridView) NexusTheme.colors.primary.copy(alpha = 0.2f) else Color.Transparent)
                                     .springBounceClick { if (!uiState.isGridView) viewModel.toggleGridView() }
-                                    .padding(8.dp)
+                                    .padding(NexusTheme.spacing.xs)
                             ) {
                                 Image(
                                     painter = painterResource(id = R.drawable.ic_view_grid),
@@ -742,7 +737,14 @@ fun DashboardScreen(
                         }
                     }
                     
-                    Spacer(modifier = Modifier.height(8.dp))
+                    if (uiState.isRefreshing) {
+                        androidx.compose.material3.LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = NexusTheme.colors.primary,
+                            trackColor = NexusTheme.colors.surfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
             }
             
@@ -767,7 +769,7 @@ fun DashboardScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = emptyMinHeight, max = emptyMaxHeight)
-                            .padding(16.dp),
+                            .padding(NexusTheme.spacing.md),
                         contentAlignment = Alignment.Center
                     ) {
                         NexusEmptyStateImage(
@@ -775,7 +777,8 @@ fun DashboardScreen(
                             contentDescription = "Storage access needed",
                             modifier = Modifier
                                 .fillMaxWidth(if (isWide) 0.70f else 0.95f)
-                                .heightIn(max = imgMaxHeight),
+                                .heightIn(max = imgMaxHeight)
+                                .breathePulse(minScale = 0.96f, maxScale = 1.04f, durationMs = 2800),
                             contentScale = androidx.compose.ui.layout.ContentScale.Fit
                         )
                     }
@@ -793,7 +796,7 @@ fun DashboardScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = emptyMinHeight, max = emptyMaxHeight)
-                            .padding(16.dp),
+                            .padding(NexusTheme.spacing.md),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
@@ -801,8 +804,8 @@ fun DashboardScreen(
                         val emptyType = when {
                             isSearching -> NexusEmptyStateType.NOT_FOUND
                             uiState.selectedTab == DashboardTab.STARRED -> NexusEmptyStateType.FAVORITES
-                            uiState.selectedTab == DashboardTab.RECENT -> NexusEmptyStateType.RECENT
-                            else -> NexusEmptyStateType.STORAGE
+                            uiState.selectedTab == DashboardTab.RECENT -> NexusEmptyStateType.EMPTY
+                            else -> NexusEmptyStateType.EMPTY
                         }
                         
                         NexusEmptyStateImage(
@@ -811,7 +814,8 @@ fun DashboardScreen(
                             modifier = Modifier
                                 .fillMaxWidth(if (isWide) 0.70f else 0.92f)
                                 .weight(1f, fill = false)
-                                .heightIn(max = imgMaxHeight),
+                                .heightIn(max = imgMaxHeight)
+                                .breathePulse(minScale = 0.96f, maxScale = 1.04f, durationMs = 2800),
                             contentScale = androidx.compose.ui.layout.ContentScale.Fit
                         )
 
@@ -847,7 +851,7 @@ fun DashboardScreen(
                             )
                         } else {
                             com.nexus.core.ui.components.NexusButton(
-                                text = "Scan New Document",
+                                text = "Browse Files",
                                 onClick = { router.navigateToScanner() }
                             )
                         }
@@ -855,26 +859,9 @@ fun DashboardScreen(
                 }
             } else {
                 itemsIndexed(uiState.documents, key = { _, it -> it.doc.uri }) { index, uiModel ->
-                    var isVisible by remember { mutableStateOf(false) }
-                    LaunchedEffect(Unit) {
-                        kotlinx.coroutines.delay(index.toLong().coerceAtMost(10L) * 10L)
-                        isVisible = true
-                    }
-                    val alpha by androidx.compose.animation.core.animateFloatAsState(
-                        targetValue = if (isVisible) 1f else 0f, 
-                        animationSpec = tween(150),
-                        label = "alpha"
-                    )
-                    val translationY by androidx.compose.animation.core.animateFloatAsState(
-                        targetValue = if (isVisible) 0f else 20f, 
-                        animationSpec = tween(150),
-                        label = "translateY"
-                    )
-
-                    val itemModifier = Modifier.animateItem().graphicsLayer {
-                        this.alpha = alpha
-                        this.translationY = translationY
-                    }
+                    val itemModifier = Modifier
+                        .animateItem()
+                        .staggeredSlideFadeIn(index = index, baseDelayMs = 20, maxDelayMs = 200, offsetY = 14.dp)
 
                     if (uiState.isGridView) {
                         FileGridItem(
@@ -984,21 +971,21 @@ fun DashboardScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 18.dp)
+                    .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.md)
                     .shadow(
                         elevation = 20.dp,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                        shape = com.nexus.core.theme.NexusTheme.shapes.large,
                         spotColor = Color.Black.copy(alpha = 0.35f),
                         ambientColor = Color.Black.copy(alpha = 0.2f)
                     )
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(22.dp))
+                    .clip(com.nexus.core.theme.NexusTheme.shapes.large)
                     .background(NexusTheme.colors.surface)
                     .border(
                         width = 1.dp,
                         color = NexusTheme.colors.divider.copy(alpha = 0.5f),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp)
+                        shape = com.nexus.core.theme.NexusTheme.shapes.large
                     )
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.sm)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1007,11 +994,11 @@ fun DashboardScreen(
                 ) {
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xxs)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
                         ) {
                             Box(
                                 modifier = Modifier
@@ -1031,7 +1018,7 @@ fun DashboardScreen(
                             }
                             NexusText(
                                 text = if (uiState.selectedUris.size == 1) "File selected" else "Files selected",
-                                style = NexusTheme.typography.title.copy(fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold),
+                                style = NexusTheme.typography.buttonLabel,
                                 color = NexusTheme.colors.textPrimary
                             )
                         }
@@ -1039,12 +1026,12 @@ fun DashboardScreen(
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                                .clip(com.nexus.core.theme.NexusTheme.shapes.small)
                                 .background(NexusTheme.colors.primary.copy(alpha = 0.12f))
                                 .springBounceClick {
                                     if (areAllSelected) viewModel.clearSelection() else viewModel.selectAll()
                                 }
-                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xxs)
                         ) {
                             NexusText(
                                 text = if (areAllSelected) "Deselect all" else "Select all",
@@ -1058,7 +1045,7 @@ fun DashboardScreen(
                     }
 
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.sm),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Share Action
@@ -1087,7 +1074,7 @@ fun DashboardScreen(
                             Spacer(modifier = Modifier.height(2.dp))
                             NexusText(
                                 text = "Share",
-                                style = NexusTheme.typography.caption.copy(fontSize = 10.5.sp, fontWeight = FontWeight.Medium),
+                                style = NexusTheme.typography.labelXs,
                                 color = NexusTheme.colors.textPrimary
                             )
                         }
@@ -1115,7 +1102,7 @@ fun DashboardScreen(
                             Spacer(modifier = Modifier.height(2.dp))
                             NexusText(
                                 text = "Delete",
-                                style = NexusTheme.typography.caption.copy(fontSize = 10.5.sp, fontWeight = FontWeight.Medium),
+                                style = NexusTheme.typography.labelXs,
                                 color = NexusTheme.colors.error
                             )
                         }
@@ -1143,7 +1130,7 @@ fun DashboardScreen(
                             Spacer(modifier = Modifier.height(2.dp))
                             NexusText(
                                 text = "Close",
-                                style = NexusTheme.typography.caption.copy(fontSize = 10.5.sp, fontWeight = FontWeight.Medium),
+                                style = NexusTheme.typography.labelXs,
                                 color = NexusTheme.colors.textSecondary
                             )
                         }
@@ -1167,14 +1154,14 @@ fun DashboardScreen(
                         .fillMaxWidth()
                         .clip(NexusTheme.shapes.pill)
                         .background(
-                            if (isDark) Color(0xF21A1C29) else Color(0xF22D3142)
+                            if (isDark) NexusTheme.colors.surfaceVariant else NexusTheme.colors.surfaceVariant
                         )
                         .border(
                             width = 1.dp,
                             color = (if (isUndo) NexusTheme.colors.error else NexusTheme.colors.primary).copy(alpha = 0.5f),
                             shape = NexusTheme.shapes.pill
                         )
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.xs)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1183,7 +1170,7 @@ fun DashboardScreen(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.sm),
                             modifier = Modifier.weight(1f)
                         ) {
                             Box(
@@ -1221,7 +1208,7 @@ fun DashboardScreen(
                                     .clip(NexusTheme.shapes.pill)
                                     .background(NexusTheme.colors.primary)
                                     .springBounceClick { snackbarData.performAction() }
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.xs)
                             ) {
                                 NexusText(
                                     text = actionText,
@@ -1247,7 +1234,7 @@ fun TabButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
             .springBounceClick(scaleDown = 0.90f, onClick = onClick)
             .clip(NexusTheme.shapes.pill)
             .background(bgColor)
-            .padding(horizontal = 24.dp, vertical = 12.dp)
+            .padding(horizontal = NexusTheme.spacing.lg, vertical = NexusTheme.spacing.sm)
     ) {
         NexusText(
             text = text,
@@ -1273,7 +1260,7 @@ fun FileCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
+                .padding(NexusTheme.spacing.lg),
             verticalAlignment = Alignment.CenterVertically
         ) {
             com.nexus.core.ui.components.FileTypeIcon(

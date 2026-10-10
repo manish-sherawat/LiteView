@@ -175,7 +175,7 @@ fun PdfAnnotationPill(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(3.dp)
+                        .padding(NexusTheme.spacing.xxs)
                         .size(13.dp)
                         .clip(CircleShape)
                         .background(selectedColor)
@@ -400,18 +400,18 @@ fun PdfAnnotationPill(
                             .glassBackground(blurRadius = 30f, alpha = 0.92f, fallbackColor = NexusTheme.colors.surfaceVariant)
                             .border(0.8.dp, NexusTheme.colors.divider.copy(alpha = 0.6f), NexusTheme.shapes.medium)
                             .pointerInput(Unit) { detectTapGestures { } }
-                            .padding(8.dp)
+                            .padding(NexusTheme.spacing.xs)
                     ) {
                         if (isHorizontalRibbon) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
                             ) {
                                 ShapeType.values().forEach { shape ->
                                     val isSelected = selectedShape == shape
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs),
                                         modifier = Modifier
                                             .clip(CircleShape)
                                             .background(
@@ -423,7 +423,7 @@ fun PdfAnnotationPill(
                                                 onShapeSelect(shape)
                                                 showShapesPopover = false
                                             }
-                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                            .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xs)
                                     ) {
                                         Icon(
                                             imageVector = when (shape) {
@@ -447,13 +447,13 @@ fun PdfAnnotationPill(
                         } else {
                             Column(
                                 horizontalAlignment = Alignment.Start,
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xxs)
                             ) {
                                 ShapeType.values().forEach { shape ->
                                     val isSelected = selectedShape == shape
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs),
                                         modifier = Modifier
                                             .clip(CircleShape)
                                             .background(
@@ -465,7 +465,7 @@ fun PdfAnnotationPill(
                                                 onShapeSelect(shape)
                                                 showShapesPopover = false
                                             }
-                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                            .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xs)
                                     ) {
                                         Icon(
                                             imageVector = when (shape) {
@@ -567,12 +567,12 @@ fun PdfAnnotationPill(
                     if (isHorizontalRibbon) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
                         ) {
                             dragHandleContent()
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xxs),
                                 modifier = Modifier.horizontalScroll(rememberScrollState())
                             ) {
                                 toolButtonsContent()
@@ -581,12 +581,12 @@ fun PdfAnnotationPill(
                     } else {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                            verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
                         ) {
                             dragHandleContent()
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(3.dp),
+                                verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xxs),
                                 modifier = Modifier
                                     .heightIn(max = maxPillHeight)
                                     .verticalScroll(rememberScrollState())
@@ -613,7 +613,7 @@ fun PdfAnnotationPill(
                     ToolbarDockPosition.Left -> {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
                         ) {
                             mainPillContent()
                             shapesPopoverContent()
@@ -625,7 +625,7 @@ fun PdfAnnotationPill(
                     ToolbarDockPosition.Right -> {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
                         ) {
                             shapesPopoverContent()
                             stampsPopoverContent()
@@ -637,7 +637,7 @@ fun PdfAnnotationPill(
                     ToolbarDockPosition.Top -> {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
                         ) {
                             mainPillContent()
                             shapesPopoverContent()
@@ -649,7 +649,7 @@ fun PdfAnnotationPill(
                     ToolbarDockPosition.Bottom -> {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
                         ) {
                             shapesPopoverContent()
                             stampsPopoverContent()
@@ -706,7 +706,7 @@ private fun ToolIconButton(
                 if (enabled) Modifier.springBounceClick(onClick = onClick)
                 else Modifier
             )
-            .padding(7.dp)
+            .padding(NexusTheme.spacing.xs)
     ) {
         Icon(
             imageVector = icon,
@@ -752,7 +752,7 @@ private fun ColorIconButton(
                 shape = CircleShape
             )
             .springBounceClick(onClick = onClick)
-            .padding(4.dp)
+            .padding(NexusTheme.spacing.xxs)
     ) {
         Box(
             contentAlignment = Alignment.Center,
@@ -815,11 +815,11 @@ fun PdfAnnotationColorVerticalPopover(
                 ),
                 NexusTheme.shapes.medium
             )
-            .padding(vertical = 12.dp, horizontal = 12.dp)
+            .padding(vertical = NexusTheme.spacing.sm, horizontal = NexusTheme.spacing.sm)
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs),
             modifier = Modifier.heightIn(max = maxPopoverHeight)
         ) {
             // Live Stroke Preview Bar
@@ -827,9 +827,9 @@ fun PdfAnnotationColorVerticalPopover(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(24.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(NexusTheme.shapes.small)
                     .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.6f))
-                    .padding(horizontal = 10.dp),
+                    .padding(horizontal = NexusTheme.spacing.xs),
                 contentAlignment = Alignment.Center
             ) {
                 androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
@@ -845,13 +845,13 @@ fun PdfAnnotationColorVerticalPopover(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.sm),
                 modifier = Modifier.verticalScroll(rememberScrollState())
             ) {
                 // Vertical Column of Color Swatches
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
                 ) {
                     colors.forEach { color ->
                         val isSelected = selectedColor == color
@@ -897,7 +897,7 @@ fun PdfAnnotationColorVerticalPopover(
                 // Vertical Column of Stroke Width Options
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.sm)
                 ) {
                     strokeWidths.forEach { width ->
                         val isSelected = strokeWidth == width
@@ -1239,11 +1239,11 @@ fun PdfAnnotationEraserOptionsPopover(
             .clip(NexusTheme.shapes.medium)
             .glassBackground(blurRadius = 35f, alpha = 0.92f, fallbackColor = NexusTheme.colors.surfaceVariant)
             .border(0.8.dp, NexusTheme.colors.divider.copy(alpha = 0.6f), NexusTheme.shapes.medium)
-            .padding(vertical = 8.dp, horizontal = 10.dp)
+            .padding(vertical = NexusTheme.spacing.xs, horizontal = NexusTheme.spacing.xs)
     ) {
         Column(
             horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xxs),
             modifier = Modifier
                 .heightIn(max = maxPopoverHeight)
                 .verticalScroll(rememberScrollState())
@@ -1256,23 +1256,23 @@ fun PdfAnnotationEraserOptionsPopover(
                     letterSpacing = 0.8.sp
                 ),
                 color = NexusTheme.colors.primary,
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                modifier = Modifier.padding(horizontal = NexusTheme.spacing.xxs, vertical = 2.dp)
             )
 
             EraserTargetFilter.values().forEach { filter ->
                 val isSelected = selectedEraserFilter == filter
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(NexusTheme.shapes.small)
                         .background(
                             if (isSelected) NexusTheme.colors.primary.copy(alpha = 0.15f)
                             else Color.Transparent
                         )
                         .springBounceClick { onEraserFilterSelect(filter) }
-                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                        .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xs)
                 ) {
                     Icon(
                         imageVector = when (filter) {
@@ -1379,11 +1379,11 @@ fun PdfAnnotationStampsPopover(
             .clip(NexusTheme.shapes.medium)
             .glassBackground(blurRadius = 35f, alpha = 0.92f, fallbackColor = NexusTheme.colors.surfaceVariant)
             .border(0.8.dp, NexusTheme.colors.divider.copy(alpha = 0.6f), NexusTheme.shapes.medium)
-            .padding(vertical = 8.dp, horizontal = 10.dp)
+            .padding(vertical = NexusTheme.spacing.xs, horizontal = NexusTheme.spacing.xs)
     ) {
         Column(
             horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xxs),
             modifier = Modifier
                 .heightIn(max = maxPopoverHeight)
                 .verticalScroll(rememberScrollState())
@@ -1396,7 +1396,7 @@ fun PdfAnnotationStampsPopover(
                     letterSpacing = 0.8.sp
                 ),
                 color = NexusTheme.colors.primary,
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                modifier = Modifier.padding(horizontal = NexusTheme.spacing.xxs, vertical = 2.dp)
             )
 
             StampType.values().forEach { stamp ->
@@ -1404,16 +1404,16 @@ fun PdfAnnotationStampsPopover(
                 val badgeColor = Color(stamp.colorHex)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(NexusTheme.shapes.small)
                         .background(
                             if (isSelected) badgeColor.copy(alpha = 0.20f)
                             else Color.Transparent
                         )
                         .springBounceClick { onStampSelect(stamp) }
-                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                        .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xs)
                 ) {
                     Box(
                         modifier = Modifier

@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
+import dev.chrisbanes.haze.HazeState
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Liquid Glass Configuration & Composition Locals
@@ -57,11 +58,7 @@ val readerNavGlassConfig = GlassEffectConfig(
 
 val LocalGlassEffectConfig = compositionLocalOf { readerNavGlassConfig }
 val LocalAppBackdrop = compositionLocalOf<Any?> { null }
-
-@Composable
-fun rememberLayerBackdrop(): Any? = remember { Any() }
-
-fun Modifier.layerBackdrop(backdrop: Any?): Modifier = this
+val LocalHazeState = compositionLocalOf<dev.chrisbanes.haze.HazeState?> { null }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AGSL RuntimeShader Definition
@@ -83,17 +80,17 @@ private const val LIQUID_GLASS_AGSL = """
 
         // Chromatic aberration / dispersion at the rim
         float dispersion = chromaticAberration > 0.5 ? (0.0032 * lensAmount * 2.0) : 0.0;
-        half r = content.eval(float2((uv.x + dispersion) * size.x, uv.y * size.y)).r;
-        half g = content.eval(fragCoord).g;
-        half b = content.eval(float2((uv.x - dispersion) * size.x, uv.y * size.y)).b;
-        half a = content.eval(fragCoord).a;
+        float r = content.eval(float2((uv.x + dispersion) * size.x, uv.y * size.y)).r;
+        float g = content.eval(fragCoord).g;
+        float b = content.eval(float2((uv.x - dispersion) * size.x, uv.y * size.y)).b;
+        float a = content.eval(fragCoord).a;
 
-        half4 color = half4(r, g, b, a);
+        float4 color = float4(r, g, b, a);
 
         // Vibrancy / saturation boost
         if (vibrancy > 1.0) {
-            half luma = dot(color.rgb, half3(0.2126, 0.7152, 0.0722));
-            color.rgb = mix(half3(luma), color.rgb, vibrancy);
+            float luma = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
+            color.rgb = mix(float3(luma), color.rgb, vibrancy);
         }
 
         // Frosted glass tint & surface opacity blend
@@ -102,17 +99,17 @@ private const val LIQUID_GLASS_AGSL = """
         // Specular highlight at top edge (light catching curved glass rim)
         if (lensHeight > 0.0) {
             float highlight = smoothstep(lensHeight, 0.0, uv.y) * 0.28 * lensAmount;
-            color.rgb += highlight;
+            color.rgb += float3(highlight);
         }
 
         // Depth shadow at bottom rim
         if (depthEffect > 0.5) {
             float shadow = smoothstep(1.0 - lensHeight, 1.0, uv.y) * 0.08 * lensAmount;
-            color.rgb -= shadow;
+            color.rgb -= float3(shadow);
         }
 
-        color.rgb = clamp(color.rgb, half3(0.0), half3(1.0));
-        return color;
+        color.rgb = clamp(color.rgb, float3(0.0), float3(1.0));
+        return half4(color);
     }
 """
 
@@ -134,16 +131,21 @@ fun Modifier.liquidGlass(config: GlassEffectConfig? = null): Modifier = composed
     val density = LocalDensity.current.density
     var size by remember { mutableStateOf(IntSize.Zero) }
 
+    val runtimeShader = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            RuntimeShader(LIQUID_GLASS_AGSL)
+        } else null
+    }
+
     this
         .onSizeChanged { size = it }
         .graphicsLayer {
             if (size == IntSize.Zero) return@graphicsLayer
 
-            val blurPx = (glassConfig.blurRadius * density).coerceAtLeast(1f)
+            val blurPx = (glassConfig.blurRadius * density)
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && runtimeShader != null) {
                 // API 33+: Blur + AGSL glass shader
-                val runtimeShader = RuntimeShader(LIQUID_GLASS_AGSL)
                 runtimeShader.setFloatUniform(
                     "size",
                     size.width.toFloat(),
@@ -163,20 +165,27 @@ fun Modifier.liquidGlass(config: GlassEffectConfig? = null): Modifier = composed
                 runtimeShader.setFloatUniform("chromaticAberration", if (glassConfig.chromaticAberration) 1f else 0f)
                 runtimeShader.setFloatUniform("depthEffect", if (glassConfig.depthEffect) 1f else 0f)
 
-                val blurEffect = RenderEffect.createBlurEffect(
-                    blurPx, blurPx, Shader.TileMode.CLAMP
-                )
                 val shaderEffect = RenderEffect.createRuntimeShaderEffect(
                     runtimeShader, "content"
                 )
-                // Chain: element content -> blur -> glass AGSL shader
-                renderEffect = RenderEffect.createChainEffect(shaderEffect, blurEffect)
-                    .asComposeRenderEffect()
+                
+                if (blurPx > 0f) {
+                    val blurEffect = RenderEffect.createBlurEffect(
+                        blurPx.coerceAtLeast(1f), blurPx.coerceAtLeast(1f), Shader.TileMode.CLAMP
+                    )
+                    // Chain: element content -> blur -> glass AGSL shader
+                    renderEffect = RenderEffect.createChainEffect(shaderEffect, blurEffect)
+                        .asComposeRenderEffect()
+                } else {
+                    renderEffect = shaderEffect.asComposeRenderEffect()
+                }
             } else {
                 // API 31–32: Blur only
-                renderEffect = RenderEffect.createBlurEffect(
-                    blurPx, blurPx, Shader.TileMode.CLAMP
-                ).asComposeRenderEffect()
+                if (blurPx > 0f) {
+                    renderEffect = RenderEffect.createBlurEffect(
+                        blurPx.coerceAtLeast(1f), blurPx.coerceAtLeast(1f), Shader.TileMode.CLAMP
+                    ).asComposeRenderEffect()
+                }
             }
         }
 }

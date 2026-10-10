@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import com.nexus.feature.dashboard.data.RecentDocumentDao
+import com.nexus.feature.dashboard.data.DocumentBookmark
+import com.nexus.feature.dashboard.data.DocumentBookmarkDao
 import com.nexus.core.preferences.UserPreferencesRepository
 import org.apache.poi.hwpf.HWPFDocument
 import org.apache.poi.poifs.filesystem.POIFSFileSystem
@@ -75,7 +77,9 @@ sealed class OfficeReaderUiState {
         val showOutline: Boolean = false,
         val author: String? = null,
         val creationDate: String? = null,
-        val wordCount: Int? = null
+        val wordCount: Int? = null,
+        val characterCount: Int? = null,
+        val readingTimeMinutes: Int? = null
     ) : OfficeReaderUiState()
 
     data class XlsxReady(
@@ -102,11 +106,15 @@ sealed class OfficeReaderUiState {
 class OfficeReaderViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val recentDocumentDao: RecentDocumentDao,
+    private val bookmarkDao: DocumentBookmarkDao,
     private val prefsRepository: UserPreferencesRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<OfficeReaderUiState>(OfficeReaderUiState.Loading())
     val uiState: StateFlow<OfficeReaderUiState> = _uiState.asStateFlow()
+
+    private val _bookmarks = MutableStateFlow<List<DocumentBookmark>>(emptyList())
+    val bookmarks: StateFlow<List<DocumentBookmark>> = _bookmarks.asStateFlow()
 
     // Typography preferences for DOCX
     private val _docxFontSize = MutableStateFlow(16f)
@@ -165,6 +173,26 @@ class OfficeReaderViewModel @Inject constructor(
         }
     }
 
+    fun addBookmark(label: String, scrollY: Int) {
+        val uriStr = currentEncodedUri ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val decodedUri = safeDecode(uriStr)
+            bookmarkDao.insertBookmark(
+                DocumentBookmark(
+                    documentUri = decodedUri,
+                    pageIndex = scrollY,
+                    label = label
+                )
+            )
+        }
+    }
+
+    fun deleteBookmark(bookmark: DocumentBookmark) {
+        viewModelScope.launch(Dispatchers.IO) {
+            bookmarkDao.deleteBookmark(bookmark)
+        }
+    }
+
     fun loadDocument(encodedUri: String, docType: String, password: String? = null) {
         currentEncodedUri = encodedUri
         _currentUriFlow.value = encodedUri
@@ -172,19 +200,28 @@ class OfficeReaderViewModel @Inject constructor(
             _uiState.value = OfficeReaderUiState.Loading()
             withContext(Dispatchers.IO) {
                 try {
-                    val uriStr = safeDecode(encodedUri)
+                    val decodedUri = safeDecode(encodedUri)
+                    val docTypeClean = safeDecode(docType)
+                    val uriStr = decodedUri
+
+                    // Load bookmarks for this document
+                    viewModelScope.launch(Dispatchers.IO) {
+                        bookmarkDao.getBookmarksForDocument(decodedUri).collect { bks ->
+                            _bookmarks.value = bks
+                        }
+                    }
+
                     val uri = Uri.parse(uriStr)
 
-                    // Enforce 50 MB file size limit
-                    val fileSize = getFileSize(uri)
-                    if (fileSize > 50L * 1024 * 1024) {
-                        withContext(Dispatchers.Main) {
-                            _uiState.value = OfficeReaderUiState.Error(
-                                "File exceeds the 50 MB limit for Office documents."
-                            )
+                    val fileSize = try {
+                        if (uri.scheme == "file") java.io.File(uri.path ?: "").length()
+                        else {
+                            context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+                                val idx = c.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                                if (c.moveToFirst() && idx >= 0) c.getLong(idx) else 0L
+                            } ?: 0L
                         }
-                        return@withContext
-                    }
+                    } catch (_: Exception) { 0L }
 
                     val inputStream = openStream(uri)
                         ?: throw IllegalStateException("Cannot open file")
@@ -323,28 +360,39 @@ class OfficeReaderViewModel @Inject constructor(
         }
     }
 
+    private var searchJob: kotlinx.coroutines.Job? = null
+
     fun setSearchQuery(query: String) {
+        searchJob?.cancel()
         val current = _uiState.value
         if (current is OfficeReaderUiState.XlsxReady) {
             if (query.isEmpty()) {
                 _uiState.value = current.copy(searchQuery = query, searchMatches = emptyList(), currentMatchIndex = 0)
                 return
             }
-            val matches = mutableListOf<Pair<Int, Int>>()
-            val rows = current.sheetsRows.getOrNull(current.currentSheet) ?: emptyList()
-            for ((rIdx, row) in rows.withIndex()) {
-                for ((cIdx, cell) in row.cells.withIndex()) {
-                    if (cell.text.contains(query, ignoreCase = true) && !cell.isHidden) {
-                        matches.add(Pair(rIdx, cIdx))
+            searchJob = viewModelScope.launch(Dispatchers.Default) {
+                val matches = mutableListOf<Pair<Int, Int>>()
+                val rows = current.sheetsRows.getOrNull(current.currentSheet) ?: emptyList()
+                for ((rIdx, row) in rows.withIndex()) {
+                    kotlinx.coroutines.yield()
+                    for ((cIdx, cell) in row.cells.withIndex()) {
+                        if (cell.text.contains(query, ignoreCase = true) && !cell.isHidden) {
+                            matches.add(Pair(rIdx, cIdx))
+                        }
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    val latest = _uiState.value
+                    if (latest is OfficeReaderUiState.XlsxReady) {
+                        _uiState.value = latest.copy(
+                            searchQuery = query,
+                            searchMatches = matches,
+                            currentMatchIndex = 0,
+                            selectedCell = matches.firstOrNull()
+                        )
                     }
                 }
             }
-            _uiState.value = current.copy(
-                searchQuery = query,
-                searchMatches = matches,
-                currentMatchIndex = 0,
-                selectedCell = matches.firstOrNull()
-            )
         }
     }
 
@@ -533,6 +581,7 @@ class OfficeReaderViewModel @Inject constructor(
             val author = try { doc.properties.coreProperties.creator } catch (_: Exception) { null }
             val creationDate = try { doc.properties.coreProperties.created?.toString() } catch (_: Exception) { null }
             var totalWords = 0
+            var totalChars = 0
 
             val headers = try { doc.headerList } catch (_: Exception) { emptyList() }
             if (headers.isNotEmpty()) {
@@ -560,14 +609,18 @@ class OfficeReaderViewModel @Inject constructor(
                 when (element.elementType) {
                     org.apache.poi.xwpf.usermodel.BodyElementType.PARAGRAPH -> {
                         val para = element as org.apache.poi.xwpf.usermodel.XWPFParagraph
-                        totalWords += (para.text ?: "").split(Regex("\\s+")).count { it.isNotBlank() }
+                        val txt = para.text ?: ""
+                        totalWords += txt.split(Regex("\\s+")).count { it.isNotBlank() }
+                        totalChars += txt.length
                         appendParagraphHtml(para, doc, sb, headings)
                     }
                     org.apache.poi.xwpf.usermodel.BodyElementType.TABLE -> {
                         val table = element as org.apache.poi.xwpf.usermodel.XWPFTable
                         for (row in table.rows) {
                             for (cell in row.tableCells) {
-                                totalWords += (cell.text ?: "").split(Regex("\\s+")).count { it.isNotBlank() }
+                                val txt = cell.text ?: ""
+                                totalWords += txt.split(Regex("\\s+")).count { it.isNotBlank() }
+                                totalChars += txt.length
                             }
                         }
                         appendTableHtml(table, sb)
@@ -623,7 +676,9 @@ class OfficeReaderViewModel @Inject constructor(
                 headings = headings,
                 author = author,
                 creationDate = creationDate,
-                wordCount = totalWords
+                wordCount = totalWords,
+                characterCount = totalChars,
+                readingTimeMinutes = Math.max(1, Math.ceil(totalWords / 200.0).toInt())
             )
             }
         } finally {

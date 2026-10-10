@@ -8,13 +8,13 @@ plugins {
 
 android {
     namespace = "com.nexus.feature.reader.office"
-    compileSdk = 35
+    compileSdk = 37
     defaultConfig { minSdk = 26; consumerProguardFiles("consumer-rules.pro") }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+
     buildFeatures { compose = true }
     // POI bundles many resources that Android doesn't need — exclude them to avoid conflicts
     packaging {

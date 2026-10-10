@@ -1,5 +1,7 @@
 package com.nexus.feature.dashboard
 
+import com.nexus.core.theme.DocumentAccentColors
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
@@ -50,10 +52,11 @@ fun FileOptionsDialog(
     // Determine format icon and accent based on file extension
     val lowerName = fileName.lowercase()
     val (formatIconRes, formatColor, formatLabel) = when {
-        lowerName.endsWith(".pdf") -> Triple(R.drawable.ic_file_pdf_new, Color(0xFFEF4444), "PDF Document")
-        lowerName.endsWith(".docx") || lowerName.endsWith(".doc") -> Triple(R.drawable.ic_file_word_new, Color(0xFF2563EB), "Word Document")
-        lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls") -> Triple(R.drawable.ic_file_sheet_new, Color(0xFF10B981), "Excel Spreadsheet")
-        lowerName.endsWith(".txt") -> Triple(R.drawable.ic_file_txt_new, Color(0xFF8B5CF6), "Text Document")
+        lowerName.endsWith(".pdf") -> Triple(R.drawable.ic_file_pdf_new, DocumentAccentColors.PDF, "PDF Document")
+        lowerName.endsWith(".docx") || lowerName.endsWith(".doc") -> Triple(R.drawable.ic_file_word_new, DocumentAccentColors.DOCX, "Word Document")
+        lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls") -> Triple(R.drawable.ic_file_sheet_new, DocumentAccentColors.XLSX, "Excel Spreadsheet")
+        lowerName.endsWith(".pptx") || lowerName.endsWith(".ppt") -> Triple(com.nexus.core.R.drawable.ic_file_ppt_new, DocumentAccentColors.PPTX, "PowerPoint Presentation")
+        lowerName.endsWith(".txt") -> Triple(R.drawable.ic_file_txt_new, DocumentAccentColors.TXT, "Text Document")
         else -> Triple(R.drawable.ic_file_gen_new, NexusTheme.colors.primary, "Document")
     }
 
@@ -70,7 +73,7 @@ fun FileOptionsDialog(
         dragHandle = {
             Box(
                 modifier = Modifier
-                    .padding(top = 10.dp, bottom = 14.dp)
+                    .padding(top = NexusTheme.spacing.xs, bottom = NexusTheme.spacing.sm)
                     .width(36.dp)
                     .height(4.dp)
                     .clip(CircleShape)
@@ -82,24 +85,24 @@ fun FileOptionsDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp)
+                .padding(horizontal = NexusTheme.spacing.md)
+                .padding(bottom = NexusTheme.spacing.lg)
         ) {
             // ── Header: File Icon, Name, Meta (Type & Size), Favorite Button ──
             Row(
                 modifier = Modifier
                     .fadeSlideIn(delay = 50)
                     .fillMaxWidth()
-                    .padding(horizontal = 2.dp, vertical = 4.dp),
+                    .padding(horizontal = 2.dp, vertical = NexusTheme.spacing.xxs),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // File Icon Container (46dp x 46dp, rounded 12dp)
                 Box(
                     modifier = Modifier
                         .size(46.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(NexusTheme.shapes.medium)
                         .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.8f))
-                        .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                        .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.5f), NexusTheme.shapes.medium),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
@@ -114,7 +117,7 @@ fun FileOptionsDialog(
                 // File Name & Meta
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                    verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xxs)
                 ) {
                     NexusText(
                         text = fileName,
@@ -130,7 +133,7 @@ fun FileOptionsDialog(
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
                     ) {
                         NexusText(
                             text = formatLabel,
@@ -176,12 +179,12 @@ fun FileOptionsDialog(
                         .scale(starScale)
                         .clip(CircleShape)
                         .background(
-                            if (isStarred) Color(0xFFFFB300).copy(alpha = 0.16f)
+                            if (isStarred) NexusTheme.colors.warning.copy(alpha = 0.16f)
                             else NexusTheme.colors.surfaceVariant.copy(alpha = 0.7f)
                         )
                         .border(
                             width = 1.dp,
-                            color = if (isStarred) Color(0xFFFFB300).copy(alpha = 0.7f)
+                            color = if (isStarred) NexusTheme.colors.warning.copy(alpha = 0.7f)
                             else NexusTheme.colors.divider.copy(alpha = 0.6f),
                             shape = CircleShape
                         )
@@ -195,7 +198,7 @@ fun FileOptionsDialog(
                         contentDescription = "Toggle Star",
                         modifier = Modifier.size(17.dp),
                         colorFilter = ColorFilter.tint(
-                            if (isStarred) Color(0xFFFFB300) else NexusTheme.colors.textSecondary
+                            if (isStarred) NexusTheme.colors.warning else NexusTheme.colors.textSecondary
                         )
                     )
                 }
@@ -203,7 +206,7 @@ fun FileOptionsDialog(
 
             // Divider
             HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 2.dp, vertical = 14.dp),
+                modifier = Modifier.padding(horizontal = 2.dp, vertical = NexusTheme.spacing.sm),
                 color = NexusTheme.colors.divider.copy(alpha = 0.45f),
                 thickness = 0.8.dp
             )
@@ -216,14 +219,14 @@ fun FileOptionsDialog(
                     fontWeight = FontWeight.SemiBold
                 ),
                 color = NexusTheme.colors.textSecondary,
-                modifier = Modifier.padding(start = 2.dp, bottom = 10.dp)
+                modifier = Modifier.padding(start = 2.dp, bottom = NexusTheme.spacing.xs)
             )
 
             Row(
                 modifier = Modifier
                     .fadeSlideIn(delay = 100)
                     .fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
             ) {
                 // Share
                 QuickActionItem(
@@ -262,7 +265,7 @@ fun FileOptionsDialog(
                 QuickActionItem(
                     iconRes = if (isStarred) R.drawable.ic_star_filled else R.drawable.ic_star,
                     label = if (isStarred) "Starred" else "Star",
-                    iconTint = if (isStarred) Color(0xFFFFB300) else NexusTheme.colors.textPrimary,
+                    iconTint = if (isStarred) NexusTheme.colors.warning else NexusTheme.colors.textPrimary,
                     modifier = Modifier.weight(1f),
                     onClick = {
                         onToggleStarred()
@@ -280,7 +283,7 @@ fun FileOptionsDialog(
                     fontWeight = FontWeight.SemiBold
                 ),
                 color = NexusTheme.colors.textSecondary,
-                modifier = Modifier.padding(start = 2.dp, bottom = 10.dp)
+                modifier = Modifier.padding(start = 2.dp, bottom = NexusTheme.spacing.xs)
             )
 
             // Management List Card
@@ -288,9 +291,9 @@ fun FileOptionsDialog(
                 modifier = Modifier
                     .fadeSlideIn(delay = 150)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(NexusTheme.shapes.medium)
                     .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f))
-                    .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+                    .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.5f), NexusTheme.shapes.medium)
             ) {
                 Row(
                     modifier = Modifier
@@ -299,13 +302,13 @@ fun FileOptionsDialog(
                             onDismissRequest()
                             onShowDetails()
                         }
-                        .padding(horizontal = 16.dp, vertical = 13.dp),
+                        .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.sm),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
                             .size(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(NexusTheme.shapes.small)
                             .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.9f)),
                         contentAlignment = Alignment.Center
                     ) {
@@ -333,9 +336,7 @@ fun FileOptionsDialog(
                         )
                         NexusText(
                             text = "Size, location, and metadata",
-                            style = NexusTheme.typography.caption.copy(
-                                fontSize = 12.sp
-                            ),
+                            style = NexusTheme.typography.caption,
                             color = NexusTheme.colors.textSecondary
                         )
                     }
@@ -351,31 +352,31 @@ fun FileOptionsDialog(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ── Section 3: Destructive Action (Remove from recents) ───────────
+            // ── Section 3: Destructive Action (Move to Recycle Bin) ───────────
             Row(
                 modifier = Modifier
                     .fadeSlideIn(delay = 200)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(NexusTheme.shapes.medium)
                     .background(NexusTheme.colors.error.copy(alpha = 0.08f))
-                    .border(1.dp, NexusTheme.colors.error.copy(alpha = 0.22f), RoundedCornerShape(14.dp))
+                    .border(1.dp, NexusTheme.colors.error.copy(alpha = 0.22f), NexusTheme.shapes.medium)
                     .springBounceClick {
                         onDismissRequest()
                         onRemove()
                     }
-                    .padding(horizontal = 16.dp, vertical = 13.dp),
+                    .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.sm),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
                         .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(NexusTheme.shapes.small)
                         .background(NexusTheme.colors.error.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.ic_delete),
-                        contentDescription = "Remove from recents",
+                        contentDescription = "Move to Recycle Bin",
                         modifier = Modifier.size(17.dp),
                         colorFilter = ColorFilter.tint(NexusTheme.colors.error)
                     )
@@ -388,7 +389,7 @@ fun FileOptionsDialog(
                     verticalArrangement = Arrangement.spacedBy(1.dp)
                 ) {
                     NexusText(
-                        text = "Remove from recents",
+                        text = "Move to Recycle Bin",
                         style = NexusTheme.typography.body.copy(
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 14.sp
@@ -396,10 +397,8 @@ fun FileOptionsDialog(
                         color = NexusTheme.colors.error
                     )
                     NexusText(
-                        text = "Clears this document from recent history",
-                        style = NexusTheme.typography.caption.copy(
-                            fontSize = 12.sp
-                        ),
+                        text = "Files can be restored within retention period",
+                        style = NexusTheme.typography.caption,
                         color = NexusTheme.colors.textSecondary
                     )
                 }
@@ -425,17 +424,17 @@ private fun QuickActionItem(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs),
         modifier = modifier
             .springBounceClick { onClick() }
-            .padding(vertical = 4.dp)
+            .padding(vertical = NexusTheme.spacing.xxs)
     ) {
         Box(
             modifier = Modifier
                 .size(52.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .clip(NexusTheme.shapes.medium)
                 .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.65f))
-                .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.5f), RoundedCornerShape(14.dp)),
+                .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.5f), NexusTheme.shapes.medium),
             contentAlignment = Alignment.Center
         ) {
             Image(

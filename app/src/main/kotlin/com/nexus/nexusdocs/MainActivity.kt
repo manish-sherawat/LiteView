@@ -49,15 +49,14 @@ import com.nexus.core.ui.components.NexusNavItem
 import com.nexus.core.ui.components.rememberFloatingTabBarScrollConnection
 import com.nexus.core.ui.utils.LocalAppBackdrop
 import com.nexus.core.ui.utils.LocalGlassEffectConfig
-import com.nexus.core.ui.utils.layerBackdrop
 import com.nexus.core.ui.utils.readerNavGlassConfig
-import com.nexus.core.ui.utils.rememberLayerBackdrop
 import com.nexus.nexusdocs.navigation.DocumentReaderRouterImpl
 import com.nexus.nexusdocs.navigation.NexusNavHost
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import com.nexus.core.R
-
+import dev.chrisbanes.haze.haze
+import com.nexus.core.ui.utils.LocalHazeState
 // ─── Main Activity ────────────────────────────────────────────────────────────
 // @AndroidEntryPoint enables Hilt injection in this Activity.
 // SingleTask launch mode ensures only one instance exists — important for
@@ -124,7 +123,6 @@ class MainActivity : ComponentActivity() {
                                 android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
                             )
                         } catch (e: Exception) {}
-                        dashboardViewModel.onDocumentOpened(uri, mimeType = null)
                         router.openDocument(uri = uri, mimeType = null)
                     }
                 }
@@ -139,7 +137,7 @@ class MainActivity : ComponentActivity() {
 
                 val dashboardUiState by dashboardViewModel.uiState.collectAsStateWithLifecycle()
                 val isSelectionMode = dashboardUiState.isSelectionMode
-                var isChangelogVisible by remember { mutableStateOf(false) }
+
 
                 val isStorageGranted = remember(currentRoute) { dashboardViewModel.hasStoragePermission(this@MainActivity) }
                 val isPermissionScreenShowing = !isStorageGranted && !dashboardUiState.permissionRationaleShown
@@ -157,10 +155,9 @@ class MainActivity : ComponentActivity() {
                     onCollapseChanged = { isNavCollapsed = it }
                 )
 
-                // Bottom nav is shown on Dashboard and Settings screens when not in selection mode, changelog, or permission request screen
+                // Bottom nav is shown on Dashboard and Settings screens when not in selection mode or permission request screen
                 val showBottomNav = (currentRoute == NexusRoute.Dashboard.route || currentRoute == NexusRoute.Settings.route)
                         && !isSelectionMode
-                        && !isChangelogVisible
                         && !isPermissionScreenShowing
 
                 val navItems = listOf(
@@ -178,11 +175,12 @@ class MainActivity : ComponentActivity() {
                     )
                 )
 
-                val backdrop = rememberLayerBackdrop()
+                val hazeState = remember { dev.chrisbanes.haze.HazeState() }
 
                 CompositionLocalProvider(
                     LocalGlassEffectConfig provides readerNavGlassConfig,
-                    LocalAppBackdrop provides backdrop,
+                    LocalAppBackdrop provides null,
+                    LocalHazeState provides hazeState,
                 ) {
                     // ── Root Box: content fills full size, nav pill is a Z-ordered overlay ──
                     // The Scaffold bottomBar approach added innerPadding that pushed content
@@ -202,7 +200,7 @@ class MainActivity : ComponentActivity() {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .layerBackdrop(backdrop)
+                                .haze(hazeState)
                         ) {
                             NexusNavHost(
                                 navController = navController,
@@ -213,7 +211,6 @@ class MainActivity : ComponentActivity() {
                                         preferencesRepository.completeFirstLaunch()
                                     }
                                 },
-                                onChangelogVisibilityChanged = { isChangelogVisible = it },
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -223,29 +220,29 @@ class MainActivity : ComponentActivity() {
                             visible = showBottomNav,
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                            .zIndex(1f),
-                        enter = androidx.compose.animation.slideInVertically(
-                            initialOffsetY = { it },
-                            animationSpec  = navPillSpring()
-                        ) + androidx.compose.animation.fadeIn(
-                            animationSpec = androidx.compose.animation.core.tween(
-                                durationMillis = DurationScreenEnter,
-                                easing         = EmphasizedDecelerateEasing
+                                .zIndex(1f),
+                            enter = androidx.compose.animation.slideInVertically(
+                                initialOffsetY = { it },
+                                animationSpec  = navPillSpring()
+                            ) + androidx.compose.animation.fadeIn(
+                                animationSpec = androidx.compose.animation.core.tween(
+                                    durationMillis = 220,
+                                    easing         = EmphasizedDecelerateEasing
+                                )
+                            ),
+                            exit = androidx.compose.animation.slideOutVertically(
+                                targetOffsetY = { it },
+                                animationSpec = androidx.compose.animation.core.tween(
+                                    durationMillis = 200,
+                                    easing         = EmphasizedAccelerateEasing
+                                )
+                            ) + androidx.compose.animation.fadeOut(
+                                animationSpec = androidx.compose.animation.core.tween(
+                                    durationMillis = 180,
+                                    easing         = EmphasizedAccelerateEasing
+                                )
                             )
-                        ),
-                        exit = androidx.compose.animation.slideOutVertically(
-                            targetOffsetY = { it },
-                            animationSpec = androidx.compose.animation.core.tween(
-                                durationMillis = DurationQuickRelease,
-                                easing         = EmphasizedAccelerateEasing
-                            )
-                        ) + androidx.compose.animation.fadeOut(
-                            animationSpec = androidx.compose.animation.core.tween(
-                                durationMillis = DurationFadeIn,
-                                easing         = EmphasizedAccelerateEasing
-                            )
-                        )
-                    ) {
+                        ) {
                         NexusFloatingBottomNav(
                             items = navItems,
                             currentRoute = currentRoute,

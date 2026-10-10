@@ -1,6 +1,7 @@
 package com.nexus.core.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -45,13 +46,13 @@ fun NexusTextField(
                 modifier = Modifier
                     .clip(NexusTheme.shapes.pill)
                     .background(NexusTheme.colors.surfaceVariant)
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                    .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.sm),
                 contentAlignment = Alignment.CenterStart
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (leadingIcon != null) {
                         leadingIcon()
-                        Box(modifier = Modifier.padding(end = 12.dp))
+                        Box(modifier = Modifier.padding(end = NexusTheme.spacing.sm))
                     }
                     Box(modifier = Modifier.weight(1f)) {
                         if (value.isEmpty()) {
@@ -64,7 +65,63 @@ fun NexusTextField(
                         innerTextField()
                     }
                     if (trailingIcon != null) {
-                        Box(modifier = Modifier.padding(start = 12.dp))
+                        Box(modifier = Modifier.padding(start = NexusTheme.spacing.sm))
+                        trailingIcon()
+                    }
+                }
+            }
+        }
+    )
+}
+
+@Composable
+fun NexusOutlinedTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String = "",
+    leadingIcon: (@Composable () -> Unit)? = null,
+    trailingIcon: (@Composable () -> Unit)? = null,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    singleLine: Boolean = true
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier.fillMaxWidth(),
+        textStyle = NexusTheme.typography.body.copy(color = NexusTheme.colors.textPrimary),
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
+        visualTransformation = visualTransformation,
+        singleLine = singleLine,
+        cursorBrush = SolidColor(NexusTheme.colors.primary),
+        decorationBox = { innerTextField ->
+            Box(
+                modifier = Modifier
+                    .border(1.dp, NexusTheme.colors.divider, NexusTheme.shapes.pill)
+                    .clip(NexusTheme.shapes.pill)
+                    .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.sm),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (leadingIcon != null) {
+                        leadingIcon()
+                        Box(modifier = Modifier.padding(end = NexusTheme.spacing.sm))
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        if (value.isEmpty()) {
+                            NexusText(
+                                text = placeholder,
+                                color = NexusTheme.colors.textSecondary,
+                                style = NexusTheme.typography.body
+                            )
+                        }
+                        innerTextField()
+                    }
+                    if (trailingIcon != null) {
+                        Box(modifier = Modifier.padding(start = NexusTheme.spacing.sm))
                         trailingIcon()
                     }
                 }

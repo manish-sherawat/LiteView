@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.nexus.core"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 26
@@ -28,9 +28,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+
 
     buildFeatures {
         compose = true
@@ -54,10 +52,15 @@ dependencies {
     implementation(libs.compose.animation)
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
+
+    api(libs.compose.material.icons.extended)
     debugImplementation(libs.compose.ui.tooling)
 
     // Navigation
     implementation(libs.navigation.compose)
+
+    // Haze (Glassmorphism)
+    api(libs.haze)
 
     // Lottie Animations
     implementation(libs.lottie.compose)
@@ -72,6 +75,14 @@ dependencies {
 
     // DataStore
     implementation(libs.androidx.datastore.preferences)
+
+    // Document Processing
+    api(libs.apache.poi)
+    api(libs.apache.poi.ooxml)
+    api(libs.apache.poi.scratchpad)
+    
+    // PDFBox Android
+    api(libs.pdfbox.android)
 
     // Testing
     testImplementation(libs.junit)

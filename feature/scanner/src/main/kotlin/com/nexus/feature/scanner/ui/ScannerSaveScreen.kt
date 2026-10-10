@@ -63,7 +63,7 @@ fun ScannerSaveScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(NexusTheme.spacing.md),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // PDF Thumbnail (Using first page)
@@ -71,15 +71,15 @@ fun ScannerSaveScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(16.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .padding(NexusTheme.spacing.md)
+                    .clip(NexusTheme.shapes.medium)
                     .background(NexusTheme.colors.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
                     bitmap = scannedPages.first().croppedBitmap.asImageBitmap(),
                     contentDescription = "PDF Thumbnail",
-                    modifier = Modifier.fillMaxSize().padding(8.dp),
+                    modifier = Modifier.fillMaxSize().padding(NexusTheme.spacing.xs),
                     contentScale = ContentScale.Fit
                 )
             }
@@ -91,15 +91,15 @@ fun ScannerSaveScreen(
                 text = "File Name",
                 style = NexusTheme.typography.label,
                 color = NexusTheme.colors.textSecondary,
-                modifier = Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 4.dp)
+                modifier = Modifier.fillMaxWidth().padding(start = NexusTheme.spacing.xxs, bottom = NexusTheme.spacing.xxs)
             )
             BasicTextField(
                 value = fileName,
                 onValueChange = { viewModel.updatePdfFileName(it) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(NexusTheme.colors.surface, RoundedCornerShape(8.dp))
-                    .padding(16.dp),
+                    .background(NexusTheme.colors.surface, NexusTheme.shapes.small)
+                    .padding(NexusTheme.spacing.md),
                 textStyle = NexusTheme.typography.body.copy(color = NexusTheme.colors.textPrimary),
                 singleLine = true
             )
@@ -110,9 +110,9 @@ fun ScannerSaveScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(NexusTheme.shapes.small)
                     .background(NexusTheme.colors.surface)
-                    .padding(16.dp),
+                    .padding(NexusTheme.spacing.md),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {

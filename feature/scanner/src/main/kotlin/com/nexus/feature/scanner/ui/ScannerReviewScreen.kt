@@ -52,9 +52,9 @@ fun ScannerReviewScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(0.8f)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(NexusTheme.shapes.medium)
                     .background(NexusTheme.colors.surface)
-                    .padding(24.dp)
+                    .padding(NexusTheme.spacing.lg)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     NexusText(text = "Extracted Text", style = NexusTheme.typography.title)
@@ -90,7 +90,7 @@ fun ScannerReviewScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(NexusTheme.spacing.md),
             contentAlignment = Alignment.Center
         ) {
             Image(
@@ -105,7 +105,7 @@ fun ScannerReviewScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.xs),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             ActionIcon(R.drawable.ic_delete, "Delete") {
@@ -133,14 +133,14 @@ fun ScannerReviewScreen(
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.xs),
+                horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
             ) {
                 itemsIndexed(scannedPages) { index, page ->
                     Box(
                         modifier = Modifier
                             .size(60.dp, 80.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(NexusTheme.shapes.small)
                         .background(if (index == selectedPageIndex) NexusTheme.colors.primary else Color.Gray)
                         .springBounceClick { selectedPageIndex = index }
                         .padding(2.dp)
@@ -148,7 +148,7 @@ fun ScannerReviewScreen(
                         Image(
                             bitmap = page.croppedBitmap.asImageBitmap(), 
                             contentDescription = "Page $index",
-                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp)),
+                            modifier = Modifier.fillMaxSize().clip(NexusTheme.shapes.small),
                             contentScale = ContentScale.Crop
                         )
                     }
@@ -163,7 +163,7 @@ fun ScannerReviewScreen(
 @Composable
 private fun ActionIcon(iconRes: Int, label: String, onClick: () -> Unit) {
     Column(
-        modifier = Modifier.springBounceClick { onClick() }.padding(8.dp),
+        modifier = Modifier.springBounceClick { onClick() }.padding(NexusTheme.spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Image(

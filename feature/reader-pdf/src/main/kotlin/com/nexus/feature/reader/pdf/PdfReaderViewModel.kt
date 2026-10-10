@@ -80,7 +80,7 @@ class PdfReaderViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<PdfReaderUiState>(PdfReaderUiState.Loading)
     val uiState: StateFlow<PdfReaderUiState> = _uiState.asStateFlow()
 
-    private val maxCacheSize = 40
+    private val maxCacheSize = 5
     private val renderedPagesCache = linkedMapOf<Int, Bitmap>()
 
     private val _renderedPages = MutableStateFlow<Map<Int, Bitmap>>(emptyMap())
@@ -248,12 +248,7 @@ class PdfReaderViewModel @Inject constructor(
                         } catch (_: Exception) {}
                     }
                     
-                    if (fileSize > 100L * 1024 * 1024) {
-                        withContext(Dispatchers.Main) {
-                            _uiState.value = PdfReaderUiState.Error("File exceeds the 100MB limit for PDF documents. Opening it might cause the app to run out of memory.")
-                        }
-                        return@withContext
-                    }
+
                     
                     var filePathToOpen: String? = null
                     if (uri.scheme == "file") {
@@ -323,7 +318,7 @@ class PdfReaderViewModel @Inject constructor(
                         val out = doc.loadOutline()
                         _outline.value = extractOutline(out)
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        android.util.Log.e("PdfReaderViewModel", "Failed to load outline", e)
                     }
 
                     try {
@@ -376,13 +371,15 @@ class PdfReaderViewModel @Inject constructor(
                 val doc = mupdfDocument
                 
                 pdfTextByPage.forEachIndexed { index, text ->
+                    if (!isActive) return@launch
                     kotlinx.coroutines.yield()
                     if (text.contains(query, ignoreCase = true)) {
                         matches.add(index)
                         
-                        if (doc != null) {
+                        if (doc != null && doc == mupdfDocument) {
                             try {
                                 renderMutex.withLock {
+                                    if (!isActive) return@launch
                                     val page = doc.loadPage(index)
                                     val rect = page.bounds
                                     val width = rect.x1 - rect.x0
@@ -405,7 +402,7 @@ class PdfReaderViewModel @Inject constructor(
                                     page.destroy()
                                 }
                             } catch (e: Exception) {
-                                e.printStackTrace()
+                                android.util.Log.e("PdfReaderViewModel", "Failed to extract search highlights", e)
                             }
                         }
                     }
@@ -712,7 +709,7 @@ class PdfReaderViewModel @Inject constructor(
                     onResult(true)
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("PdfReaderViewModel", "Failed to extract annotation bounds", e)
                 withContext(Dispatchers.Main) {
                     onResult(false)
                 }
@@ -736,8 +733,12 @@ class PdfReaderViewModel @Inject constructor(
                 if (filePath != null) {
                     val targetFile = java.io.File(filePath)
                     if (targetFile.exists() && targetFile.canWrite()) {
-                        saveAnnotatedPdfInPlace(targetFile, drawnStrokesMap)
-                        success = true
+                        try {
+                            saveAnnotatedPdfInPlace(targetFile, drawnStrokesMap)
+                            success = true
+                        } catch (e: Exception) {
+                            success = false
+                        }
                     }
                 }
 
@@ -762,7 +763,7 @@ class PdfReaderViewModel @Inject constructor(
                     onResult(true)
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("PdfReaderViewModel", "Failed to save annotations", e)
                 withContext(Dispatchers.Main) {
                     onResult(false)
                 }

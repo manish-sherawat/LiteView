@@ -106,7 +106,7 @@ class TextReaderViewModel @Inject constructor(
     }
 
     companion object {
-        private const val MAX_LINES = 25_000
+        private const val MAX_LINES = 500_000
         private const val MIN_FONT_SIZE = 10f
         private const val MAX_FONT_SIZE = 28f
         private const val FONT_STEP = 2f
@@ -244,8 +244,8 @@ class TextReaderViewModel @Inject constructor(
                         totalLines++
                         if (totalLines <= MAX_LINES) {
                             // Truncate excessively long lines to prevent Compose layout engine from hanging
-                            val safeLine = if ((line?.length ?: 0) > 5000) {
-                                line?.substring(0, 5000) + "… [Line Truncated]"
+                            val safeLine = if ((line?.length ?: 0) > 20000) {
+                                line?.substring(0, 20000) + "… [Line Truncated]"
                             } else {
                                 line ?: ""
                             }
@@ -467,6 +467,65 @@ class TextReaderViewModel @Inject constructor(
                     android.widget.Toast.makeText(context, "Failed to share: ${e.localizedMessage}", android.widget.Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+    }
+
+    fun printText(context: android.content.Context, displayName: String) {
+        try {
+            val printManager = context.getSystemService(Context.PRINT_SERVICE) as? android.print.PrintManager ?: return
+            
+            val printAdapter = object : android.print.PrintDocumentAdapter() {
+                override fun onLayout(
+                    oldAttributes: android.print.PrintAttributes?,
+                    newAttributes: android.print.PrintAttributes,
+                    cancellationSignal: android.os.CancellationSignal?,
+                    callback: LayoutResultCallback,
+                    extras: android.os.Bundle?
+                ) {
+                    if (cancellationSignal?.isCanceled == true) {
+                        callback.onLayoutCancelled()
+                        return
+                    }
+                    val info = android.print.PrintDocumentInfo.Builder(displayName)
+                        .setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
+                        .setPageCount(android.print.PrintDocumentInfo.PAGE_COUNT_UNKNOWN)
+                        .build()
+                    callback.onLayoutFinished(info, true)
+                }
+
+                override fun onWrite(
+                    pages: Array<out android.print.PageRange>?,
+                    destination: android.os.ParcelFileDescriptor,
+                    cancellationSignal: android.os.CancellationSignal?,
+                    callback: WriteResultCallback?
+                ) {
+                    var inStream: java.io.InputStream? = null
+                    var outStream: java.io.FileOutputStream? = null
+                    try {
+                        val uriStr = currentEncodedUri ?: return
+                        val uri = Uri.parse(safeDecode(uriStr))
+                        inStream = if (uri.scheme == "file") {
+                            java.io.FileInputStream(java.io.File(uri.path ?: ""))
+                        } else {
+                            context.contentResolver.openInputStream(uri)
+                        }
+                        outStream = java.io.FileOutputStream(destination.fileDescriptor)
+                        
+                        inStream?.copyTo(outStream)
+                        
+                        callback?.onWriteFinished(arrayOf(android.print.PageRange.ALL_PAGES))
+                    } catch (e: Exception) {
+                        callback?.onWriteFailed(e.message)
+                    } finally {
+                        inStream?.close()
+                        outStream?.close()
+                    }
+                }
+            }
+            
+            printManager.print(displayName, printAdapter, null)
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(context, "Print failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 }

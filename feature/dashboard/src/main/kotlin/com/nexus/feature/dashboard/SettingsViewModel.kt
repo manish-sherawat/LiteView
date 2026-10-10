@@ -17,10 +17,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import com.nexus.core.updater.AppUpdater
-import com.nexus.core.updater.UpdateState
 import com.nexus.feature.dashboard.data.RecentDocumentRepository
 import com.nexus.feature.dashboard.data.TagDefinition
+import com.nexus.feature.dashboard.data.TrashRepository
 
 // ─── Settings UI State ────────────────────────────────────────────────────────
 
@@ -34,7 +33,9 @@ data class SettingsUiState(
     val rememberReadingPosition: Boolean = true,
     val defaultIsGridView: Boolean = false,
     val hapticFeedbackEnabled: Boolean = true,
-    val isManualUpdateCheck: Boolean = false
+    val trashedCount: Int = 0,
+    val trashedSizeText: String = "Empty",
+    val trashRetentionDays: Int = 30
 )
 
 // ─── Settings ViewModel ───────────────────────────────────────────────────────
@@ -44,13 +45,12 @@ class SettingsViewModel @Inject constructor(
     private val prefsRepository: UserPreferencesRepository,
     private val recentDocumentDao: com.nexus.feature.dashboard.data.RecentDocumentDao,
     private val repository: RecentDocumentRepository,
-    private val appUpdater: AppUpdater,
+    private val trashRepository: TrashRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _cacheClearResult = MutableStateFlow<String?>(null)
     private val _cacheSizeText = MutableStateFlow("Calculating...")
-    private val _isManualUpdateCheck = MutableStateFlow(false)
     
     private val _uiEvents = kotlinx.coroutines.flow.MutableSharedFlow<String>()
     val uiEvents = _uiEvents.asSharedFlow()
@@ -75,12 +75,23 @@ class SettingsViewModel @Inject constructor(
         combine(
             _cacheSizeText,
             _cacheClearResult,
-            _isManualUpdateCheck,
+            { a, b -> Pair(a, b) }
+        ),
+        combine(
+            trashRepository.observeTrashedCount(),
+            trashRepository.observeTotalTrashedSize(),
+            prefsRepository.trashRetentionDays,
             ::Triple
         )
     ) { (themeMode, defaultFontSize, keepScreenAwake),
         (rememberReadingPosition, defaultIsGridView, hapticFeedbackEnabled),
-        (cacheSizeText, cacheClearResult, isManualUpdateCheck) ->
+        (cacheSizeText, cacheClearResult),
+        (trashedCount, trashedSize, retentionDays) ->
+        val trashSummary = if (trashedCount == 0) {
+            "Empty"
+        } else {
+            "$trashedCount item${if (trashedCount > 1) "s" else ""} · ${formatFileSize(trashedSize)}"
+        }
         SettingsUiState(
             themeMode = themeMode,
             defaultFontSize = defaultFontSize,
@@ -91,13 +102,24 @@ class SettingsViewModel @Inject constructor(
             appVersion = getAppVersion(),
             cacheSizeText = cacheSizeText,
             cacheClearMessage = cacheClearResult,
-            isManualUpdateCheck = isManualUpdateCheck
+            trashedCount = trashedCount,
+            trashedSizeText = trashSummary,
+            trashRetentionDays = retentionDays
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = SettingsUiState()
     )
+
+    fun setTrashRetentionDays(days: Int) {
+        viewModelScope.launch {
+            prefsRepository.setTrashRetentionDays(days)
+            trashRepository.purgeExpired(days)
+            val msg = if (days <= 0) "Retention set to Never" else "Auto-purge set to $days days"
+            _uiEvents.emit(msg)
+        }
+    }
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { prefsRepository.setThemeMode(mode) }
@@ -122,24 +144,26 @@ class SettingsViewModel @Inject constructor(
     fun exportReadingHistory(uri: android.net.Uri) {
         viewModelScope.launch {
             try {
-                val docs = recentDocumentDao.observeAll().first()
-                // Convert list to simple JSON string manually or using org.json
-                val jsonArray = org.json.JSONArray()
-                for (doc in docs) {
-                    val jsonObj = org.json.JSONObject()
-                    jsonObj.put("uri", doc.uri)
-                    jsonObj.put("fileName", doc.fileName)
-                    jsonObj.put("mimeType", doc.mimeType)
-                    jsonObj.put("documentType", doc.documentType)
-                    jsonObj.put("fileSizeBytes", doc.fileSizeBytes)
-                    jsonObj.put("lastOpenedAt", doc.lastOpenedAt)
-                    jsonObj.put("lastScrollIndex", doc.lastScrollIndex)
-                    jsonObj.put("lastScrollOffset", doc.lastScrollOffset)
-                    jsonArray.put(jsonObj)
-                }
-                
-                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    outputStream.write(jsonArray.toString(2).toByteArray())
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val docs = recentDocumentDao.observeAll().first()
+                    // Convert list to simple JSON string manually or using org.json
+                    val jsonArray = org.json.JSONArray()
+                    for (doc in docs) {
+                        val jsonObj = org.json.JSONObject()
+                        jsonObj.put("uri", doc.uri)
+                        jsonObj.put("fileName", doc.fileName)
+                        jsonObj.put("mimeType", doc.mimeType)
+                        jsonObj.put("documentType", doc.documentType)
+                        jsonObj.put("fileSizeBytes", doc.fileSizeBytes)
+                        jsonObj.put("lastOpenedAt", doc.lastOpenedAt)
+                        jsonObj.put("lastScrollIndex", doc.lastScrollIndex)
+                        jsonObj.put("lastScrollOffset", doc.lastScrollOffset)
+                        jsonArray.put(jsonObj)
+                    }
+                    
+                    context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                        outputStream.write(jsonArray.toString(2).toByteArray())
+                    }
                 }
                 _uiEvents.emit("Reading history exported successfully")
             } catch (e: Exception) {
@@ -208,48 +232,6 @@ class SettingsViewModel @Inject constructor(
             pInfo.versionName ?: "Unknown"
         } catch (_: Exception) {
             "Unknown"
-        }
-    }
-
-    val updateState: StateFlow<UpdateState> = appUpdater.updateState
-
-    fun checkForUpdates(isManual: Boolean = true) {
-        viewModelScope.launch {
-            _isManualUpdateCheck.value = isManual
-            appUpdater.checkForUpdates(getAppVersion(), showNotification = !isManual)
-        }
-    }
-
-    fun downloadAndInstallUpdate(url: String, version: String) {
-        appUpdater.downloadAndInstallUpdate(url, version)
-    }
-
-    fun resetUpdateState() {
-        _isManualUpdateCheck.value = false
-        appUpdater.resetState()
-    }
-
-    // ─── Dynamic Changelog ────────────────────────────────────────────────────
-    
-    private val _changelogState = MutableStateFlow<ChangelogState>(ChangelogState.Idle)
-    val changelogState: StateFlow<ChangelogState> = _changelogState.asStateFlow()
-
-    fun fetchChangelog() {
-        // If already fetched successfully, don't fetch again
-        if (_changelogState.value is ChangelogState.Success) return
-        
-        _changelogState.value = ChangelogState.Loading
-        viewModelScope.launch {
-            try {
-                val releases = appUpdater.fetchAllReleases()
-                if (releases.isNotEmpty()) {
-                    _changelogState.value = ChangelogState.Success(releases)
-                } else {
-                    _changelogState.value = ChangelogState.Error("No releases found.")
-                }
-            } catch (e: Exception) {
-                _changelogState.value = ChangelogState.Error("Failed to load changelog: ${e.message}")
-            }
         }
     }
 
@@ -322,9 +304,3 @@ class SettingsViewModel @Inject constructor(
     }
 }
 
-sealed class ChangelogState {
-    object Idle : ChangelogState()
-    object Loading : ChangelogState()
-    data class Success(val releases: List<com.nexus.core.updater.GithubRelease>) : ChangelogState()
-    data class Error(val message: String) : ChangelogState()
-}

@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -50,6 +51,7 @@ class UserPreferencesRepository @Inject constructor(
         val WORD_WRAP_ENABLED = booleanPreferencesKey("word_wrap_enabled")
         val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback")
         val IS_FIRST_LAUNCH = booleanPreferencesKey("is_first_launch")
+        val TRASH_RETENTION_DAYS = intPreferencesKey("trash_retention_days")
     }
 
     val homeStyle: Flow<HomeStyle> = context.dataStore.data.map { prefs ->
@@ -70,10 +72,13 @@ class UserPreferencesRepository @Inject constructor(
     /** Reactive stream of the current theme preference. */
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
         when (prefs[Keys.THEME_MODE]) {
-            ThemeMode.SEPIA.name -> ThemeMode.SEPIA
+            ThemeMode.DARK.name   -> ThemeMode.DARK
+            ThemeMode.AMOLED.name -> ThemeMode.AMOLED
+            ThemeMode.SYSTEM.name -> ThemeMode.SYSTEM
+            ThemeMode.SEPIA.name  -> ThemeMode.SEPIA
             ThemeMode.FOREST.name -> ThemeMode.FOREST
             ThemeMode.SUNSET.name -> ThemeMode.SUNSET
-            else -> ThemeMode.LIGHT
+            else                  -> ThemeMode.LIGHT
         }
     }
 
@@ -142,6 +147,10 @@ class UserPreferencesRepository @Inject constructor(
 
     val isFirstLaunch: Flow<Boolean> = context.dataStore.data.map { prefs -> prefs[Keys.IS_FIRST_LAUNCH] ?: true }
     suspend fun completeFirstLaunch() { context.dataStore.edit { prefs -> prefs[Keys.IS_FIRST_LAUNCH] = false } }
+
+    /** Number of days before trashed items are permanently auto-purged (e.g. 30, 15, 7, or -1 for never). Default is 30. */
+    val trashRetentionDays: Flow<Int> = context.dataStore.data.map { prefs -> prefs[Keys.TRASH_RETENTION_DAYS] ?: 30 }
+    suspend fun setTrashRetentionDays(days: Int) { context.dataStore.edit { prefs -> prefs[Keys.TRASH_RETENTION_DAYS] = days } }
 
     suspend fun resetToDefaults() {
         context.dataStore.edit { prefs ->

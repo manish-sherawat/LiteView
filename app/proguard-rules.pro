@@ -90,3 +90,7 @@
 -dontwarn org.osgi.framework.**
 -dontwarn org.w3.x2000.**
 -dontwarn aQute.bnd.annotation.spi.**
+
+# ─── PDFBox Android (Optional JPX / JP2 decoder) ───────────────────────────
+-dontwarn com.gemalto.jp2.**
+-dontwarn com.tom_roush.pdfbox.**

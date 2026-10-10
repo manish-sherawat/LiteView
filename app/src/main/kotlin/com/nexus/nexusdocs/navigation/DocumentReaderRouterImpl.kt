@@ -94,6 +94,14 @@ class DocumentReaderRouterImpl @Inject constructor(
                         ).buildRoute()
                     )
                 }
+                DocumentType.PPTX -> {
+                    controller.navigate(
+                        NexusRoute.PresentationReader(
+                            encodedUri = encodedUri,
+                            fileName = encodedName
+                        ).buildRoute()
+                    )
+                }
                 DocumentType.TXT -> {
                     controller.navigate(
                         NexusRoute.TextReader(
@@ -126,5 +134,13 @@ class DocumentReaderRouterImpl @Inject constructor(
 
     override fun navigateToSettings() {
         navController?.navigate(NexusRoute.Settings.route)
+    }
+
+    override fun navigateToRecycleBin() {
+        navController?.navigate(NexusRoute.RecycleBin.route)
+    }
+
+    override fun navigateToToolAction(toolId: String) {
+        navController?.navigate(NexusRoute.ToolAction(toolId).buildRoute())
     }
 }

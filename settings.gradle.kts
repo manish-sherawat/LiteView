@@ -32,5 +32,5 @@ include(":feature:dashboard")
 include(":feature:reader-pdf")
 include(":feature:reader-office")
 include(":feature:reader-text")
-
+include(":feature:reader-presentation")
 include(":feature:scanner")

@@ -96,6 +96,7 @@ fun FileGridItem(
             DocumentType.PDF  -> DocumentAccentColors.PDF
             DocumentType.DOCX -> DocumentAccentColors.DOCX
             DocumentType.XLSX -> DocumentAccentColors.XLSX
+            DocumentType.PPTX -> DocumentAccentColors.PPTX
             DocumentType.TXT  -> DocumentAccentColors.TXT
             else              -> DocumentAccentColors.UNKNOWN
         }
@@ -137,7 +138,7 @@ fun FileGridItem(
 
     val selectionScale by animateFloatAsState(
         targetValue = if (isSelected) 1f else 0.8f,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f),
+        animationSpec = spring(dampingRatio = 0.76f, stiffness = 420f),
         label = "gridSelectionScale"
     )
     val selectionAlpha by animateFloatAsState(
@@ -148,7 +149,7 @@ fun FileGridItem(
 
     val scale by animateFloatAsState(
         targetValue = if (isSelected) 0.96f else 1f,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f),
+        animationSpec = spring(dampingRatio = 0.76f, stiffness = 420f),
         label = "gridScale"
     )
 
@@ -167,16 +168,16 @@ fun FileGridItem(
             }
             .shadow(
                 elevation = if (isSelected) 3.dp else 1.dp,
-                shape = RoundedCornerShape(14.dp),
+                shape = NexusTheme.shapes.medium,
                 ambientColor = NexusTheme.colors.textPrimary.copy(alpha = 0.04f),
                 spotColor = NexusTheme.colors.textPrimary.copy(alpha = 0.08f)
             )
-            .clip(RoundedCornerShape(14.dp))
+            .clip(NexusTheme.shapes.medium)
             .background(NexusTheme.colors.surface)
             .border(
                 width = if (isSelected) 2.dp else 1.dp,
                 color = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.divider.copy(alpha = 0.65f),
-                shape = RoundedCornerShape(14.dp)
+                shape = NexusTheme.shapes.medium
             )
             .springBounceCombinedClick(
                 enabled = true,
@@ -197,7 +198,7 @@ fun FileGridItem(
             if (sharedScope != null && animatedScope != null) {
                 with(sharedScope) {
                     thumbnailModifier = thumbnailModifier.sharedElement(
-                        state = rememberSharedContentState(key = "thumb_${doc.uri}"),
+                        sharedContentState = rememberSharedContentState(key = "thumb_${doc.uri}"),
                         animatedVisibilityScope = animatedScope,
                         boundsTransform = { _, _ -> tween(300) }
                     )
@@ -238,11 +239,11 @@ fun FileGridItem(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(7.dp)
+                        .padding(NexusTheme.spacing.xs)
                         .clip(RoundedCornerShape(5.dp))
                         .background(NexusTheme.colors.surface.copy(alpha = 0.90f))
                         .border(0.5.dp, NexusTheme.colors.divider.copy(alpha = 0.6f), RoundedCornerShape(5.dp))
-                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                        .padding(horizontal = NexusTheme.spacing.xxs, vertical = 2.dp)
                 ) {
                     NexusText(
                         text = docType.name,
@@ -268,7 +269,7 @@ fun FileGridItem(
                         contentDescription = stringResource(id = R.string.cd_selected),
                         modifier = Modifier
                             .align(Alignment.TopStart)
-                            .padding(6.dp)
+                            .padding(NexusTheme.spacing.xs)
                             .size(20.dp)
                             .graphicsLayer {
                                 scaleX = selectionScale
@@ -276,7 +277,7 @@ fun FileGridItem(
                                 alpha = selectionAlpha
                             }
                             .background(NexusTheme.colors.primary, CircleShape)
-                            .padding(3.dp),
+                            .padding(NexusTheme.spacing.xxs),
                         colorFilter = ColorFilter.tint(NexusTheme.colors.onPrimary)
                     )
                 }
@@ -288,10 +289,10 @@ fun FileGridItem(
                         contentDescription = "Missing",
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(6.dp)
+                            .padding(NexusTheme.spacing.xs)
                             .size(18.dp)
                             .background(NexusTheme.colors.error, CircleShape)
-                            .padding(3.dp),
+                            .padding(NexusTheme.spacing.xxs),
                         colorFilter = ColorFilter.tint(Color.White)
                     )
                 }
@@ -327,8 +328,8 @@ fun FileGridItem(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 9.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xs),
+                verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xxs)
             ) {
                 // Title + Action Icons Row
                 Row(
@@ -340,7 +341,7 @@ fun FileGridItem(
                     if (sharedScope != null && animatedScope != null) {
                         with(sharedScope) {
                             titleModifier = titleModifier.sharedElement(
-                                state = rememberSharedContentState(key = "title_${doc.uri}"),
+                                sharedContentState = rememberSharedContentState(key = "title_${doc.uri}"),
                                 animatedVisibilityScope = animatedScope,
                                 boundsTransform = { _, _ -> tween(300) }
                             )
@@ -360,33 +361,20 @@ fun FileGridItem(
                         modifier = titleModifier
                     )
 
-                    // 1-Tap Star Button
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .clickable { onToggleStarred() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(
-                                id = if (isStarred) com.nexus.core.R.drawable.ic_star_filled
-                                else com.nexus.core.R.drawable.ic_star
-                            ),
-                            contentDescription = stringResource(id = R.string.cd_starred),
-                            modifier = Modifier.size(15.dp),
-                            colorFilter = ColorFilter.tint(
-                                if (isStarred) Color(0xFFFFB300) else NexusTheme.colors.textSecondary.copy(alpha = 0.6f)
-                            )
-                        )
-                    }
+                    // 1-Tap Star Button with Spring Burst Animation
+                    NexusStarBurst(
+                        isStarred = isStarred,
+                        onToggle = onToggleStarred,
+                        size = 26.dp,
+                        iconSize = 16.dp
+                    )
                 }
 
                 // Tag badge row (if tags assigned)
                 if (tags.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(3.dp))
                     androidx.compose.foundation.lazy.LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xxs),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         items(tags) { tagModel ->
@@ -400,7 +388,7 @@ fun FileGridItem(
                                         color = tagColor.copy(alpha = 0.45f),
                                         shape = CircleShape
                                     )
-                                    .padding(horizontal = 6.dp, vertical = 1.5.dp)
+                                    .padding(horizontal = NexusTheme.spacing.xs, vertical = 1.5.dp)
                             ) {
                                 NexusText(
                                     text = tagModel.chipLabel,
@@ -539,28 +527,43 @@ fun FileGridItem(
 
 @Composable
 private fun GridStylizedPaperGraphic(docType: DocumentType, accentColor: Color) {
+    val iconRes = when (docType) {
+        DocumentType.PDF  -> com.nexus.core.R.drawable.ic_file_pdf_new
+        DocumentType.DOCX -> com.nexus.core.R.drawable.ic_file_word_new
+        DocumentType.XLSX -> com.nexus.core.R.drawable.ic_file_sheet_new
+        DocumentType.TXT  -> com.nexus.core.R.drawable.ic_file_txt_new
+        else              -> com.nexus.core.R.drawable.ic_file_gen_new
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier.padding(12.dp)
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(NexusTheme.spacing.xs)
     ) {
-        // Document lines graphic
-        Column(
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.width(46.dp).padding(bottom = 8.dp)
+        // Ambient Glowing Format Icon
+        Box(
+            modifier = Modifier
+                .size(54.dp)
+                .ambientGlow(color = accentColor, alpha = 0.38f, radiusMultiplier = 0.95f),
+            contentAlignment = Alignment.Center
         ) {
-            Box(modifier = Modifier.fillMaxWidth().height(2.5.dp).clip(CircleShape).background(accentColor.copy(alpha = 0.35f)))
-            Box(modifier = Modifier.fillMaxWidth(0.85f).height(2.5.dp).clip(CircleShape).background(accentColor.copy(alpha = 0.35f)))
-            Box(modifier = Modifier.fillMaxWidth(0.95f).height(2.5.dp).clip(CircleShape).background(accentColor.copy(alpha = 0.35f)))
-            Box(modifier = Modifier.fillMaxWidth(0.6f).height(2.5.dp).clip(CircleShape).background(accentColor.copy(alpha = 0.20f)))
+            Image(
+                painter = painterResource(id = iconRes),
+                contentDescription = docType.name,
+                modifier = Modifier.size(40.dp)
+            )
         }
+
+        Spacer(modifier = Modifier.height(6.dp))
 
         // Format Badge Pill
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
+                .clip(NexusTheme.shapes.extraSmall)
                 .background(accentColor)
-                .padding(horizontal = 7.dp, vertical = 2.5.dp)
+                .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xxs)
         ) {
             NexusText(
                 text = docType.name,

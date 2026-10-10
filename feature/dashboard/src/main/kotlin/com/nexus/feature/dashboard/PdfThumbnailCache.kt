@@ -22,7 +22,24 @@ object PdfThumbnailCache {
         }
     }
 
+    private var isRegistered = false
+
     suspend fun getThumbnail(context: Context, uriString: String): ImageBitmap? {
+        if (!isRegistered) {
+            isRegistered = true
+            context.applicationContext.registerComponentCallbacks(object : android.content.ComponentCallbacks2 {
+                override fun onTrimMemory(level: Int) {
+                    if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
+                        memoryCache.evictAll()
+                    }
+                }
+                override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {}
+                override fun onLowMemory() {
+                    memoryCache.evictAll()
+                }
+            })
+        }
+
         val cached = memoryCache.get(uriString)
         if (cached != null) return cached
 
@@ -56,7 +73,7 @@ object PdfThumbnailCache {
                     fd.close()
                     null
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    android.util.Log.e("PdfThumbnailCache", "Failed to generate thumbnail for $uriString", e)
                     null
                 }
             }

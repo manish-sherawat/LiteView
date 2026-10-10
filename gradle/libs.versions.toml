@@ -1,15 +1,15 @@
 [versions]
 # Android
-agp = "8.6.0"
+agp = "8.10.0"
 kotlin = "2.0.21"
-ksp = "2.0.21-1.0.25"
+ksp = "2.0.21-1.0.28"
 
 # CameraX & OpenCV
 mlkitTextRecognition = "19.0.0"
-mlkitDocumentScanner = "16.0.0-beta1"
+mlkitDocumentScanner = "16.0.0"
 
 # Jetpack Compose BOM
-composeBom = "2024.12.01"
+composeBom = "2025.06.00"
 
 # Core AndroidX
 coreKtx = "1.15.0"
@@ -19,8 +19,7 @@ lifecycleRuntimeKtx = "2.8.7"
 lifecycleViewmodelCompose = "2.8.7"
 navigationCompose = "2.8.5"
 
-# Hilt
-hilt = "2.53.1"
+hilt = "2.55"
 hiltNavigationCompose = "1.2.0"
 
 # Room
@@ -43,8 +42,11 @@ aaltoXml = "1.3.2"
 # MuPDF
 mupdf = "1.23.0"
 
+# PDFBox Android
+pdfboxAndroid = "2.0.27.0"
+
 # Coil
-coil = "2.6.0"
+coil = "3.0.0"
 
 # Lottie
 lottie = "6.6.2"
@@ -53,6 +55,10 @@ lottie = "6.6.2"
 junit = "4.13.2"
 junitAndroidExt = "1.2.1"
 espresso = "3.6.1"
+
+# Haze (Glassmorphism blur)
+haze = "1.3.0"
+
 
 [libraries]
 # AndroidX Core
@@ -75,6 +81,7 @@ compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4
 compose-animation = { group = "androidx.compose.animation", name = "animation" }
 compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 
 # Navigation
 navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
@@ -108,8 +115,11 @@ aalto-xml = { group = "com.fasterxml", name = "aalto-xml", version.ref = "aaltoX
 # MuPDF
 mupdf = { group = "com.artifex.mupdf", name = "fitz", version.ref = "mupdf" }
 
+# PDFBox Android
+pdfbox-android = { group = "com.tom-roush", name = "pdfbox-android", version.ref = "pdfboxAndroid" }
+
 # Coil
-coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 
 # Lottie
 lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottie" }
@@ -122,6 +132,10 @@ androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-co
 # ML Kit
 mlkit-text-recognition = { group = "com.google.android.gms", name = "play-services-mlkit-text-recognition", version.ref = "mlkitTextRecognition" }
 mlkit-document-scanner = { group = "com.google.android.gms", name = "play-services-mlkit-document-scanner", version.ref = "mlkitDocumentScanner" }
+
+# Haze
+haze = { group = "dev.chrisbanes.haze", name = "haze", version.ref = "haze" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
