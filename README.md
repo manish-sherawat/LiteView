@@ -21,7 +21,7 @@
 
 <div align="center">
 
-<img src="assets/Banner_1024x500.png" width="100%" style="border-radius: 20px;" alt="LiteView Banner" />
+<img src="assets/Banner_1024x500.png" width="100%" style="border-radius: 30px;" alt="LiteView Banner" />
 
 </div>
 
