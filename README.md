@@ -4,7 +4,7 @@
 <a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs"><img src="https://img.shields.io/badge/Google%20Play-Available-34A853?style=for-the-badge&logo=googleplay&logoColor=white" /></a>
 <img src="https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" />
 <img src="https://img.shields.io/badge/Jetpack%20Compose-BOM%202025.06-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" />
-<img src="https://img.shields.io/badge/Version-3.2.0-orange?style=for-the-badge" />
+<img src="https://img.shields.io/badge/Version-4.2.0-orange?style=for-the-badge" />
 <img src="https://img.shields.io/badge/Min%20SDK-26%20(Android%208.0)-blue?style=for-the-badge" />
 <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" />
 
