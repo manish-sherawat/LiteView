@@ -16,6 +16,7 @@ import androidx.navigation.compose.composable
 
 // ─── Compose Animation Imports ──────────────────────────────────────
 import androidx.compose.animation.*
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.tween
 
@@ -73,6 +74,10 @@ object NavConstants {
     const val DURATION_UNSUPPORTED_ENTER = 320
     const val DURATION_UNSUPPORTED_EXIT = 280
     const val DURATION_UNSUPPORTED_BACK = 280
+
+    // ─── Bottom Navigation Tab Switch Animation ─────────────────────
+    const val DURATION_TAB_SLIDE = 340
+    val TabSlideEasing: Easing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
     
     // ─── Default Values ─────────────────────────────────────────────
     const val DEFAULT_FILE_NAME = "Document"
@@ -319,6 +324,85 @@ fun unsupportedBackExitTransition(): ExitTransition = fadeOut(
     targetOffsetY = { 60 },
     animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_EXIT, easing = EmphasizedAccelerateEasing)
 )
+
+// ─── BOTTOM NAVIGATION TAB SWITCH ANIMATIONS ─────────────────────────
+
+/**
+ * Returns the 0-based tab index of the bottom navigation routes.
+ * 0: Home (Dashboard), 1: Tools, 2: Settings.
+ * Returns null for child or non-bottom-bar destinations.
+ */
+fun getBottomNavTabIndex(route: String?): Int? {
+    val clean = route?.substringBefore('?') ?: return null
+    return when {
+        clean == NexusRoute.Dashboard.route || clean.startsWith("dashboard") -> 0
+        clean == NexusRoute.Tools.route || (clean.startsWith("tools") && !clean.startsWith("tools/action")) -> 1
+        clean == NexusRoute.Settings.route || clean.startsWith("settings") -> 2
+        else -> null
+    }
+}
+
+/**
+ * Smooth directional entrance animation for bottom bar tab switching.
+ * If moving right (e.g. Home -> Tools, Tools -> Settings), enters smoothly from the right edge.
+ * If moving left (e.g. Settings -> Tools, Tools -> Home), enters smoothly from the left edge.
+ */
+fun bottomTabEnterTransition(movingRight: Boolean): EnterTransition {
+    return slideInHorizontally(
+        initialOffsetX = { fullWidth -> if (movingRight) fullWidth else -fullWidth },
+        animationSpec = tween(
+            durationMillis = NavConstants.DURATION_TAB_SLIDE,
+            easing = NavConstants.TabSlideEasing
+        )
+    )
+}
+
+/**
+ * Smooth directional exit animation for bottom bar tab switching.
+ * If moving right (e.g. Home -> Tools), exits smoothly to the left edge.
+ * If moving left (e.g. Tools -> Home), exits smoothly to the right edge.
+ */
+fun bottomTabExitTransition(movingRight: Boolean): ExitTransition {
+    return slideOutHorizontally(
+        targetOffsetX = { fullWidth -> if (movingRight) -fullWidth else fullWidth },
+        animationSpec = tween(
+            durationMillis = NavConstants.DURATION_TAB_SLIDE,
+            easing = NavConstants.TabSlideEasing
+        )
+    )
+}
+
+/**
+ * Scope extension to intercept transitions between bottom nav tabs (Home, Tools, Settings)
+ * and apply smooth, directional spatial motion. Falls back to default transition for non-tab navigation.
+ */
+fun AnimatedContentTransitionScope<NavBackStackEntry>.tabAwareEnter(
+    fallback: () -> EnterTransition
+): EnterTransition {
+    val initialIdx = getBottomNavTabIndex(initialState.destination.route)
+    val targetIdx = getBottomNavTabIndex(targetState.destination.route)
+    return if (initialIdx != null && targetIdx != null && initialIdx != targetIdx) {
+        bottomTabEnterTransition(movingRight = targetIdx > initialIdx)
+    } else {
+        fallback()
+    }
+}
+
+/**
+ * Scope extension to intercept transitions between bottom nav tabs (Home, Tools, Settings)
+ * and apply smooth, directional spatial motion. Falls back to default transition for non-tab navigation.
+ */
+fun AnimatedContentTransitionScope<NavBackStackEntry>.tabAwareExit(
+    fallback: () -> ExitTransition
+): ExitTransition {
+    val initialIdx = getBottomNavTabIndex(initialState.destination.route)
+    val targetIdx = getBottomNavTabIndex(targetState.destination.route)
+    return if (initialIdx != null && targetIdx != null && initialIdx != targetIdx) {
+        bottomTabExitTransition(movingRight = targetIdx > initialIdx)
+    } else {
+        fallback()
+    }
+}
 
 // ════════════════════════════════════════════════════════════════════
 // SECTION 4: ARGUMENT EXTENSION HELPERS
@@ -663,10 +747,10 @@ fun NexusNavHost(
                 // ─── Dashboard Screen ────────────────────────────────────
                 composable(
                     route = NexusRoute.Dashboard.route,
-                    enterTransition = { dashboardEnterTransition() },
-                    exitTransition = { dashboardExitTransition() },
-                    popEnterTransition = { dashboardBackEnterTransition() },
-                    popExitTransition = { dashboardBackExitTransition() }
+                    enterTransition = { tabAwareEnter { dashboardEnterTransition() } },
+                    exitTransition = { tabAwareExit { dashboardExitTransition() } },
+                    popEnterTransition = { tabAwareEnter { dashboardBackEnterTransition() } },
+                    popExitTransition = { tabAwareExit { dashboardBackExitTransition() } }
                 ) {
                     DashboardRoute(router)
                 }
@@ -674,10 +758,10 @@ fun NexusNavHost(
                 // ─── Settings Screen ─────────────────────────────────────
                 composable(
                     route = NexusRoute.Settings.route,
-                    enterTransition = { settingsEnterTransition() },
-                    exitTransition = { settingsExitTransition() },
-                    popEnterTransition = { settingsBackEnterTransition() },
-                    popExitTransition = { settingsBackExitTransition() }
+                    enterTransition = { tabAwareEnter { settingsEnterTransition() } },
+                    exitTransition = { tabAwareExit { settingsExitTransition() } },
+                    popEnterTransition = { tabAwareEnter { settingsBackEnterTransition() } },
+                    popExitTransition = { tabAwareExit { settingsBackExitTransition() } }
                 ) {
                     SettingsRoute(router)
                 }
@@ -685,10 +769,10 @@ fun NexusNavHost(
                 // ─── Tools Screen ────────────────────────────────────────
                 composable(
                     route = NexusRoute.Tools.route,
-                    enterTransition = { dashboardEnterTransition() },
-                    exitTransition = { dashboardExitTransition() },
-                    popEnterTransition = { dashboardBackEnterTransition() },
-                    popExitTransition = { dashboardBackExitTransition() }
+                    enterTransition = { tabAwareEnter { dashboardEnterTransition() } },
+                    exitTransition = { tabAwareExit { dashboardExitTransition() } },
+                    popEnterTransition = { tabAwareEnter { dashboardBackEnterTransition() } },
+                    popExitTransition = { tabAwareExit { dashboardBackExitTransition() } }
                 ) {
                     ToolsRoute(router)
                 }

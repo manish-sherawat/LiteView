@@ -94,3 +94,10 @@
 # ─── PDFBox Android (Optional JPX / JP2 decoder) ───────────────────────────
 -dontwarn com.gemalto.jp2.**
 -dontwarn com.tom_roush.pdfbox.**
+
+# ─── Compose Release Optimizations (Strip debug source information) ──────────
+-assumenosideeffects class androidx.compose.runtime.ComposerKt {
+    void sourceInformation(androidx.compose.runtime.Composer, java.lang.String);
+    void sourceInformationMarkerStart(androidx.compose.runtime.Composer, int, java.lang.String);
+    void sourceInformationMarkerEnd(androidx.compose.runtime.Composer);
+}

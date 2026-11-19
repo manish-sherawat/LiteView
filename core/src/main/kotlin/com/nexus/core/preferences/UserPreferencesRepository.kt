@@ -10,14 +10,23 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
 // ─── Theme Mode Enum ──────────────────────────────────────────────────────────
 
-enum class ThemeMode { LIGHT, DARK, AMOLED, SYSTEM, SEPIA, FOREST, SUNSET }
+enum class ThemeMode { LIGHT, DARK, SYSTEM, FOREST, SUNSET }
 
 // ─── Home Screen Style Enum ───────────────────────────────────────────────────
 enum class HomeStyle { APPLE_GLASSMORPHIC, MINIMAL, CLASSIC }
@@ -52,6 +61,104 @@ class UserPreferencesRepository @Inject constructor(
         val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback")
         val IS_FIRST_LAUNCH = booleanPreferencesKey("is_first_launch")
         val TRASH_RETENTION_DAYS = intPreferencesKey("trash_retention_days")
+        val USE_LIQUID_BOTTOM_NAV = booleanPreferencesKey("use_liquid_bottom_nav")
+        val BOTTOM_NAV_CORNER_RADIUS = floatPreferencesKey("bottom_nav_corner_radius")
+        val BOTTOM_NAV_BLUR_RADIUS = floatPreferencesKey("bottom_nav_blur_radius")
+        val BOTTOM_NAV_REFRACTION_HEIGHT = floatPreferencesKey("bottom_nav_refraction_height")
+        val BOTTOM_NAV_REFRACTION_AMOUNT = floatPreferencesKey("bottom_nav_refraction_amount")
+    }
+
+    private val repoScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private val _useLiquidBottomNav = MutableStateFlow(true)
+    val useLiquidBottomNav: StateFlow<Boolean> = _useLiquidBottomNav.asStateFlow()
+
+    private val _bottomNavCornerRadius = MutableStateFlow(28f)
+    val bottomNavCornerRadius: StateFlow<Float> = _bottomNavCornerRadius.asStateFlow()
+
+    private val _bottomNavBlurRadius = MutableStateFlow(10f)
+    val bottomNavBlurRadius: StateFlow<Float> = _bottomNavBlurRadius.asStateFlow()
+
+    private val _bottomNavRefractionHeight = MutableStateFlow(20f)
+    val bottomNavRefractionHeight: StateFlow<Float> = _bottomNavRefractionHeight.asStateFlow()
+
+    private val _bottomNavRefractionAmount = MutableStateFlow(22f)
+    val bottomNavRefractionAmount: StateFlow<Float> = _bottomNavRefractionAmount.asStateFlow()
+
+    init {
+        repoScope.launch {
+            context.dataStore.data.collect { prefs ->
+                prefs[Keys.USE_LIQUID_BOTTOM_NAV]?.let { _useLiquidBottomNav.value = it }
+                prefs[Keys.BOTTOM_NAV_CORNER_RADIUS]?.let { _bottomNavCornerRadius.value = it }
+                prefs[Keys.BOTTOM_NAV_BLUR_RADIUS]?.let { _bottomNavBlurRadius.value = it }
+                prefs[Keys.BOTTOM_NAV_REFRACTION_HEIGHT]?.let { _bottomNavRefractionHeight.value = it }
+                prefs[Keys.BOTTOM_NAV_REFRACTION_AMOUNT]?.let { _bottomNavRefractionAmount.value = it }
+            }
+        }
+    }
+
+    fun setUseLiquidBottomNav(value: Boolean) {
+        _useLiquidBottomNav.value = value
+        repoScope.launch {
+            context.dataStore.edit { prefs ->
+                prefs[Keys.USE_LIQUID_BOTTOM_NAV] = value
+            }
+        }
+    }
+
+    private var cornerRadiusSaveJob: Job? = null
+    fun setBottomNavCornerRadius(value: Float) {
+        _bottomNavCornerRadius.value = value
+        cornerRadiusSaveJob?.cancel()
+        cornerRadiusSaveJob = repoScope.launch {
+            delay(120)
+            context.dataStore.edit { prefs ->
+                prefs[Keys.BOTTOM_NAV_CORNER_RADIUS] = value
+            }
+        }
+    }
+
+    private var blurRadiusSaveJob: Job? = null
+    fun setBottomNavBlurRadius(value: Float) {
+        _bottomNavBlurRadius.value = value
+        blurRadiusSaveJob?.cancel()
+        blurRadiusSaveJob = repoScope.launch {
+            delay(120)
+            context.dataStore.edit { prefs ->
+                prefs[Keys.BOTTOM_NAV_BLUR_RADIUS] = value
+            }
+        }
+    }
+
+    private var refractionHeightSaveJob: Job? = null
+    fun setBottomNavRefractionHeight(value: Float) {
+        _bottomNavRefractionHeight.value = value
+        refractionHeightSaveJob?.cancel()
+        refractionHeightSaveJob = repoScope.launch {
+            delay(120)
+            context.dataStore.edit { prefs ->
+                prefs[Keys.BOTTOM_NAV_REFRACTION_HEIGHT] = value
+            }
+        }
+    }
+
+    private var refractionAmountSaveJob: Job? = null
+    fun setBottomNavRefractionAmount(value: Float) {
+        _bottomNavRefractionAmount.value = value
+        refractionAmountSaveJob?.cancel()
+        refractionAmountSaveJob = repoScope.launch {
+            delay(120)
+            context.dataStore.edit { prefs ->
+                prefs[Keys.BOTTOM_NAV_REFRACTION_AMOUNT] = value
+            }
+        }
+    }
+
+    fun resetBottomNavCustomization() {
+        setBottomNavCornerRadius(28f)
+        setBottomNavBlurRadius(10f)
+        setBottomNavRefractionHeight(20f)
+        setBottomNavRefractionAmount(22f)
     }
 
     val homeStyle: Flow<HomeStyle> = context.dataStore.data.map { prefs ->
@@ -72,10 +179,8 @@ class UserPreferencesRepository @Inject constructor(
     /** Reactive stream of the current theme preference. */
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
         when (prefs[Keys.THEME_MODE]) {
-            ThemeMode.DARK.name   -> ThemeMode.DARK
-            ThemeMode.AMOLED.name -> ThemeMode.AMOLED
+            ThemeMode.DARK.name, "AMOLED" -> ThemeMode.DARK
             ThemeMode.SYSTEM.name -> ThemeMode.SYSTEM
-            ThemeMode.SEPIA.name  -> ThemeMode.SEPIA
             ThemeMode.FOREST.name -> ThemeMode.FOREST
             ThemeMode.SUNSET.name -> ThemeMode.SUNSET
             else                  -> ThemeMode.LIGHT
@@ -136,7 +241,7 @@ class UserPreferencesRepository @Inject constructor(
         return isStarred
     }
 
-    val readerTheme: Flow<String> = context.dataStore.data.map { prefs -> prefs[Keys.READER_THEME] ?: "LIGHT" }
+    val readerTheme: Flow<String> = context.dataStore.data.map { prefs -> prefs[Keys.READER_THEME]?.takeIf { it != "SEPIA" } ?: "LIGHT" }
     suspend fun setReaderTheme(theme: String) { context.dataStore.edit { prefs -> prefs[Keys.READER_THEME] = theme } }
 
     val wordWrapEnabled: Flow<Boolean> = context.dataStore.data.map { prefs -> prefs[Keys.WORD_WRAP_ENABLED] ?: true }
@@ -165,6 +270,16 @@ class UserPreferencesRepository @Inject constructor(
             prefs.remove(Keys.READER_THEME)
             prefs.remove(Keys.WORD_WRAP_ENABLED)
             prefs.remove(Keys.HAPTIC_FEEDBACK)
+            prefs.remove(Keys.USE_LIQUID_BOTTOM_NAV)
+            prefs.remove(Keys.BOTTOM_NAV_CORNER_RADIUS)
+            prefs.remove(Keys.BOTTOM_NAV_BLUR_RADIUS)
+            prefs.remove(Keys.BOTTOM_NAV_REFRACTION_HEIGHT)
+            prefs.remove(Keys.BOTTOM_NAV_REFRACTION_AMOUNT)
         }
+        _useLiquidBottomNav.value = true
+        _bottomNavCornerRadius.value = 28f
+        _bottomNavBlurRadius.value = 10f
+        _bottomNavRefractionHeight.value = 20f
+        _bottomNavRefractionAmount.value = 22f
     }
 }

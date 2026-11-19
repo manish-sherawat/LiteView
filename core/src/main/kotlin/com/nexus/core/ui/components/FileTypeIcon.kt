@@ -19,6 +19,15 @@ import com.nexus.core.navigation.DocumentType
 import com.nexus.core.theme.NexusTheme
 import com.nexus.core.ui.NexusText
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.graphicsLayer
+
 data class FileTypeStyle(
     val accentColor: Color,
     val containerColor: Color
@@ -61,9 +70,36 @@ fun FileTypeIcon(
     type: DocumentType,
     size: Dp = 40.dp,
     drawContainer: Boolean = true,
+    animateOnMount: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val style = fileTypeStyleFor(type)
+
+    var isAppeared by remember { mutableStateOf(!animateOnMount) }
+    LaunchedEffect(type) {
+        if (animateOnMount) {
+            isAppeared = true
+        }
+    }
+
+    val animScale by animateFloatAsState(
+        targetValue = if (isAppeared) 1f else 0.72f,
+        animationSpec = spring(
+            dampingRatio = 0.62f,
+            stiffness = 400f
+        ),
+        label = "iconScale"
+    )
+
+    val animRotation by animateFloatAsState(
+        targetValue = if (isAppeared) 0f else -10f,
+        animationSpec = spring(
+            dampingRatio = 0.68f,
+            stiffness = 350f
+        ),
+        label = "iconRotation"
+    )
+
     val content = @Composable {
         val iconSize = if (drawContainer) size * 0.6f else size
         val imageRes = when (type) {
@@ -76,7 +112,13 @@ fun FileTypeIcon(
         }
         
         Box(
-            modifier = Modifier.size(iconSize),
+            modifier = Modifier
+                .size(iconSize)
+                .graphicsLayer {
+                    scaleX = animScale
+                    scaleY = animScale
+                    rotationZ = animRotation
+                },
             contentAlignment = Alignment.Center
         ) {
             Image(

@@ -52,8 +52,16 @@ import com.nexus.core.ui.animations.shimmerEffect
 import com.nexus.core.ui.animations.springBounceClick
 import com.nexus.core.ui.components.NexusButton
 import com.nexus.core.ui.components.NexusTopBar
+import com.nexus.core.ui.components.NexusViewerTopBar
+import com.nexus.core.ui.components.NexusViewerActionButton
+import com.nexus.core.ui.components.NexusViewerActionDivider
+import com.nexus.core.ui.components.NexusFloatingIconButton
+import com.nexus.core.ui.components.NexusFloatingActionButton
 import com.nexus.core.ui.components.NexusVerticalScrollbar
 import com.nexus.core.ui.utils.glassBackground
+import com.nexus.core.ui.utils.hazeGlassBackground
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import com.nexus.core.util.toUserFriendlyMessage
 import kotlinx.coroutines.launch
 import java.net.URLDecoder
@@ -73,6 +81,7 @@ fun TextReaderScreen(
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    val hazeState = remember { HazeState() }
     
     val displayName = try { URLDecoder.decode(URLDecoder.decode(fileName, "UTF-8"), "UTF-8") } catch (_: Exception) { fileName }
     val context = LocalContext.current
@@ -81,7 +90,6 @@ fun TextReaderScreen(
     val readerTheme by viewModel.readerTheme.collectAsStateWithLifecycle()
     val readerColors = when (readerTheme) {
         "DARK" -> com.nexus.core.theme.darkNexusColors
-        "SEPIA" -> com.nexus.core.theme.sepiaNexusColors
         else -> com.nexus.core.theme.lightNexusColors
     }
     val readerBackgroundColor = readerColors.background
@@ -180,6 +188,7 @@ fun TextReaderScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
+                                .hazeSource(hazeState)
                                 .pointerInput(Unit) {
                                     detectTapGestures(onTap = { isImmersiveMode = !isImmersiveMode })
                                 }
@@ -296,11 +305,8 @@ fun TextReaderScreen(
                                     spotColor = NexusTheme.colors.primary.copy(alpha = 0.16f),
                                     ambientColor = Color.Black.copy(alpha = 0.10f)
                                 )
-                                .clip(NexusTheme.shapes.pill)
-                                .background(NexusTheme.colors.surface)
-                                .border(
-                                    width = 1.dp,
-                                    color = NexusTheme.colors.divider.copy(alpha = 0.7f),
+                                .hazeGlassBackground(
+                                    hazeState = hazeState,
                                     shape = NexusTheme.shapes.pill
                                 )
                                 .springBounceClick { showGoToLineSheet = true }
@@ -336,16 +342,16 @@ fun TextReaderScreen(
                             .padding(horizontal = NexusTheme.spacing.sm, vertical = NexusTheme.spacing.xs)
                             .shadow(
                                 elevation = 16.dp,
-                                shape = NexusTheme.shapes.large,
-                                spotColor = NexusTheme.colors.primary.copy(alpha = if (isDarkTheme) 0.28f else 0.14f),
-                                ambientColor = Color.Black.copy(alpha = if (isDarkTheme) 0.40f else 0.10f)
+                                shape = RoundedCornerShape(25.dp),
+                                spotColor = NexusTheme.colors.primary.copy(alpha = if (isDarkTheme) 0.28f else 0.10f),
+                                ambientColor = Color.Black.copy(alpha = if (isDarkTheme) 0.40f else 0.08f)
                             )
-                            .clip(NexusTheme.shapes.large)
-                            .background(NexusTheme.colors.surface.copy(alpha = 0.95f))
-                            .border(
-                                width = 1.dp,
-                                color = NexusTheme.colors.divider.copy(alpha = 0.65f),
-                                shape = NexusTheme.shapes.large
+                            .hazeGlassBackground(
+                                hazeState = hazeState,
+                                shape = RoundedCornerShape(25.dp),
+                                blurRadius = 28.dp,
+                                borderWidth = 1.dp,
+                                borderColor = if (isDarkTheme) Color.White.copy(alpha = 0.12f) else Color(0xFFE6E7EF)
                             )
                             .padding(horizontal = NexusTheme.spacing.xxs, vertical = NexusTheme.spacing.xxs)
                     ) {
@@ -428,28 +434,17 @@ fun TextReaderScreen(
                                 onClick = { showLineNumbers = !showLineNumbers }
                             )
 
-                            // Theme Toggle (Light -> Sepia -> Dark)
+                            // Theme Toggle (Light -> Dark)
                             TextBottomBarActionItem(
                                 modifier = Modifier.weight(1f),
                                 iconPainter = androidx.compose.ui.res.painterResource(
-                                    id = when (readerTheme) {
-                                        "DARK" -> com.nexus.core.R.drawable.ic_theme_dark
-                                        else -> com.nexus.core.R.drawable.ic_theme_light
-                                    }
+                                    id = if (readerTheme == "DARK") com.nexus.core.R.drawable.ic_theme_dark else com.nexus.core.R.drawable.ic_theme_light
                                 ),
-                                label = when (readerTheme) {
-                                    "DARK" -> "Dark"
-                                    "SEPIA" -> "Sepia"
-                                    else -> "Light"
-                                },
+                                label = if (readerTheme == "DARK") "Dark" else "Light",
                                 contentDescription = "Theme",
                                 tint = NexusTheme.colors.textPrimary,
                                 onClick = {
-                                    val next = when (readerTheme) {
-                                        "LIGHT" -> "SEPIA"
-                                        "SEPIA" -> "DARK"
-                                        else -> "LIGHT"
-                                    }
+                                    val next = if (readerTheme == "LIGHT") "DARK" else "LIGHT"
                                     viewModel.setReaderTheme(next)
                                 }
                             )
@@ -485,61 +480,44 @@ fun TextReaderScreen(
                     exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { -it }) + androidx.compose.animation.fadeOut()
                 ) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .statusBarsPadding()
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        NexusTopBar(
+                        NexusViewerTopBar(
                             title = displayTitle,
-                            navigationIcon = {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(androidx.compose.foundation.shape.CircleShape)
-                                        .clickable { onBack() },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    androidx.compose.foundation.Image(
-                                        painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_back),
-                                        contentDescription = "Back",
-                                        modifier = Modifier.size(20.dp),
-                                        colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
-                                    )
-                                }
-                            },
+                            hazeState = hazeState,
+                            onBack = onBack,
                             actions = {
-                                androidx.compose.foundation.Image(
+                                NexusViewerActionButton(
                                     painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_search),
                                     contentDescription = "Search",
-                                    colorFilter = ColorFilter.tint(
-                                        if (isSearchMode) NexusTheme.colors.primary else NexusTheme.colors.textPrimary
-                                    ),
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(androidx.compose.foundation.shape.CircleShape)
-                                        .springBounceClick { isSearchMode = !isSearchMode }
-                                        .padding(NexusTheme.spacing.xs)
+                                    isActive = isSearchMode,
+                                    onClick = { isSearchMode = !isSearchMode }
                                 )
                                 if (uiState is TextReaderUiState.Success && percent > 0) {
-                                    NexusText(
-                                        text = "$percent%",
-                                        color = NexusTheme.colors.primary,
-                                        style = NexusTheme.typography.label.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                                    NexusViewerActionDivider()
+                                    Box(
                                         modifier = Modifier
-                                            .background(NexusTheme.colors.primary.copy(alpha = 0.15f), androidx.compose.foundation.shape.CircleShape)
-                                            .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xxs)
-                                            .clickable { showGoToLineSheet = true }
-                                    )
+                                            .height(34.dp)
+                                            .clip(CircleShape)
+                                            .springBounceClick(onClick = { showGoToLineSheet = true })
+                                            .padding(horizontal = 6.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        NexusText(
+                                            text = "$percent%",
+                                            color = NexusTheme.colors.primary,
+                                            style = NexusTheme.typography.label.copy(
+                                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                                fontSize = 11.sp
+                                            )
+                                        )
+                                    }
                                 }
-                                androidx.compose.foundation.Image(
+                                NexusViewerActionDivider()
+                                NexusViewerActionButton(
                                     painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_more_vert),
                                     contentDescription = "More",
-                                    colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary),
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(androidx.compose.foundation.shape.CircleShape)
-                                        .springBounceClick { showMenu = true }
-                                        .padding(NexusTheme.spacing.xs)
+                                    onClick = { showMenu = true }
                                 )
                             }
                         )

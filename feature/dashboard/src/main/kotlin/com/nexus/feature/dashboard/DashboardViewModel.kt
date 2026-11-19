@@ -3,6 +3,7 @@ package com.nexus.feature.dashboard
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nexus.core.navigation.DocumentType
@@ -47,6 +48,7 @@ enum class DocumentTypeFilter(val title: String, val docType: DocumentType?) {
     ALL("All", null),
     PDF("PDF", DocumentType.PDF),
     DOCX("Word", DocumentType.DOCX),
+    PPT("PPT", DocumentType.PPTX),
     XLSX("Excel", DocumentType.XLSX),
     TXT("Text", DocumentType.TXT)
 }
@@ -54,11 +56,13 @@ enum class DocumentTypeFilter(val title: String, val docType: DocumentType?) {
 
 
 // ─── Dashboard UI State ───────────────────────────────────────────────────────
+@Immutable
 data class PendingDeletionState(
     val documents: List<RecentDocument>,
     val remainingSeconds: Int
 )
 
+@Immutable
 data class DashboardUiState(
     val documents: List<RecentDocumentUiModel> = emptyList(),
     val isLoading: Boolean = true,
@@ -148,7 +152,7 @@ class DashboardViewModel @Inject constructor(
         ),
         combine(
             _isLoading,
-            @OptIn(kotlinx.coroutines.FlowPreview::class) _searchQuery.debounce(150),
+            _searchQuery,
             _sortOrder,
             ::Triple
         ),

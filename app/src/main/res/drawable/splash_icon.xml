@@ -7,7 +7,7 @@
     <!-- Background circle -->
     <path
         android:pathData="M54,54m-54,0a54,54 0,1 1,108 0a54,54 0,1 1,-108 0"
-        android:fillColor="#4A6CF7" />
+        android:fillColor="#2143cbff" />
 
     <!-- Document shape -->
     <path

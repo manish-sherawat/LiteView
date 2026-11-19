@@ -18,7 +18,9 @@ test_mupdf/
 needed_icons.txt
 .kotlin/
 
-# Keystores & Signing Credentials
+# External reference projects
+AndroidLiquidGlass-kmp/
+
 *.jks
 *.keystore
 keystore.properties

@@ -20,3 +20,10 @@ target_link_libraries(
     ${jnigraphics-lib}
     ${android-lib}
 )
+
+# Enforce 16 KB ELF segment alignment for Android 15+ compatibility
+target_link_options(
+    nexus_presentation_engine
+    PRIVATE
+    "-Wl,-z,max-page-size=16384"
+)

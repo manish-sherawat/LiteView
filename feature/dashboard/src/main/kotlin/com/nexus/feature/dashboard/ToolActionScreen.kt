@@ -27,8 +27,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
+import com.nexus.core.ui.liquidglass.NexusLiquidSlider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.*
@@ -82,6 +81,158 @@ fun ToolActionScreen(
     
     if (toolId == "word_to_pdf") {
         com.nexus.feature.dashboard.tools.word_to_pdf.WordToPdfScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "ppt_to_pdf" || toolId == "pptx_to_pdf") {
+        com.nexus.feature.dashboard.tools.ppt_to_pdf.PptToPdfScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "xlsx_to_pdf" || toolId == "excel_to_pdf") {
+        com.nexus.feature.dashboard.tools.xlsx_to_pdf.XlsxToPdfScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "txt_to_pdf" || toolId == "text_to_pdf") {
+        com.nexus.feature.dashboard.tools.txt_to_pdf.TxtToPdfScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "rotate_pdf" || toolId == "rotate_pages") {
+        com.nexus.feature.dashboard.tools.rotate_pdf.RotatePdfScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "protect_pdf") {
+        com.nexus.feature.dashboard.tools.protect_pdf.ProtectPdfScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "repair_pdf") {
+        com.nexus.feature.dashboard.tools.repair_pdf.RepairPdfScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "watermark_pdf") {
+        com.nexus.feature.dashboard.tools.watermark_pdf.WatermarkPdfScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "pdf_to_image") {
+        com.nexus.feature.dashboard.tools.pdf_to_image.PdfToImageScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "compress_pdf") {
+        com.nexus.feature.dashboard.tools.compress_pdf.CompressPdfScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "merge_pdf") {
+        com.nexus.feature.dashboard.tools.merge_pdf.MergePdfScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "sign_pdf") {
+        com.nexus.feature.dashboard.tools.sign_pdf.SignPdfScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "reorder_pdf" || toolId == "page_reorder") {
+        com.nexus.feature.dashboard.tools.reorder_pdf.ReorderPdfScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "split_pdf") {
+        com.nexus.feature.dashboard.tools.split_pdf.SplitPdfScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "extract_pages") {
+        com.nexus.feature.dashboard.tools.extract_pages.ExtractPagesScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "page_number" || toolId == "page_numbers") {
+        com.nexus.feature.dashboard.tools.page_number.PageNumberScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "crop_pdf" || toolId == "crop_pages") {
+        com.nexus.feature.dashboard.tools.crop_pages.CropPagesScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "delete_pages" || toolId == "delete_pdf_pages") {
+        com.nexus.feature.dashboard.tools.delete_pages.DeletePagesScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "header_footer" || toolId == "header_and_footer") {
+        com.nexus.feature.dashboard.tools.header_footer.HeaderFooterScreen(
+            onBack = onBack,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (toolId == "pdf_to_docx" || toolId == "pdf_to_word") {
+        com.nexus.feature.dashboard.tools.pdf_to_docx.PdfToDocxScreen(
             onBack = onBack,
             modifier = modifier
         )
@@ -483,15 +634,12 @@ fun ToolActionScreen(
                                                 style = NexusTheme.typography.body.copy(fontWeight = FontWeight.Medium),
                                                 color = NexusTheme.colors.textPrimary
                                             )
-                                            Slider(
+                                            NexusLiquidSlider(
                                                 value = compressionLevel,
                                                 onValueChange = { compressionLevel = it },
                                                 valueRange = 0f..1f,
-                                                colors = SliderDefaults.colors(
-                                                    thumbColor = NexusTheme.colors.primary,
-                                                    activeTrackColor = NexusTheme.colors.primary,
-                                                    inactiveTrackColor = NexusTheme.colors.surfaceVariant
-                                                )
+                                                accentColor = NexusTheme.colors.primary,
+                                                modifier = Modifier.fillMaxWidth()
                                             )
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),

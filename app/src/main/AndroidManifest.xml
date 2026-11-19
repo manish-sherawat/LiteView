@@ -62,6 +62,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.NexusDocsViewer.Splash"
         android:hardwareAccelerated="true"
+        android:largeHeap="true"
         tools:targetApi="35">
 
         <!-- Main Activity -->

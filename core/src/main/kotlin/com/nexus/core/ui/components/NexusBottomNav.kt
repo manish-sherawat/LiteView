@@ -31,7 +31,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import dev.chrisbanes.haze.hazeChild
+import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.HazeStyle
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -74,6 +74,7 @@ sealed class Screens(
     @RawRes val animRawRes: Int? = null,
 ) {
     data object Home     : Screens(R.string.home, R.drawable.ic_home_outline, R.drawable.ic_home_filled, "home")
+    data object Tools    : Screens(R.string.tools, R.drawable.ic_tools_outline, R.drawable.ic_tools_filled, "tools")
     data object Settings : Screens(R.string.settings, R.drawable.ic_settings_outline, R.drawable.ic_settings_filled, "settings")
 }
 
@@ -191,8 +192,8 @@ fun NexusFloatingBottomNav(
         label         = "capsuleH"
     )
 
-    // Comfortable ergonomic tab width (calibrated dynamically for 2 or 3 tabs)
-    val baseTabWidth = if (isCollapsed) 68.dp else (if (items.size <= 2) 112.dp else 96.dp)
+    // Comfortable, compact ergonomic tab width with reduced gap between icons
+    val baseTabWidth = if (isCollapsed) 52.dp else (if (items.size <= 2) 80.dp else 68.dp)
     val animTabWidth by animateDpAsState(
         targetValue   = baseTabWidth,
         animationSpec = morphSpring,
@@ -211,13 +212,15 @@ fun NexusFloatingBottomNav(
         label         = "iconSize"
     )
 
-    val horizontalPaddingDp = if (isCollapsed) 8.dp else 10.dp
-    val tabSpacingDp        = 6.dp
+    val horizontalPaddingDp = if (isCollapsed) 6.dp else 8.dp
+    val tabSpacingDp        = 4.dp
 
-    // ── Fluid Sliding Indicator Position Animatable ───────────────────────────
-    // Using an animated tab index fraction eliminates composition frame resets
-    // and guarantees perfect synchronization with dynamic width animations
-    val tabFraction = remember { Animatable(if (selectedIndex >= 0) selectedIndex.toFloat() else 0f) }
+    // ── Fluid Morphing Sliding Indicator Position Animatables ───────────────────
+    // Using dual head/tail animatables produces an elastic, gooey morphing effect:
+    // the leading edge springs forward first, stretching the capsule across the gap,
+    // and the trailing edge follows and snaps into place with organic spring physics.
+    val headFraction = remember { Animatable(if (selectedIndex >= 0) selectedIndex.toFloat() else 0f) }
+    val tailFraction = remember { Animatable(if (selectedIndex >= 0) selectedIndex.toFloat() else 0f) }
     val indicatorAlpha = remember { Animatable(if (isCapsuleSelected) 1f else 0f) }
 
     // ── Container entry / exit ────────────────────────────────────────────────
@@ -240,21 +243,42 @@ fun NexusFloatingBottomNav(
         }
 
         if (indicatorAlpha.value < 0.05f) {
-            tabFraction.snapTo(selectedIndex.toFloat())
+            headFraction.snapTo(selectedIndex.toFloat())
+            tailFraction.snapTo(selectedIndex.toFloat())
             launch { indicatorAlpha.animateTo(1f, tween(160, easing = FastOutSlowInEasing)) }
             return@LaunchedEffect
         }
 
         launch { indicatorAlpha.animateTo(1f, tween(120, easing = FastOutSlowInEasing)) }
-        // Fluid, organic glide spring
-        launch {
-            tabFraction.animateTo(
-                targetValue = selectedIndex.toFloat(),
-                animationSpec = spring(
-                    dampingRatio = 0.84f,
-                    stiffness = 360f
-                )
-            )
+
+        val target = selectedIndex.toFloat()
+        val currentCenter = (headFraction.value + tailFraction.value) / 2f
+        val movingRight = target > currentCenter
+
+        // Asymmetric spring physics: lead shoots forward eagerly, trail follows with damping
+        val leadSpring = spring<Float>(
+            dampingRatio = 0.74f,
+            stiffness = 420f
+        )
+        val trailSpring = spring<Float>(
+            dampingRatio = 0.86f,
+            stiffness = 310f
+        )
+
+        if (movingRight) {
+            launch {
+                headFraction.animateTo(targetValue = target, animationSpec = leadSpring)
+            }
+            launch {
+                tailFraction.animateTo(targetValue = target, animationSpec = trailSpring)
+            }
+        } else {
+            launch {
+                tailFraction.animateTo(targetValue = target, animationSpec = leadSpring)
+            }
+            launch {
+                headFraction.animateTo(targetValue = target, animationSpec = trailSpring)
+            }
         }
     }
 
@@ -279,7 +303,7 @@ fun NexusFloatingBottomNav(
         .clip(pillShape)
         .then(
             if (hazeState != null && hazeState.areas.isNotEmpty()) {
-                Modifier.hazeChild(
+                Modifier.hazeEffect(
                     state = hazeState,
                     style = dev.chrisbanes.haze.HazeStyle(
                         backgroundColor = NexusTheme.colors.surface,
@@ -366,19 +390,22 @@ fun NexusFloatingBottomNav(
                         val radius = indH / 2f
                         val top = centerY - indH / 2f
 
-                        val currentLeft = pad + (tabW + spacing) * tabFraction.value
-                        val iW = (tabW - 6.dp.toPx()).coerceAtLeast(0f)
-                        val iX = currentLeft + 3.dp.toPx()
+                        val leftIndex = minOf(headFraction.value, tailFraction.value)
+                        val rightIndex = maxOf(headFraction.value, tailFraction.value)
+
+                        val leftX = pad + (tabW + spacing) * leftIndex + 2.dp.toPx()
+                        val rightX = pad + (tabW + spacing) * rightIndex + tabW - 2.dp.toPx()
+                        val iW = (rightX - leftX).coerceAtLeast(tabW - 4.dp.toPx())
 
                         drawRoundRect(
                             color        = indicatorFill,
-                            topLeft      = Offset(iX, top),
+                            topLeft      = Offset(leftX, top),
                             size         = Size(iW, indH),
                             cornerRadius = CornerRadius(radius, radius)
                         )
                         drawRoundRect(
                             color        = indicatorStroke,
-                            topLeft      = Offset(iX + 0.5f, top + 0.5f),
+                            topLeft      = Offset(leftX + 0.5f, top + 0.5f),
                             size         = Size(iW - 1f, indH - 1f),
                             cornerRadius = CornerRadius(radius, radius),
                             style        = Stroke(width = 1.dp.toPx())

@@ -63,7 +63,7 @@ class TextReaderViewModel @Inject constructor(
     private val _isWordWrapEnabled = MutableStateFlow(true)
     val isWordWrapEnabled: StateFlow<Boolean> = _isWordWrapEnabled.asStateFlow()
 
-    private val _readerTheme = MutableStateFlow("LIGHT") // LIGHT, DARK, SEPIA
+    private val _readerTheme = MutableStateFlow("LIGHT") // LIGHT, DARK
     val readerTheme: StateFlow<String> = _readerTheme.asStateFlow()
     
     private val _matchCase = MutableStateFlow(false)

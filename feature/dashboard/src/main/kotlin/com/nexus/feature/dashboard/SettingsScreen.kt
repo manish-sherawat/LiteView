@@ -15,6 +15,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
@@ -29,6 +30,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,8 +38,11 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -64,6 +69,9 @@ import com.nexus.core.ui.components.NexusCard
 import com.nexus.core.ui.components.NexusDialog
 import com.nexus.core.ui.components.NexusIconButton
 import com.nexus.core.ui.components.NexusSwitch
+import com.nexus.core.ui.liquidglass.NexusLiquidToggle
+import com.nexus.core.ui.liquidglass.NexusLiquidSlider
+import kotlin.math.roundToInt
 import com.nexus.core.ui.components.NexusTopBar
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -90,9 +98,9 @@ fun SettingsScreen(
 
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var showThemeDialog      by remember { mutableStateOf(false) }
-    var showLicensesDialog   by remember { mutableStateOf(false) }
     var showTagManagerScreen by remember { mutableStateOf(false) }
     var showRetentionDialog  by remember { mutableStateOf(false) }
+    var isCustomizationExpanded by rememberSaveable { mutableStateOf(false) }
 
 
     // ── Storage permission helpers ────────────────────────────────────────────
@@ -228,8 +236,6 @@ fun SettingsScreen(
                         ThemeMode.SYSTEM -> "System Default"
                         ThemeMode.LIGHT  -> "Light"
                         ThemeMode.DARK   -> "Dark"
-                        ThemeMode.AMOLED -> "AMOLED Black"
-                        ThemeMode.SEPIA  -> "Sepia"
                         ThemeMode.FOREST -> "Forest"
                         ThemeMode.SUNSET -> "Sunset"
                     }
@@ -239,6 +245,105 @@ fun SettingsScreen(
                         value    = themeText,
                         onClick  = { showThemeDialog = true }
                     )
+                }
+            }
+
+            // ── Navigation Bar Customization ───────────────────────────────────
+            item {
+                SettingsSectionGroup(
+                    label    = "Bottom Tab Bar Customization",
+                    modifier = Modifier.fadeSlideIn(delay = 90, offsetY = 16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.sm)
+                            .clip(RoundedCornerShape(50.dp))
+                            .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        NavStyleOption(
+                            label = "Classic Bar",
+                            iconRes = R.drawable.ic_nav_dock,
+                            selected = !uiState.useLiquidBottomNav,
+                            onClick = { viewModel.setUseLiquidBottomNav(false) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        NavStyleOption(
+                            label = "Liquid Glass",
+                            iconRes = R.drawable.ic_blur,
+                            selected = uiState.useLiquidBottomNav,
+                            onClick = {
+                                viewModel.setUseLiquidBottomNav(true)
+                                isCustomizationExpanded = true
+                            },
+                            isExpanded = isCustomizationExpanded,
+                            onToggleExpand = { isCustomizationExpanded = !isCustomizationExpanded },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = uiState.useLiquidBottomNav && isCustomizationExpanded,
+                        enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                    ) {
+                        Column {
+                            SettingsDivider()
+                            // 1. Corner Radius
+                            SettingsSliderRow(
+                                title = "Corner Radius",
+                                valueText = "${uiState.bottomNavCornerRadius.roundToInt()} dp",
+                                value = uiState.bottomNavCornerRadius,
+                                onValueChange = { viewModel.setBottomNavCornerRadius(it) },
+                                valueRange = 4f..31f,
+                                iconRes = R.drawable.ic_corner_radius
+                            )
+
+                            SettingsDivider()
+                            // 2. Blur Radius
+                            SettingsSliderRow(
+                                title = "Blur Radius",
+                                valueText = "${uiState.bottomNavBlurRadius.roundToInt()} dp",
+                                value = uiState.bottomNavBlurRadius,
+                                onValueChange = { viewModel.setBottomNavBlurRadius(it) },
+                                valueRange = 0f..35f,
+                                iconRes = R.drawable.ic_blur
+                            )
+
+                            SettingsDivider()
+                            // 3. Refraction Height
+                            SettingsSliderRow(
+                                title = "Refraction Height",
+                                valueText = "${uiState.bottomNavRefractionHeight.roundToInt()} dp",
+                                value = uiState.bottomNavRefractionHeight,
+                                onValueChange = { viewModel.setBottomNavRefractionHeight(it) },
+                                valueRange = 0f..50f,
+                                iconRes = R.drawable.ic_refraction_height
+                            )
+
+                            SettingsDivider()
+                            // 4. Refraction Amount
+                            SettingsSliderRow(
+                                title = "Refraction Amount",
+                                valueText = "${uiState.bottomNavRefractionAmount.roundToInt()} dp",
+                                value = uiState.bottomNavRefractionAmount,
+                                onValueChange = { viewModel.setBottomNavRefractionAmount(it) },
+                                valueRange = 0f..50f,
+                                iconRes = R.drawable.ic_refraction_amount
+                            )
+
+                            SettingsDivider()
+                            // Reset
+                            SettingsNavRow(
+                                iconRes = R.drawable.ic_rotate,
+                                title = "Reset Tab Bar Optics",
+                                value = "Default",
+                                onClick = { viewModel.resetBottomNavCustomization() }
+                            )
+                        }
+                    }
                 }
             }
 
@@ -358,13 +463,6 @@ fun SettingsScreen(
                             }
                         }
                     )
-                    SettingsDivider()
-                    SettingsNavRow(
-                        iconRes  = R.drawable.ic_startup,
-                        title    = "Open Source Licenses",
-                        value    = "Libraries",
-                        onClick  = { showLicensesDialog = true }
-                    )
                 }
             }
         }
@@ -410,10 +508,6 @@ fun SettingsScreen(
             onDaysSelected = { viewModel.setTrashRetentionDays(it) },
             onDismiss = { showRetentionDialog = false }
         )
-    }
-
-    if (showLicensesDialog) {
-        LicensesDialog(onDismiss = { showLicensesDialog = false })
     }
 }
 
@@ -679,7 +773,173 @@ private fun SettingsSwitchRow(
             )
         }
         Spacer(modifier = Modifier.width(16.dp))
-        NexusSwitch(checked = checked, onCheckedChange = null)
+        NexusLiquidToggle(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
+    }
+}
+
+@Composable
+private fun NavStyleOption(
+    label:          String,
+    iconRes:        Int,
+    selected:       Boolean,
+    onClick:        () -> Unit,
+    modifier:       Modifier = Modifier,
+    isExpanded:     Boolean? = null,
+    onToggleExpand: (() -> Unit)? = null
+) {
+    val haptic = LocalHapticFeedback.current
+    val hapticEnabled = LocalHapticFeedbackEnabled.current
+    val primaryColor = NexusTheme.colors.primary
+
+    val backgroundColor by animateColorAsState(
+        targetValue = if (selected) NexusTheme.colors.surface else Color.Transparent,
+        animationSpec = tween(180),
+        label = "navOptionBg"
+    )
+
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) primaryColor else NexusTheme.colors.textSecondary,
+        animationSpec = tween(180),
+        label = "navOptionContent"
+    )
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(50.dp))
+            .then(
+                if (selected) {
+                    Modifier
+                        .shadow(2.dp, RoundedCornerShape(50.dp))
+                        .background(backgroundColor, RoundedCornerShape(50.dp))
+                        .border(1.dp, primaryColor.copy(alpha = 0.28f), RoundedCornerShape(50.dp))
+                } else {
+                    Modifier.background(backgroundColor, RoundedCornerShape(50.dp))
+                }
+            )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                if (hapticEnabled) {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
+                if (!selected) {
+                    onClick()
+                } else if (onToggleExpand != null) {
+                    onToggleExpand()
+                }
+            }
+            .padding(vertical = 10.dp, horizontal = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Image(
+                painter            = painterResource(id = iconRes),
+                contentDescription = null,
+                modifier           = Modifier.size(17.dp),
+                colorFilter        = ColorFilter.tint(contentColor)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            NexusText(
+                text  = label,
+                style = NexusTheme.typography.body.copy(
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    fontSize   = 13.5.sp
+                ),
+                color = contentColor
+            )
+
+            if (isExpanded != null && selected) {
+                Spacer(modifier = Modifier.width(4.dp))
+                val arrowRotation by animateFloatAsState(
+                    targetValue   = if (isExpanded) -90f else 90f,
+                    animationSpec = tween(200),
+                    label         = "navOptionChevron"
+                )
+                Image(
+                    painter            = painterResource(id = R.drawable.ic_arrow_right),
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    modifier           = Modifier
+                        .size(13.dp)
+                        .graphicsLayer { rotationZ = arrowRotation },
+                    colorFilter        = ColorFilter.tint(contentColor)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsSliderRow(
+    title:           String,
+    valueText:       String,
+    value:           Float,
+    onValueChange:   (Float) -> Unit,
+    valueRange:      ClosedFloatingPointRange<Float>,
+    iconRes:         Int,
+    iconTint:        Color = NexusTheme.colors.textPrimary
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.sm)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(NexusTheme.shapes.medium)
+                    .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.7f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter            = painterResource(id = iconRes),
+                    contentDescription = title,
+                    modifier           = Modifier.size(20.dp),
+                    colorFilter        = ColorFilter.tint(iconTint)
+                )
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            NexusText(
+                text     = title,
+                style    = NexusTheme.typography.body,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(NexusTheme.colors.primary.copy(alpha = 0.12f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                NexusText(
+                    text  = valueText,
+                    style = NexusTheme.typography.caption.copy(fontWeight = FontWeight.SemiBold),
+                    color = NexusTheme.colors.primary
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        NexusLiquidSlider(
+            value         = value,
+            onValueChange = onValueChange,
+            valueRange    = valueRange,
+            accentColor   = NexusTheme.colors.primary,
+            modifier      = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp)
+        )
     }
 }
 
@@ -871,8 +1131,6 @@ private fun ThemeSelectionDialog(
         Triple(ThemeMode.SYSTEM, "System Default", R.drawable.ic_theme),
         Triple(ThemeMode.LIGHT,  "Light",          R.drawable.ic_theme_light),
         Triple(ThemeMode.DARK,   "Dark",           R.drawable.ic_theme_dark),
-        Triple(ThemeMode.AMOLED, "AMOLED Black",   R.drawable.ic_theme_dark),
-        Triple(ThemeMode.SEPIA,  "Sepia",          R.drawable.ic_theme_sepia),
         Triple(ThemeMode.FOREST, "Forest",         R.drawable.ic_theme_forest),
         Triple(ThemeMode.SUNSET, "Sunset",         R.drawable.ic_theme_sunset)
     )
@@ -928,8 +1186,6 @@ private fun ThemeSelectionDialog(
                 val accentColor = when (mode) {
                     ThemeMode.LIGHT  -> lightNexusColors.primary
                     ThemeMode.DARK   -> darkNexusColors.primary
-                    ThemeMode.AMOLED -> amoledNexusColors.primary
-                    ThemeMode.SEPIA  -> sepiaNexusColors.primary
                     ThemeMode.FOREST -> forestNexusColors.primary
                     ThemeMode.SUNSET -> sunsetNexusColors.primary
                     else             -> NexusTheme.colors.primary
@@ -938,8 +1194,6 @@ private fun ThemeSelectionDialog(
                 val swatchColor = when (mode) {
                     ThemeMode.LIGHT  -> lightNexusColors.background
                     ThemeMode.DARK   -> darkNexusColors.background
-                    ThemeMode.AMOLED -> amoledNexusColors.background
-                    ThemeMode.SEPIA  -> sepiaNexusColors.background
                     ThemeMode.FOREST -> forestNexusColors.background
                     ThemeMode.SUNSET -> sunsetNexusColors.background
                     else             -> NexusTheme.colors.background
@@ -1022,56 +1276,4 @@ private fun ThemeSelectionDialog(
     }
 }
 
-// ─── Open Source Licenses Dialog ──────────────────────────────────────────────
-
-@Composable
-private fun LicensesDialog(onDismiss: () -> Unit) {
-    val libraries = listOf(
-        Pair("MuPDF 1.23", "High-performance PDF rendering engine (AGPL / Commercial license)"),
-        Pair("Jetpack Compose & Kotlin", "Modern declarative UI framework & Coroutines by Google / JetBrains (Apache 2.0)"),
-        Pair("Hilt & Dagger", "Dependency injection framework by Google (Apache 2.0)"),
-        Pair("Jetpack DataStore", "Robust, asynchronous key-value storage by Google (Apache 2.0)"),
-        Pair("Apache POI", "Java API for Microsoft Documents (Apache 2.0)"),
-        Pair("Material Components", "Modular and customizable Material Design UI components (Apache 2.0)")
-    )
-    NexusDialog(
-        onDismissRequest = onDismiss,
-        title = { NexusText("Open Source Licenses", style = NexusTheme.typography.h2) },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
-            ) {
-                libraries.forEach { (name, desc) ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(NexusTheme.shapes.small)
-                            .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.6f))
-                            .border(1.dp, NexusTheme.colors.divider.copy(alpha = 0.6f), NexusTheme.shapes.small)
-                            .padding(NexusTheme.spacing.sm)
-                    ) {
-                        NexusText(
-                            text = name,
-                            style = NexusTheme.typography.body.copy(fontWeight = FontWeight.SemiBold),
-                            color = NexusTheme.colors.textPrimary
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        NexusText(
-                            text = desc,
-                            style = NexusTheme.typography.caption,
-                            color = NexusTheme.colors.textSecondary
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            NexusButton(
-                text = "Close",
-                onClick = onDismiss
-            )
-        }
-    )
-}
 

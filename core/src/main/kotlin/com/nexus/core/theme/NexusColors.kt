@@ -72,29 +72,8 @@ val lightNexusColors = NexusColors(
 )
 
 val darkNexusColors = NexusColors(
-    background = Color(0xFF121212), // Material Dark Surface
-    surface = Color(0xFF1E1E1E),
-    surfaceVariant = Color(0xFF2C2C2C), 
-    primary = Color(0xFFFFFFFF), 
-    onPrimary = Color(0xFF000000),
-    textPrimary = Color(0xFFE8E8E8),
-    textSecondary = Color(0xFFAAAAAA),
-    divider = Color(0xFF333333),
-    error = Color(0xFFFF453A),
-    success = Color(0xFF32D74B),
-    warning = Color(0xFFFF9F0A),
-    searchHighlight = Color(0x88FFD60A),
-    surfaceElevated = Color(0xFF2C2C2C),
-    surfaceGlass = Color(0xFF1E1E1E).copy(alpha = 0.65f),
-    onSurface = Color(0xFFE8E8E8),
-    trackBackground = Color(0xFF333333),
-    surfaceGradient = Brush.verticalGradient(listOf(Color(0xFF2C2C2C), Color(0xFF1E1E1E))),
-    primaryGradient = Brush.horizontalGradient(listOf(Color(0xFFE8E8E8), Color(0xFFCCCCCC)))
-)
-
-val amoledNexusColors = NexusColors(
-    background = Color(0xFF000000), // True AMOLED black
-    surface = Color(0xFF0F0F0F),    // Deeper grey for better contrast
+    background = Color(0xFF000000), // True AMOLED pitch black
+    surface = Color(0xFF0F0F0F),    // Deep contrast surface
     surfaceVariant = Color(0xFF181818), 
     primary = Color(0xFFFFFFFF), 
     onPrimary = Color(0xFF000000),
@@ -113,26 +92,7 @@ val amoledNexusColors = NexusColors(
     primaryGradient = Brush.horizontalGradient(listOf(Color(0xFFE8E8E8), Color(0xFFCCCCCC)))
 )
 
-val sepiaNexusColors = NexusColors(
-    background = Color(0xFFFBF0D9), // Warm parchment
-    surface = Color(0xFFF2E6CD),
-    surfaceVariant = Color(0xFFE8DCC3),
-    primary = Color(0xFF5D4037),    // Soft brown accent
-    onPrimary = Color(0xFFFFFFFF),
-    textPrimary = Color(0xFF3E2723), // Espresso text
-    textSecondary = Color(0xFF795548),
-    divider = Color(0xFFD7CCC8),
-    error = Color(0xFFD32F2F),
-    success = Color(0xFF4CAF50),
-    warning = Color(0xFFFF9800),
-    searchHighlight = Color(0x66FFEB3B),
-    surfaceElevated = Color(0xFFE8DCC3),
-    surfaceGlass = Color(0xFFF2E6CD).copy(alpha = 0.65f),
-    onSurface = Color(0xFF3E2723),
-    trackBackground = Color(0xFFD7CCC8),
-    surfaceGradient = Brush.verticalGradient(listOf(Color(0xFFF2E6CD), Color(0xFFE8DCC3))),
-    primaryGradient = Brush.horizontalGradient(listOf(Color(0xFF5D4037), Color(0xFF4E342E)))
-)
+val amoledNexusColors = darkNexusColors
 
 val forestNexusColors = NexusColors(
     background = Color(0xFFE8F5E9), // Light sage green

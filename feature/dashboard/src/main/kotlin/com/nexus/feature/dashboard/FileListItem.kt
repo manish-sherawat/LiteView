@@ -37,6 +37,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,7 +86,8 @@ fun FileListItem(
     allAvailableTags: List<TagUiModel> = emptyList(),
     onSaveTags: (List<String>) -> Unit = {},
     onSaveTagDefinition: ((name: String, colorHex: String, emoji: String?) -> Unit)? = null,
-    onOpenTagManager: (() -> Unit)? = null
+    onOpenTagManager: (() -> Unit)? = null,
+    searchQuery: String = ""
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -92,6 +95,33 @@ fun FileListItem(
     var renameDialogExpanded by remember { mutableStateOf(false) }
     var tagDialogExpanded by remember { mutableStateOf(false) }
     var newFileName by remember(doc.uri) { mutableStateOf(doc.fileName) }
+
+    val highlightedFileName = remember(doc.fileName, searchQuery) {
+        if (searchQuery.isBlank()) {
+            AnnotatedString(doc.fileName)
+        } else {
+            val lowerName = doc.fileName.lowercase()
+            val queryWords = searchQuery.lowercase().trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+            val builder = AnnotatedString.Builder(doc.fileName)
+            for (word in queryWords) {
+                var startIndex = 0
+                while (startIndex < lowerName.length) {
+                    val index = lowerName.indexOf(word, startIndex)
+                    if (index == -1) break
+                    builder.addStyle(
+                        SpanStyle(
+                            background = Color(0xFFFFEB3B).copy(alpha = 0.38f),
+                            fontWeight = FontWeight.ExtraBold
+                        ),
+                        start = index,
+                        end = index + word.length
+                    )
+                    startIndex = index + word.length
+                }
+            }
+            builder.toAnnotatedString()
+        }
+    }
 
     val docType = runCatching { DocumentType.valueOf(doc.documentType) }
         .getOrDefault(DocumentType.UNKNOWN)
@@ -119,19 +149,30 @@ fun FileListItem(
 
     // PDF Thumbnail Loading
     var pdfThumbnail by remember { mutableStateOf<ImageBitmap?>(null) }
+    var extractedCoverColor by remember { mutableStateOf<Color?>(null) }
     var isThumbnailLoading by remember { mutableStateOf(docType == DocumentType.PDF) }
 
     LaunchedEffect(doc.uri) {
         if (docType == DocumentType.PDF) {
             isThumbnailLoading = true
             try {
-                pdfThumbnail = PdfThumbnailCache.getThumbnail(context, doc.uri)
+                val (bmp, color) = PdfThumbnailCache.getThumbnailAndColor(context, doc.uri)
+                pdfThumbnail = bmp
+                extractedCoverColor = color
             } catch (_: Exception) {
                 pdfThumbnail = null
+                extractedCoverColor = null
             } finally {
                 isThumbnailLoading = false
             }
         }
+    }
+
+    val effectiveAccentColor = extractedCoverColor ?: accentColor
+
+    val isNew = remember(doc.lastOpenedAt) {
+        val now = System.currentTimeMillis()
+        doc.lastOpenedAt > 0 && (now - doc.lastOpenedAt) < 24 * 60 * 60 * 1000L
     }
 
     // Extract clean folder path
@@ -223,7 +264,7 @@ fun FileListItem(
                                 brush = Brush.linearGradient(
                                     colors = listOf(
                                         NexusTheme.colors.surface,
-                                        accentColor.copy(alpha = 0.12f)
+                                        effectiveAccentColor.copy(alpha = 0.14f)
                                     )
                                 )
                             )
@@ -241,7 +282,7 @@ fun FileListItem(
                                     contentScale = ContentScale.Crop
                                 )
                             } else {
-                                StylizedPaperGraphic(docType = docType, accentColor = accentColor)
+                                StylizedPaperGraphic(docType = docType, accentColor = effectiveAccentColor)
                             }
                         } else {
                             // Non-PDF formats (Word, Excel, Text, etc.)
@@ -289,6 +330,29 @@ fun FileListItem(
                             colorFilter = ColorFilter.tint(Color.White)
                         )
                     }
+
+                    // Pulsing "NEW" badge (Top-End) for recently added/opened files
+                    if (isNew && selectionAlpha == 0f) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                                .breathePulse(minScale = 0.92f, maxScale = 1.08f, durationMs = 1800)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFF10B981))
+                                .padding(horizontal = 4.dp, vertical = 1.5.dp)
+                        ) {
+                            NexusText(
+                                text = "NEW",
+                                style = NexusTheme.typography.caption.copy(
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 0.4.sp
+                                ),
+                                color = Color.White
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -318,7 +382,7 @@ fun FileListItem(
                         }
 
                         NexusText(
-                            text = doc.fileName,
+                            text = highlightedFileName,
                             style = NexusTheme.typography.title.copy(
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -580,6 +644,7 @@ private fun StylizedPaperGraphic(docType: DocumentType, accentColor: Color) {
         DocumentType.PDF  -> com.nexus.core.R.drawable.ic_file_pdf_new
         DocumentType.DOCX -> com.nexus.core.R.drawable.ic_file_word_new
         DocumentType.XLSX -> com.nexus.core.R.drawable.ic_file_sheet_new
+        DocumentType.PPTX -> com.nexus.core.R.drawable.ic_file_ppt_new
         DocumentType.TXT  -> com.nexus.core.R.drawable.ic_file_txt_new
         else              -> com.nexus.core.R.drawable.ic_file_gen_new
     }

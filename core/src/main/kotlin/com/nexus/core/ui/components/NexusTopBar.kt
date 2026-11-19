@@ -24,9 +24,33 @@ import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import android.os.Build
+import androidx.compose.ui.graphics.RectangleShape
 import com.nexus.core.theme.NexusTheme
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.NexusSurface
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import com.nexus.core.R
+import com.nexus.core.ui.animations.springBounceClick
+import com.nexus.core.ui.utils.LocalHazeState
+import com.nexus.core.ui.utils.hazeGlassBackground
+import dev.chrisbanes.haze.HazeState
+import androidx.compose.ui.composed
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Shape
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
 
 @Composable
 fun NexusCollapsingTopBar(
@@ -148,6 +172,7 @@ fun NexusCollapsingTopBar(
 fun NexusTopBar(
     title: String,
     modifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
     titleStyle: androidx.compose.ui.text.TextStyle? = null,
     navigationIcon: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {}
@@ -258,3 +283,287 @@ fun NexusPillTopBar(
         }
     }
 }
+
+/**
+ * A floating circular action button designed with subtle shadows, thin borders,
+ * theme-adaptive glassmorphism background, and spring bounce micro-interactions.
+ * Ideal for document viewer toolbars (Back, Search, Rotate, More options).
+ */
+@Composable
+fun NexusFloatingActionButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 40.dp,
+    elevation: Dp = 3.dp,
+    borderWidth: Dp = 0.8.dp,
+    hazeState: HazeState? = null,
+    isActive: Boolean = false,
+    content: @Composable () -> Unit
+) {
+    val isDark = isSystemInDarkTheme()
+    val activeBg = if (isActive) {
+        NexusTheme.colors.primary.copy(alpha = if (isDark) 0.22f else 0.14f)
+    } else {
+        Color.Transparent
+    }
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .viewerSolidSurface(shape = CircleShape, elevation = elevation)
+            .background(activeBg, CircleShape)
+            .springBounceClick(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        content()
+    }
+}
+
+/**
+ * Applies a clean, simple solid surface background with subtle floating shadow and hairline border.
+ */
+fun Modifier.viewerSolidSurface(
+    shape: Shape = CircleShape,
+    elevation: Dp = 3.dp
+): Modifier = composed {
+    val isDark = isSystemInDarkTheme()
+    val surfaceColor = NexusTheme.colors.surface
+    val borderColor = if (isDark) {
+        Color.White.copy(alpha = 0.12f)
+    } else {
+        NexusTheme.colors.divider.copy(alpha = 0.70f)
+    }
+    val ambientShadow = Color.Black.copy(alpha = if (isDark) 0.35f else 0.06f)
+    val spotShadow = Color.Black.copy(alpha = if (isDark) 0.25f else 0.08f)
+
+    this
+        .shadow(
+            elevation = elevation,
+            shape = shape,
+            clip = false,
+            spotColor = spotShadow,
+            ambientColor = ambientShadow
+        )
+        .clip(shape)
+        .background(surfaceColor, shape)
+        .border(width = 0.8.dp, color = borderColor, shape = shape)
+}
+
+/**
+ * Backward-compatible alias for [viewerSolidSurface], ensuring all callers render clean solid styling.
+ */
+fun Modifier.viewerLiquidGlass(
+    hazeState: HazeState? = null,
+    shape: Shape = CircleShape,
+    elevation: Dp = 3.dp
+): Modifier = viewerSolidSurface(shape = shape, elevation = elevation)
+
+/**
+ * Action button designed specifically for the shared action pill in document viewers.
+ */
+@Composable
+fun NexusViewerActionButton(
+    painter: Painter,
+    contentDescription: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isActive: Boolean = false,
+    size: Dp = 38.dp,
+    iconSize: Dp = 20.dp,
+    tint: Color = NexusTheme.colors.textPrimary,
+    activeTint: Color = NexusTheme.colors.primary
+) {
+    val isDark = isSystemInDarkTheme()
+    val activeBg = if (isActive) {
+        NexusTheme.colors.primary.copy(alpha = if (isDark) 0.22f else 0.14f)
+    } else {
+        Color.Transparent
+    }
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(activeBg)
+            .springBounceClick(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painter,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(iconSize),
+            colorFilter = ColorFilter.tint(if (isActive) activeTint else tint)
+        )
+    }
+}
+
+/**
+ * Subtle vertical divider line separating action buttons inside the shared action pill.
+ */
+@Composable
+fun NexusViewerActionDivider(
+    modifier: Modifier = Modifier
+) {
+    val isDark = isSystemInDarkTheme()
+    val dividerColor = if (isDark) {
+        Color.White.copy(alpha = 0.14f)
+    } else {
+        NexusTheme.colors.divider.copy(alpha = 0.55f)
+    }
+    Box(
+        modifier = modifier
+            .width(1.dp)
+            .height(18.dp)
+            .background(dividerColor, CircleShape)
+    )
+}
+
+/**
+ * A floating circular icon button with subtle shadows and thin borders.
+ */
+@Composable
+fun NexusFloatingIconButton(
+    painter: Painter,
+    contentDescription: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 38.dp,
+    iconSize: Dp = 20.dp,
+    tint: Color = NexusTheme.colors.textPrimary,
+    hazeState: HazeState? = null,
+    isActive: Boolean = false,
+    activeTint: Color = NexusTheme.colors.primary,
+    elevation: Dp = 4.dp,
+    borderWidth: Dp = 0.75.dp,
+    standalone: Boolean = false
+) {
+    if (standalone) {
+        NexusFloatingActionButton(
+            onClick = onClick,
+            modifier = modifier,
+            size = size,
+            elevation = elevation,
+            borderWidth = borderWidth,
+            hazeState = hazeState,
+            isActive = isActive
+        ) {
+            Image(
+                painter = painter,
+                contentDescription = contentDescription,
+                modifier = Modifier.size(iconSize),
+                colorFilter = ColorFilter.tint(if (isActive) activeTint else tint)
+            )
+        }
+    } else {
+        NexusViewerActionButton(
+            painter = painter,
+            contentDescription = contentDescription,
+            onClick = onClick,
+            modifier = modifier,
+            isActive = isActive,
+            size = size,
+            iconSize = iconSize,
+            tint = tint,
+            activeTint = activeTint
+        )
+    }
+}
+
+/**
+ * Modern floating solid top bar for document viewers (PDF, Office, Presentation, Text).
+ *
+ * Structures the top bar into 3 balanced, clean floating components with solid surface colors:
+ * 1. Back button (floating solid circle)
+ * 2. Title section (expanded, prominent floating solid pill)
+ * 3. Combined actions section (shared single floating solid pill holding Search and More)
+ */
+@Composable
+fun NexusViewerTopBar(
+    title: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    titleModifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
+    titleStyle: androidx.compose.ui.text.TextStyle? = null,
+    onTitleClick: (() -> Unit)? = null,
+    navigationIcon: (@Composable () -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit = {}
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // 1. Back navigation button: circular floating solid button
+        if (navigationIcon != null) {
+            navigationIcon()
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .viewerSolidSurface(shape = CircleShape)
+                    .springBounceClick(onClick = onBack),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = com.nexus.core.R.drawable.ic_back),
+                    contentDescription = "Back",
+                    modifier = Modifier.size(20.dp),
+                    colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary)
+                )
+            }
+        }
+
+        // 2. Title section: prominent expanded floating solid pill
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(44.dp)
+                .viewerSolidSurface(shape = CircleShape)
+                .then(
+                    if (onTitleClick != null) {
+                        Modifier.springBounceClick(onClick = onTitleClick)
+                    } else {
+                        Modifier
+                    }
+                )
+                .padding(horizontal = 16.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            NexusText(
+                text = title,
+                style = titleStyle ?: NexusTheme.typography.body.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    letterSpacing = (-0.2).sp
+                ),
+                color = NexusTheme.colors.textPrimary,
+                maxLines = 1,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .basicMarquee()
+                    .then(titleModifier)
+            )
+        }
+
+        // 3. Actions section: single shared solid pill capsule
+        Box(
+            modifier = Modifier
+                .height(44.dp)
+                .viewerSolidSurface(shape = CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.padding(horizontal = 4.dp)
+            ) {
+                actions()
+            }
+        }
+    }
+}
+

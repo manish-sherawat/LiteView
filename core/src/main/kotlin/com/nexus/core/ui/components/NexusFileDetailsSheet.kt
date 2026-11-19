@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
@@ -70,7 +72,8 @@ fun NexusFileDetailsSheet(
     lastOpenedAt: Long = 0L,
     docType: DocumentType = DocumentType.UNKNOWN,
     customDetails: List<FileDetailItem> = emptyList(),
-    onDismissRequest: () -> Unit
+    onDismissRequest: () -> Unit,
+    onOpen: (() -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
@@ -104,6 +107,12 @@ fun NexusFileDetailsSheet(
         }
     }
 
+    LaunchedEffect(sheetState.targetValue) {
+        try {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        } catch (_: Exception) {}
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
@@ -118,6 +127,16 @@ fun NexusFileDetailsSheet(
                     .height(4.dp)
                     .clip(CircleShape)
                     .background(NexusTheme.colors.divider.copy(alpha = 0.8f))
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = {
+                                try {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                } catch (_: Exception) {}
+                            },
+                            onDrag = { _, _ -> }
+                        )
+                    }
             )
         }
     ) {
@@ -362,24 +381,19 @@ fun NexusFileDetailsSheet(
                 Spacer(modifier = Modifier.height(20.dp))
             }
 
-            // Footer: Close Button
-            Box(
-                modifier = Modifier
-                    .fadeSlideIn(delay = 200)
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(50))
-                    .background(NexusTheme.colors.primary)
-                    .springBounceClick(onClick = onDismissRequest)
-                    .padding(vertical = 14.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                NexusText(
-                    text = "Close",
-                    style = NexusTheme.typography.body.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.5.sp
-                    ),
-                    color = NexusTheme.colors.onPrimary
+            // Footer Action Button: Primary "Open" when opened from dashboard/outside
+            if (onOpen != null) {
+                NexusButton(
+                    text = "Open",
+                    onClick = {
+                        onDismissRequest()
+                        onOpen()
+                    },
+                    containerColor = NexusTheme.colors.primary,
+                    contentColor = NexusTheme.colors.onPrimary,
+                    modifier = Modifier
+                        .fadeSlideIn(delay = 200)
+                        .fillMaxWidth()
                 )
             }
         }

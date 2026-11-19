@@ -35,7 +35,20 @@ data class SettingsUiState(
     val hapticFeedbackEnabled: Boolean = true,
     val trashedCount: Int = 0,
     val trashedSizeText: String = "Empty",
-    val trashRetentionDays: Int = 30
+    val trashRetentionDays: Int = 30,
+    val useLiquidBottomNav: Boolean = true,
+    val bottomNavCornerRadius: Float = 28f,
+    val bottomNavBlurRadius: Float = 10f,
+    val bottomNavRefractionHeight: Float = 20f,
+    val bottomNavRefractionAmount: Float = 22f
+)
+
+private data class NavCustomizationState(
+    val useLiquid: Boolean = true,
+    val cornerRadius: Float = 28f,
+    val blurRadius: Float = 10f,
+    val refractionHeight: Float = 20f,
+    val refractionAmount: Float = 22f
 )
 
 // ─── Settings ViewModel ───────────────────────────────────────────────────────
@@ -82,11 +95,21 @@ class SettingsViewModel @Inject constructor(
             trashRepository.observeTotalTrashedSize(),
             prefsRepository.trashRetentionDays,
             ::Triple
-        )
+        ),
+        combine(
+            prefsRepository.useLiquidBottomNav,
+            prefsRepository.bottomNavCornerRadius,
+            prefsRepository.bottomNavBlurRadius,
+            prefsRepository.bottomNavRefractionHeight,
+            prefsRepository.bottomNavRefractionAmount
+        ) { useLiquid, corner, blur, refH, refA ->
+            NavCustomizationState(useLiquid, corner, blur, refH, refA)
+        }
     ) { (themeMode, defaultFontSize, keepScreenAwake),
         (rememberReadingPosition, defaultIsGridView, hapticFeedbackEnabled),
         (cacheSizeText, cacheClearResult),
-        (trashedCount, trashedSize, retentionDays) ->
+        (trashedCount, trashedSize, retentionDays),
+        navState ->
         val trashSummary = if (trashedCount == 0) {
             "Empty"
         } else {
@@ -104,7 +127,12 @@ class SettingsViewModel @Inject constructor(
             cacheClearMessage = cacheClearResult,
             trashedCount = trashedCount,
             trashedSizeText = trashSummary,
-            trashRetentionDays = retentionDays
+            trashRetentionDays = retentionDays,
+            useLiquidBottomNav = navState.useLiquid,
+            bottomNavCornerRadius = navState.cornerRadius,
+            bottomNavBlurRadius = navState.blurRadius,
+            bottomNavRefractionHeight = navState.refractionHeight,
+            bottomNavRefractionAmount = navState.refractionAmount
         )
     }.stateIn(
         scope = viewModelScope,
@@ -138,6 +166,13 @@ class SettingsViewModel @Inject constructor(
     }
     fun setDefaultIsGridView(value: Boolean) = viewModelScope.launch { prefsRepository.setDefaultIsGridView(value) }
     fun setHapticFeedbackEnabled(value: Boolean) = viewModelScope.launch { prefsRepository.setHapticFeedbackEnabled(value) }
+
+    fun setUseLiquidBottomNav(value: Boolean) = prefsRepository.setUseLiquidBottomNav(value)
+    fun setBottomNavCornerRadius(value: Float) = prefsRepository.setBottomNavCornerRadius(value)
+    fun setBottomNavBlurRadius(value: Float) = prefsRepository.setBottomNavBlurRadius(value)
+    fun setBottomNavRefractionHeight(value: Float) = prefsRepository.setBottomNavRefractionHeight(value)
+    fun setBottomNavRefractionAmount(value: Float) = prefsRepository.setBottomNavRefractionAmount(value)
+    fun resetBottomNavCustomization() = prefsRepository.resetBottomNavCustomization()
 
     fun resetToDefaults() = viewModelScope.launch { prefsRepository.resetToDefaults() }
 

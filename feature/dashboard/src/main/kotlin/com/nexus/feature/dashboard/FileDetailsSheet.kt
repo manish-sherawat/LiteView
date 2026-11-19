@@ -8,7 +8,8 @@ import com.nexus.feature.dashboard.data.RecentDocument
 @Composable
 fun FileDetailsSheet(
     doc: RecentDocument,
-    onDismissRequest: () -> Unit
+    onDismissRequest: () -> Unit,
+    onOpen: (() -> Unit)? = null
 ) {
     val docType = runCatching { DocumentType.valueOf(doc.documentType) }
         .getOrDefault(DocumentType.UNKNOWN)
@@ -19,6 +20,7 @@ fun FileDetailsSheet(
         fileSizeBytes = doc.fileSizeBytes,
         lastOpenedAt = doc.lastOpenedAt,
         docType = docType,
-        onDismissRequest = onDismissRequest
+        onDismissRequest = onDismissRequest,
+        onOpen = onOpen
     )
 }

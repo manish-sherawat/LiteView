@@ -39,8 +39,8 @@ apachePoi = "5.2.5"
 log4j = "2.20.0"
 aaltoXml = "1.3.2"
 
-# MuPDF
-mupdf = "1.23.0"
+# MuPDF (16 KB page-size compatible)
+mupdf = "1.28.5"
 
 # PDFBox Android
 pdfboxAndroid = "2.0.27.0"

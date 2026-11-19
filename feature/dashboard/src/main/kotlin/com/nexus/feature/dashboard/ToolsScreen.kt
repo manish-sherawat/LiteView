@@ -1,81 +1,113 @@
 package com.nexus.feature.dashboard
 
-import android.widget.Toast
 import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material3.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nexus.core.R
+import androidx.compose.ui.zIndex
+import com.nexus.core.theme.NexusFontFamily
 import com.nexus.core.theme.NexusTheme
 import com.nexus.core.ui.NexusText
-import com.nexus.core.ui.animations.breathePulse
 import com.nexus.core.ui.animations.springBounceClick
-import com.nexus.core.ui.animations.staggeredSlideFadeIn
-import com.nexus.core.ui.components.NexusButton
-import com.nexus.core.ui.components.NexusEmptyStateImage
-import com.nexus.core.ui.components.NexusEmptyStateType
-import com.nexus.core.ui.components.NexusSearchBar
-import com.nexus.core.ui.components.NexusTopBar
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
-// ─── Tools Hub Screen ────────────────────────────────────────────────────────
-// A curated, offline document conversion & utility suite.
-// Features a Bento Spotlight Hero, category tabs, live search, and Apple-grade micro-physics.
-
+/**
+ * PDF Tools Hub screen matching the precision HTML template specification.
+ * Dynamically synchronized with app settings & active theme (Light, Dark/AMOLED, Forest, Sunset, etc.).
+ *
+ * Highlights:
+ * - Full-bleed sticky top bar with logo squircle, brand title, and "Offline" privacy pill.
+ * - Pill-shaped search bar with live multi-word filtering, '/' indicator, and quick-clear.
+ * - Interactive category chips with dynamic tool counts and smooth active states.
+ * - Responsive 2-column card grid on phones (3-4 columns on tablet/desktop).
+ * - Custom squircle tool icon containers, clear typography hierarchy, and subtle forward affordance.
+ * - Seamless theme integration without hardcoded color issues or boxiness.
+ * - Full clearance for floating bottom navigation bar.
+ */
 @Composable
 fun ToolsScreen(
     onNavigateToTool: (String) -> Unit,
     onBack: () -> Unit
 ) {
-    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val coroutineScope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
+
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedCategory by rememberSaveable { mutableStateOf(ToolCategory.ALL) }
+    var toastMessage by remember { mutableStateOf<String?>(null) }
 
-    // Dynamic filtering
+    fun showToast(message: String) {
+        toastMessage = message
+        coroutineScope.launch {
+            delay(2800)
+            if (toastMessage == message) {
+                toastMessage = null
+            }
+        }
+    }
+
+    // Dynamic keyword & category filtering (multi-word matching across title, desc, short name, keywords)
     val filteredTools = remember(searchQuery, selectedCategory) {
+        val q = searchQuery.trim().lowercase()
+        val words = if (q.isBlank()) emptyList() else q.split(Regex("\\s+"))
+
         toolsList.filter { tool ->
             val matchesCategory = selectedCategory == ToolCategory.ALL || tool.category == selectedCategory
-            val matchesQuery = searchQuery.isBlank() ||
-                tool.title.contains(searchQuery, ignoreCase = true) ||
-                tool.subtitle.contains(searchQuery, ignoreCase = true) ||
-                tool.description.contains(searchQuery, ignoreCase = true) ||
-                (tool.badge != null && tool.badge.contains(searchQuery, ignoreCase = true))
+            val matchesQuery = if (words.isEmpty()) {
+                true
+            } else {
+                val searchableText = (tool.title + " " + tool.subtitle + " " + tool.description + " " + tool.keywords + " " + tool.category.name).lowercase()
+                words.all { searchableText.contains(it) }
+            }
             matchesCategory && matchesQuery
         }
     }
 
+    // Dynamic category tool counts
     val categoryCounts = remember {
         ToolCategory.entries.associateWith { cat ->
             if (cat == ToolCategory.ALL) toolsList.size
@@ -83,165 +115,284 @@ fun ToolsScreen(
         }
     }
 
-    val heroTool = remember { toolsList.firstOrNull { it.isHero } ?: toolsList.first() }
-    val showHeroCard = searchQuery.isBlank() && (selectedCategory == ToolCategory.ALL || selectedCategory == ToolCategory.CONVERT)
+    val colors = NexusTheme.colors
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(NexusTheme.colors.background)
+            .background(colors.background)
     ) {
+        // ─── Subtle dot-grid background accent (matching HTML body::before) ───
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(480.dp)
+        ) {
+            val dotColor = colors.divider.copy(alpha = 0.38f)
+            val dotRadius = 1.1.dp.toPx()
+            val spacing = 22.dp.toPx()
+            val width = size.width
+            val height = size.height
+
+            var x = spacing / 2
+            while (x < width) {
+                var y = spacing / 2
+                while (y < height) {
+                    val alphaFade = (1f - (y / height)).coerceIn(0f, 1f)
+                    drawCircle(
+                        color = dotColor.copy(alpha = dotColor.alpha * alphaFade),
+                        radius = dotRadius,
+                        center = Offset(x, y)
+                    )
+                    y += spacing
+                }
+                x += spacing
+            }
+        }
+
         Column(modifier = Modifier.fillMaxSize()) {
-            // ─── 1. Top Navigation Bar ──────────────────────────────────────────
-            NexusTopBar(
-                title = "Tools",
-                navigationIcon = {
-                    IconButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onBack()
-                        }
+            // ─── 1. Sticky Top Bar (Full-bleed, themed blur/solid backdrop) ─────
+            val isScrolled by remember { derivedStateOf { scrollState.value > 12 } }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.background.copy(alpha = 0.96f))
+                    .border(
+                        width = if (isScrolled) 1.dp else 0.dp,
+                        color = if (isScrolled) colors.divider.copy(alpha = 0.6f) else Color.Transparent
+                    )
+                    .padding(
+                        top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 6.dp,
+                        start = 20.dp,
+                        end = 20.dp,
+                        bottom = 12.dp
+                    )
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Document Logo Squircle
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(11.dp))
+                            .background(colors.primary),
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Back",
-                            tint = NexusTheme.colors.textPrimary
-                        )
-                    }
-                },
-                actions = {
-                    // Security / Privacy badge pill
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .padding(end = 12.dp)
-                            .clip(CircleShape)
-                            .background(NexusTheme.colors.primary.copy(alpha = 0.10f))
-                            .border(
-                                width = 0.8.dp,
-                                color = NexusTheme.colors.primary.copy(alpha = 0.35f),
-                                shape = CircleShape
-                            )
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_lock),
+                            imageVector = Icons.Outlined.Description,
                             contentDescription = null,
-                            modifier = Modifier.size(12.dp),
-                            colorFilter = ColorFilter.tint(NexusTheme.colors.primary)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        NexusText(
-                            text = "Offline",
-                            style = NexusTheme.typography.caption.copy(
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            ),
-                            color = NexusTheme.colors.primary
+                            tint = colors.onPrimary,
+                            modifier = Modifier.size(19.dp)
                         )
                     }
-                }
-            )
 
-            // ─── 2. Scrollable Body with Bento Grid ──────────────────────────────
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 155.dp),
-                contentPadding = PaddingValues(
-                    start = NexusTheme.spacing.md,
-                    end = NexusTheme.spacing.md,
-                    top = 2.dp,
-                    // Extra bottom padding to clear the floating bottom navigation bar
-                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 130.dp
-                ),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                // ── Section A: Live Search Bar (Full Span) ────────────────────────
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    NexusSearchBar(
-                        query = searchQuery,
-                        onQueryChange = { searchQuery = it },
-                        onClear = { searchQuery = "" },
-                        placeholderText = "Search tools...",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 2.dp)
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    NexusText(
+                        text = "Tools",
+                        style = NexusTheme.typography.title.copy(
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = (-0.4).sp
+                        ),
+                        color = colors.textPrimary
                     )
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Minimalist "Offline" Pill Button
+                    Box(
+                        modifier = Modifier
+                            .springBounceClick {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                showToast("Everything runs on your device. Your files are never uploaded.")
+                            }
+                            .clip(CircleShape)
+                            .background(colors.surface)
+                            .border(1.5.dp, colors.divider, CircleShape)
+                            .padding(horizontal = 14.dp, vertical = 7.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Lock,
+                                contentDescription = null,
+                                tint = colors.textPrimary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            NexusText(
+                                text = "Offline",
+                                style = NexusTheme.typography.caption.copy(
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                color = colors.textPrimary
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ─── 2. Scrollable Body Content (Matching HTML Page Layout) ───────
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(
+                        start = 18.dp,
+                        end = 18.dp,
+                        top = 14.dp,
+                        // Full clearance for floating bottom navigation bar
+                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 115.dp
+                    )
+            ) {
+                // Search Bar (.search in HTML: pill shape, 56dp, surface fill, 1.5dp border)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .clip(CircleShape)
+                        .background(colors.surface)
+                        .border(1.5.dp, colors.divider, CircleShape)
+                        .padding(horizontal = 18.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Search,
+                            contentDescription = "Search",
+                            tint = colors.textSecondary,
+                            modifier = Modifier.size(21.dp)
+                        )
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                fontFamily = NexusFontFamily,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = colors.textPrimary
+                            ),
+                            decorationBox = { innerTextField ->
+                                if (searchQuery.isEmpty()) {
+                                    NexusText(
+                                        text = "Search tools…",
+                                        style = NexusTheme.typography.body.copy(
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Normal,
+                                            color = colors.textSecondary.copy(alpha = 0.65f)
+                                        )
+                                    )
+                                }
+                                innerTextField()
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        if (searchQuery.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(CircleShape)
+                                    .background(colors.surfaceVariant)
+                                    .clickable { searchQuery = "" },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Close,
+                                    contentDescription = "Clear search",
+                                    tint = colors.textPrimary,
+                                    modifier = Modifier.size(13.5.dp)
+                                )
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(colors.surfaceVariant.copy(alpha = 0.5f))
+                                    .border(1.dp, colors.divider, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                NexusText(
+                                    text = "/",
+                                    style = NexusTheme.typography.caption.copy(
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = colors.textSecondary
+                                )
+                            }
+                        }
+                    }
                 }
 
-                // ── Section B: Category Filter Pills (Full Span) ─────────────────
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(vertical = 2.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(ToolCategory.entries.toTypedArray()) { category ->
-                            val isSelected = selectedCategory == category
-                            val count = categoryCounts[category] ?: 0
+                Spacer(modifier = Modifier.height(16.dp))
 
-                            val categoryAccent = when (category) {
-                                ToolCategory.ALL -> NexusTheme.colors.primary
-                                ToolCategory.CONVERT -> Color(0xFF2563EB)
-                                ToolCategory.ORGANIZE -> Color(0xFF8B5CF6)
-                                ToolCategory.SECURITY -> Color(0xFF06B6D4)
-                            }
+                // Category Chips (.chips in HTML: pill shape, 44dp height, count pill)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(ToolCategory.entries.toTypedArray()) { category ->
+                        val isSelected = selectedCategory == category
+                        val count = categoryCounts[category] ?: 0
 
-                            val animatedBg by animateColorAsState(
-                                targetValue = if (isSelected) categoryAccent.copy(alpha = 0.14f) else NexusTheme.colors.surfaceVariant.copy(alpha = 0.45f),
-                                animationSpec = spring(dampingRatio = 0.85f, stiffness = 450f),
-                                label = "catBg"
-                            )
-                            val animatedBorderColor by animateColorAsState(
-                                targetValue = if (isSelected) categoryAccent.copy(alpha = 0.7f) else NexusTheme.colors.divider.copy(alpha = 0.20f),
-                                animationSpec = spring(dampingRatio = 0.85f, stiffness = 450f),
-                                label = "catBorder"
-                            )
-                            val animatedTextColor by animateColorAsState(
-                                targetValue = if (isSelected) categoryAccent else NexusTheme.colors.textPrimary,
-                                animationSpec = spring(dampingRatio = 0.85f, stiffness = 450f),
-                                label = "catText"
-                            )
-
+                        Box(
+                            modifier = Modifier
+                                .height(44.dp)
+                                .clip(CircleShape)
+                                .background(if (isSelected) colors.primary else colors.surface)
+                                .border(
+                                    width = 1.5.dp,
+                                    color = if (isSelected) colors.primary else colors.divider,
+                                    shape = CircleShape
+                                )
+                                .springBounceClick {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    selectedCategory = category
+                                }
+                                .padding(start = 16.dp, end = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(animatedBg)
-                                    .border(
-                                        width = if (isSelected) 1.dp else 0.5.dp,
-                                        color = animatedBorderColor,
-                                        shape = CircleShape
-                                    )
-                                    .springBounceClick {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        selectedCategory = category
-                                    }
-                                    .padding(horizontal = 13.dp, vertical = 6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 NexusText(
                                     text = category.title,
-                                    style = NexusTheme.typography.caption.copy(
-                                        fontSize = 12.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    style = NexusTheme.typography.body.copy(
+                                        fontSize = 13.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
                                     ),
-                                    color = animatedTextColor
+                                    color = if (isSelected) colors.onPrimary else colors.textSecondary
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
+
                                 Box(
                                     modifier = Modifier
+                                        .height(26.dp)
                                         .clip(CircleShape)
-                                        .background(if (isSelected) categoryAccent else NexusTheme.colors.surfaceVariant)
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        .background(if (isSelected) colors.onPrimary else colors.surfaceVariant)
+                                        .padding(horizontal = 8.dp),
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     NexusText(
                                         text = "$count",
                                         style = NexusTheme.typography.caption.copy(
-                                            fontSize = 9.5.sp,
+                                            fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold
                                         ),
-                                        color = if (isSelected) NexusTheme.colors.onPrimary else NexusTheme.colors.textSecondary
+                                        color = if (isSelected) colors.primary else colors.textSecondary
                                     )
                                 }
                             }
@@ -249,60 +400,208 @@ fun ToolsScreen(
                     }
                 }
 
-                // ── Section C: Featured Bento Hero Spotlight (Full Span) ─────────
-                if (showHeroCard) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        ToolsFeaturedHeroCard(
-                            tool = heroTool,
-                            onClick = {
-                                if (heroTool.isAvailable) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onNavigateToTool(heroTool.id)
-                                } else {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    Toast.makeText(context, "${heroTool.title} is coming soon", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        )
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // Results Line (.results-line in HTML)
+                val count = filteredTools.size
+                val resultsText = if (searchQuery.isNotBlank() || selectedCategory != ToolCategory.ALL) {
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = colors.textPrimary)) {
+                            append("$count")
+                        }
+                        append(" tool${if (count == 1) "" else "s"} found")
+                    }
+                } else {
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = colors.textPrimary)) {
+                            append("${toolsList.size}")
+                        }
+                        append(" tools · ${toolsList.size} ready to use")
                     }
                 }
 
-                // ── Section D: Search Empty State ────────────────────────────────
+                NexusText(
+                    text = resultsText.text,
+                    style = NexusTheme.typography.caption.copy(
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = colors.textSecondary,
+                    modifier = Modifier.padding(start = 2.dp, bottom = 14.dp)
+                )
+
+                // Tool Cards: 2-Column Responsive Grid (.grid in HTML)
                 if (filteredTools.isEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        ToolsSearchEmptyState(
-                            query = searchQuery,
-                            onClearSearch = {
-                                searchQuery = ""
-                                selectedCategory = ToolCategory.ALL
-                            }
-                        )
-                    }
-                }
-
-                // ── Section E: Bento Tool Cards Grid ─────────────────────────────
-                itemsIndexed(
-                    items = filteredTools,
-                    key = { _, tool -> tool.id }
-                ) { index, tool ->
-                    ToolBentoCard(
-                        tool = tool,
+                    // Empty State (.empty in HTML: dashed border, search icon, action link)
+                    Box(
                         modifier = Modifier
-                            .animateItem()
-                            .staggeredSlideFadeIn(index = index, baseDelayMs = 20, maxDelayMs = 200, offsetY = 14.dp),
-                        onClick = {
-                            if (tool.isAvailable) {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onNavigateToTool(tool.id)
-                            } else {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                Toast.makeText(
-                                    context,
-                                    "${tool.title} is coming soon",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(colors.surface)
+                            .border(1.5.dp, colors.divider, RoundedCornerShape(22.dp))
+                            .padding(vertical = 48.dp, horizontal = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Search,
+                                contentDescription = null,
+                                tint = colors.textSecondary.copy(alpha = 0.5f),
+                                modifier = Modifier.size(36.dp)
+                            )
+                            NexusText(
+                                text = "No tools match “$searchQuery”",
+                                style = NexusTheme.typography.title.copy(
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = colors.textPrimary,
+                                textAlign = TextAlign.Center
+                            )
+                            NexusText(
+                                text = "Try a file type like DOCX or JPG, or a task like “merge”.",
+                                style = NexusTheme.typography.bodySmall.copy(
+                                    fontSize = 13.sp
+                                ),
+                                color = colors.textSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Box(
+                                modifier = Modifier
+                                    .springBounceClick {
+                                        searchQuery = ""
+                                        selectedCategory = ToolCategory.ALL
+                                    }
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(colors.surfaceVariant.copy(alpha = 0.5f))
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
+                                NexusText(
+                                    text = "Show all tools",
+                                    style = NexusTheme.typography.bodySmall.copy(
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        textDecoration = TextDecoration.Underline
+                                    ),
+                                    color = colors.textPrimary
+                                )
                             }
                         }
+                    }
+                } else {
+                    // Responsive Grid: 2 columns on phones, 3 on tablets, 4 on large screens
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                        val columns = when {
+                            maxWidth >= 840.dp -> 4
+                            maxWidth >= 600.dp -> 3
+                            else -> 2
+                        }
+                        val gap = if (maxWidth >= 600.dp) 14.dp else 12.dp
+                        val chunkedTools = remember(filteredTools, columns) {
+                            filteredTools.chunked(columns)
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                            chunkedTools.forEach { rowTools ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(gap)
+                                ) {
+                                    rowTools.forEach { tool ->
+                                        ToolGridCard(
+                                            tool = tool,
+                                            onNavigateToTool = onNavigateToTool,
+                                            onShowToast = { showToast(it) },
+                                            haptic = haptic,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                    // Fill any remaining row slots
+                                    repeat(columns - rowTools.size) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Footnote (.footnote in HTML)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 32.dp, bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Lock,
+                        contentDescription = null,
+                        tint = colors.textSecondary.copy(alpha = 0.5f),
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    NexusText(
+                        text = "Files never leave your device. No sign-up needed.",
+                        style = NexusTheme.typography.caption.copy(
+                            fontSize = 12.5.sp
+                        ),
+                        color = colors.textSecondary.copy(alpha = 0.6f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        // ─── 3. Floating Toast Notification (.toast in HTML) ─────────────────
+        AnimatedVisibility(
+            visible = toastMessage != null,
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = tween(350)
+            ) + fadeIn(tween(250)),
+            exit = slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = tween(250)
+            ) + fadeOut(tween(200)),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(
+                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 85.dp,
+                    start = 20.dp,
+                    end = 20.dp
+                )
+                .zIndex(10f)
+        ) {
+            Box(
+                modifier = Modifier
+                    .shadow(16.dp, RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(colors.primary)
+                    .border(1.dp, colors.divider.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 18.dp, vertical = 12.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.CheckCircle,
+                        contentDescription = null,
+                        tint = colors.onPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    NexusText(
+                        text = toastMessage.orEmpty(),
+                        style = NexusTheme.typography.body.copy(
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = colors.onPrimary
                     )
                 }
             }
@@ -310,343 +609,126 @@ fun ToolsScreen(
     }
 }
 
-// ─── Featured Hero Card Component ────────────────────────────────────────────
-
+/**
+ * Grid Tool Card corresponding to .tool in the HTML template.
+ *
+ * Structure:
+ * - 22dp rounded card with subtle surface fill and 1.5dp border matching theme.
+ * - Top: 54dp squircle icon container with the tool's respective icon.
+ * - Bottom: Bold title + description text, padded on the right.
+ * - Bottom-Right: 30dp circular forward arrow affordance.
+ * - Tap feedback: Spring bounce press animation with haptic response.
+ */
 @Composable
-private fun ToolsFeaturedHeroCard(
+private fun ToolGridCard(
     tool: Tool,
-    onClick: () -> Unit
+    onNavigateToTool: (String) -> Unit,
+    onShowToast: (String) -> Unit,
+    haptic: HapticFeedback,
+    modifier: Modifier = Modifier
 ) {
+    val colors = NexusTheme.colors
+
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
+            .defaultMinSize(minHeight = 168.dp)
             .clip(RoundedCornerShape(22.dp))
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        tool.accentColor.copy(alpha = 0.12f),
-                        NexusTheme.colors.surface,
-                        NexusTheme.colors.surface
-                    )
-                )
-            )
-            .border(
-                width = 0.8.dp,
-                color = tool.accentColor.copy(alpha = 0.25f),
-                shape = RoundedCornerShape(22.dp)
-            )
-            .shadow(
-                elevation = 4.dp,
-                shape = RoundedCornerShape(22.dp),
-                spotColor = tool.accentColor.copy(alpha = 0.15f),
-                ambientColor = tool.accentColor.copy(alpha = 0.05f)
-            )
-            .springBounceClick(onClick = onClick)
+            .background(colors.surface)
+            .border(1.5.dp, colors.divider, RoundedCornerShape(22.dp))
+            .springBounceClick {
+                if (tool.isAvailable) {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onNavigateToTool(tool.id)
+                } else {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onShowToast("${tool.title} is coming soon.")
+                }
+            }
             .padding(16.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Squircle Icon
+            // Squircle Icon Container (.t-icon in HTML: 54dp, 16dp radius, soft surface fill, 1dp border)
             Box(
                 modifier = Modifier
-                    .size(52.dp)
+                    .size(54.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(tool.accentColor.copy(alpha = 0.14f))
-                    .border(
-                        width = 0.8.dp,
-                        color = tool.accentColor.copy(alpha = 0.28f),
-                        shape = RoundedCornerShape(16.dp)
-                    ),
+                    .background(colors.surfaceVariant.copy(alpha = 0.55f))
+                    .border(1.dp, colors.divider.copy(alpha = 0.7f), RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 if (tool.iconRes != null) {
                     Image(
                         painter = painterResource(id = tool.iconRes),
                         contentDescription = tool.title,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(16.dp)),
+                        contentScale = ContentScale.Fit
                     )
                 } else if (tool.icon != null) {
                     Icon(
                         imageVector = tool.icon,
                         contentDescription = tool.title,
-                        tint = tool.accentColor,
-                        modifier = Modifier.size(28.dp)
+                        tint = colors.textPrimary,
+                        modifier = Modifier.size(26.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    NexusText(
-                        text = tool.title,
-                        style = NexusTheme.typography.title.copy(
-                            fontSize = 16.5.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = NexusTheme.colors.textPrimary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(tool.accentColor.copy(alpha = 0.12f))
-                            .border(
-                                width = 0.5.dp,
-                                color = tool.accentColor.copy(alpha = 0.25f),
-                                shape = CircleShape
-                            )
-                            .padding(horizontal = 7.dp, vertical = 2.dp)
-                    ) {
-                        NexusText(
-                            text = "Featured",
-                            style = NexusTheme.typography.caption.copy(
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = tool.accentColor
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(3.dp))
-                NexusText(
-                    text = "Convert photos & scans into clean PDF",
-                    style = NexusTheme.typography.caption.copy(
-                        fontSize = 12.sp
-                    ),
-                    color = NexusTheme.colors.textSecondary
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Trailing circular action arrow button
-            Box(
+            // Text Hierarchy: Title + Description (with right padding so it never clashes with the arrow)
+            Column(
                 modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(tool.accentColor.copy(alpha = 0.12f))
-                    .border(
-                        width = 0.6.dp,
-                        color = tool.accentColor.copy(alpha = 0.25f),
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(end = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_arrow_right),
-                    contentDescription = "Open",
-                    modifier = Modifier.size(13.dp),
-                    colorFilter = ColorFilter.tint(tool.accentColor)
+                NexusText(
+                    text = tool.title,
+                    style = NexusTheme.typography.title.copy(
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-0.3).sp,
+                        lineHeight = 19.sp
+                    ),
+                    color = colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                NexusText(
+                    text = tool.description.ifEmpty { tool.subtitle },
+                    style = NexusTheme.typography.bodySmall.copy(
+                        fontSize = 12.sp,
+                        lineHeight = 15.5.sp
+                    ),
+                    color = colors.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
-    }
-}
 
-// ─── Individual Bento Tool Card ──────────────────────────────────────────────
-
-@Composable
-private fun ToolBentoCard(
-    tool: Tool,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .springBounceClick(onClick = onClick)
-            .border(
-                width = 0.8.dp,
-                color = NexusTheme.colors.divider.copy(alpha = 0.35f),
-                shape = RoundedCornerShape(20.dp)
-            ),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = NexusTheme.colors.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
+        // Circular Forward Arrow Affordance (.t-arrow in HTML: 30dp circle at bottom-right)
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp)
+                .align(Alignment.BottomEnd)
+                .size(30.dp)
+                .clip(CircleShape)
+                .background(colors.surfaceVariant)
+                .border(1.dp, colors.divider.copy(alpha = 0.5f), CircleShape),
+            contentAlignment = Alignment.Center
         ) {
-            // Header Row: Squircle Icon + (Badge OR subtle circle arrow)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Icon Squircle Container
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(if (tool.isAvailable) tool.accentColor.copy(alpha = 0.12f) else tool.accentColor.copy(alpha = 0.08f))
-                        .border(
-                            width = 0.8.dp,
-                            color = if (tool.isAvailable) tool.accentColor.copy(alpha = 0.22f) else tool.accentColor.copy(alpha = 0.14f),
-                            shape = RoundedCornerShape(14.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (tool.iconRes != null) {
-                        Image(
-                            painter = painterResource(id = tool.iconRes),
-                            contentDescription = tool.title,
-                            modifier = Modifier.size(24.dp),
-                            alpha = if (tool.isAvailable) 1f else 0.8f
-                        )
-                    } else if (tool.icon != null) {
-                        Icon(
-                            imageVector = tool.icon,
-                            contentDescription = tool.title,
-                            tint = if (tool.isAvailable) tool.accentColor else tool.accentColor.copy(alpha = 0.8f),
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-
-                if (!tool.isAvailable) {
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.65f))
-                            .border(
-                                width = 0.5.dp,
-                                color = NexusTheme.colors.divider.copy(alpha = 0.40f),
-                                shape = CircleShape
-                            )
-                            .padding(horizontal = 7.dp, vertical = 3.dp)
-                    ) {
-                        NexusText(
-                            text = "Coming soon",
-                            style = NexusTheme.typography.caption.copy(
-                                fontSize = 9.5.sp,
-                                fontWeight = FontWeight.SemiBold
-                            ),
-                            color = NexusTheme.colors.textSecondary
-                        )
-                    }
-                } else if (tool.badge != null) {
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(tool.accentColor.copy(alpha = 0.12f))
-                            .border(
-                                width = 0.6.dp,
-                                color = tool.accentColor.copy(alpha = 0.25f),
-                                shape = CircleShape
-                            )
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                    ) {
-                        NexusText(
-                            text = tool.badge,
-                            style = NexusTheme.typography.caption.copy(
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = tool.accentColor
-                        )
-                    }
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(NexusTheme.colors.surfaceVariant.copy(alpha = 0.5f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_arrow_right),
-                            contentDescription = null,
-                            modifier = Modifier.size(10.dp),
-                            colorFilter = ColorFilter.tint(NexusTheme.colors.textSecondary)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Tool Title
-            NexusText(
-                text = tool.title,
-                style = NexusTheme.typography.title.copy(
-                    fontSize = 14.5.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = if (tool.isAvailable) NexusTheme.colors.textPrimary else NexusTheme.colors.textPrimary.copy(alpha = 0.8f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(3.dp))
-
-            // Punchy Subtitle
-            NexusText(
-                text = tool.subtitle,
-                style = NexusTheme.typography.caption.copy(
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.Normal
-                ),
-                color = NexusTheme.colors.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                contentDescription = null,
+                tint = colors.textPrimary,
+                modifier = Modifier.size(14.dp)
             )
         }
-    }
-}
-
-// ─── Search Empty State ──────────────────────────────────────────────────────
-
-@Composable
-private fun ToolsSearchEmptyState(
-    query: String,
-    onClearSearch: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 40.dp, horizontal = NexusTheme.spacing.md),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        NexusEmptyStateImage(
-            type = NexusEmptyStateType.NOT_FOUND,
-            contentDescription = "No tools found",
-            modifier = Modifier
-                .size(160.dp)
-                .breathePulse(minScale = 0.95f, maxScale = 1.05f, durationMs = 2400)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        NexusText(
-            text = "No tools found",
-            style = NexusTheme.typography.title.copy(
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            ),
-            color = NexusTheme.colors.textPrimary
-        )
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        NexusText(
-            text = if (query.isNotBlank()) "No tool matched \"$query\"" else "No tools in this category",
-            style = NexusTheme.typography.caption.copy(fontSize = 13.sp),
-            color = NexusTheme.colors.textSecondary,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(18.dp))
-
-        NexusButton(
-            text = "Clear Filter",
-            onClick = onClearSearch
-        )
     }
 }

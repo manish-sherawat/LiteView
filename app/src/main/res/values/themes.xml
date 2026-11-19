@@ -12,7 +12,7 @@
     <!-- Splash theme — uses Android 12+ Splash Screen API -->
     <style name="Theme.NexusDocsViewer.Splash" parent="Theme.SplashScreen">
         <!-- Splash icon background -->
-        <item name="windowSplashScreenBackground">#F4F6FA</item>
+        <item name="windowSplashScreenBackground">#FFFFFF</item>
         <!-- Animated icon or static icon -->
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
         <!-- Duration for animated icon (API 33+) -->

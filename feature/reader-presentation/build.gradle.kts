@@ -10,6 +10,8 @@ android {
     namespace = "com.nexus.feature.reader.presentation"
     compileSdk = 37
 
+    ndkVersion = "28.2.13676358"
+
     defaultConfig {
         minSdk = 26
         consumerProguardFiles("consumer-rules.pro")
@@ -21,7 +23,8 @@ android {
         externalNativeBuild {
             cmake {
                 arguments += listOf(
-                    "-DANDROID_STL=c++_shared"
+                    "-DANDROID_STL=c++_shared",
+                    "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384"
                 )
                 cppFlags += listOf("-std=c++17", "-fvisibility=hidden", "-Wall")
             }

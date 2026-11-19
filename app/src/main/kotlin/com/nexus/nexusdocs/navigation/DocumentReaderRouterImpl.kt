@@ -127,6 +127,10 @@ class DocumentReaderRouterImpl @Inject constructor(
             popUpTo(NexusRoute.Dashboard.route) { inclusive = true }
         }
     }
+
+    override fun navigateToTools() {
+        navController?.navigate(NexusRoute.Tools.route)
+    }
     
     override fun navigateToScanner() {
         navController?.navigate(NexusRoute.Scanner.route)

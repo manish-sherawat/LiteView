@@ -8,11 +8,17 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -90,9 +96,33 @@ import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.animations.springBounceClick
 import com.nexus.core.ui.components.FileDetailItem
 import com.nexus.core.ui.components.NexusFileDetailsSheet
+import com.nexus.core.ui.components.DocumentOptionItem
+import com.nexus.core.ui.components.DocumentOptionsBottomSheet
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.automirrored.filled.Notes
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.ScreenRotation
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import com.nexus.core.ui.components.NexusTopBar
+import com.nexus.core.ui.components.NexusViewerTopBar
+import com.nexus.core.ui.components.NexusViewerActionButton
+import com.nexus.core.ui.components.NexusViewerActionDivider
+import com.nexus.core.ui.components.NexusFloatingIconButton
+import com.nexus.core.ui.components.ReaderSearchBar
+import com.nexus.core.ui.utils.hazeGlassBackground
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import com.nexus.feature.reader.presentation.model.PresentationUiState
+import com.nexus.feature.reader.presentation.ui.components.AsyncSlideThumbnail
+import com.nexus.feature.reader.presentation.ui.components.NativeSlideContent
+import com.nexus.feature.reader.presentation.ui.components.SlideGridSorterSheet
 import com.nexus.feature.reader.presentation.ui.components.SlideViewport
+import com.nexus.feature.reader.presentation.ui.components.SpeakerNotesDrawer
 import kotlinx.coroutines.launch
 import java.io.File
 import java.net.URLDecoder
@@ -112,11 +142,13 @@ fun PresentationReaderScreen(
     val context = LocalContext.current
     val activity = context as? Activity
     val isDark = isSystemInDarkTheme()
+    val haptic = LocalHapticFeedback.current
 
     var isImmersiveMode by remember { mutableStateOf(false) }
     var showJumpDialog by remember { mutableStateOf(false) }
     var showMenuSheet by remember { mutableStateOf(false) }
     var showInfoSheet by remember { mutableStateOf(false) }
+    var showSlideshowSettings by remember { mutableStateOf(false) }
     var jumpSlideInput by remember { mutableStateOf("") }
 
     val decodedFileName = remember(fileName) {
@@ -169,6 +201,19 @@ fun PresentationReaderScreen(
         }
     }
 
+    // ─── 2.6 Landscape Presentation Lock ───────────────────────────────────
+    val isLandscapeLocked = (uiState as? PresentationUiState.Success)?.isLandscapeLocked == true
+    DisposableEffect(isLandscapeLocked) {
+        if (isLandscapeLocked) {
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+        onDispose {
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
     fun sharePresentation() {
         try {
             var rawUriStr = URLDecoder.decode(encodedUri, "UTF-8")
@@ -203,7 +248,17 @@ fun PresentationReaderScreen(
 
     BackHandler(enabled = true) {
         val successState = uiState as? PresentationUiState.Success
-        if (successState?.showThumbnails == true) {
+        if (successState?.isSearchActive == true) {
+            viewModel.toggleSearch()
+        } else if (successState?.showSpeakerNotes == true) {
+            viewModel.toggleSpeakerNotes()
+        } else if (successState?.isGridSorterVisible == true) {
+            viewModel.toggleGridSorter()
+        } else if (successState?.isSlideshowActive == true) {
+            viewModel.toggleSlideshow()
+        } else if (successState?.isLandscapeLocked == true) {
+            viewModel.toggleLandscapeLock()
+        } else if (successState?.showThumbnails == true) {
             viewModel.toggleThumbnails()
         } else if (isImmersiveMode || successState?.isFullscreen == true) {
             if (successState?.isFullscreen == true) viewModel.toggleFullscreen()
@@ -307,6 +362,7 @@ fun PresentationReaderScreen(
             }
 
             is PresentationUiState.Success -> {
+                val hazeState = remember { HazeState() }
                 val pagerState = rememberPagerState(
                     initialPage = state.currentSlideIndex,
                     pageCount = { state.slideCount }
@@ -314,20 +370,55 @@ fun PresentationReaderScreen(
 
                 LaunchedEffect(pagerState) {
                     snapshotFlow { pagerState.currentPage }.collect { page ->
-                        viewModel.setCurrentSlide(page)
+                        if (state.currentSlideIndex != page) {
+                            viewModel.setCurrentSlide(page)
+                        }
+                    }
+                }
+
+                LaunchedEffect(state.currentSlideIndex) {
+                    if (pagerState.currentPage != state.currentSlideIndex) {
+                        pagerState.animateScrollToPage(state.currentSlideIndex)
+                    }
+                }
+
+                LaunchedEffect(state.currentMatchIndex, state.searchMatches) {
+                    if (state.isSearchActive && state.searchMatches.isNotEmpty()) {
+                        val targetSlide = state.searchMatches.getOrNull(state.currentMatchIndex)?.slideIndex
+                        if (targetSlide != null && targetSlide != pagerState.currentPage) {
+                            pagerState.animateScrollToPage(targetSlide)
+                        }
                     }
                 }
 
                 // ─── Main Slide HorizontalPager Viewport ───────────────────────────
+                val contentPaddingTop by animateDpAsState(
+                    targetValue = if (!isFullscreen) {
+                        if (state.isSearchActive) 116.dp else 56.dp
+                    } else 0.dp,
+                    label = "pptTopPadding"
+                )
+                val contentPaddingBottom by animateDpAsState(
+                    targetValue = if (!isFullscreen) {
+                        if (state.showThumbnails) 140.dp else 148.dp
+                    } else 0.dp,
+                    label = "pptBottomPadding"
+                )
+
                 HorizontalPager(
                     state = pagerState,
-                    modifier = Modifier.fillMaxSize()
+                    userScrollEnabled = true,
+                    contentPadding = PaddingValues(top = contentPaddingTop, bottom = contentPaddingBottom),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .hazeSource(hazeState)
                 ) { pageIndex ->
                     val slide = state.slides.getOrNull(pageIndex)
                     if (slide != null) {
                         SlideViewport(
                             slideInfo = slide,
                             loadSlideBitmap = { idx, w, h -> viewModel.getSlideBitmap(idx, w, h) },
+                            searchQuery = if (state.isSearchActive) state.searchQuery else "",
                             onToggleImmersive = { isImmersiveMode = !isImmersiveMode }
                         )
                     }
@@ -340,88 +431,115 @@ fun PresentationReaderScreen(
                     exit = slideOutVertically { -it } + fadeOut(),
                     modifier = Modifier.align(Alignment.TopCenter)
                 ) {
-                    NexusTopBar(
-                        title = state.fileName,
-                        navigationIcon = {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .springBounceClick(onClick = onNavigateBack),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Image(
-                                    painter = painterResource(id = com.nexus.core.R.drawable.ic_back),
-                                    contentDescription = "Back",
-                                    colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        },
+                    NexusViewerTopBar(
+                        title = if (state.fileName.isNotBlank()) state.fileName else decodedFileName,
+                        hazeState = hazeState,
+                        onBack = onNavigateBack,
                         actions = {
-                            // Star / Favorite Action
-                            Image(
-                                painter = painterResource(
-                                    id = if (isStarred) com.nexus.core.R.drawable.ic_star_filled else com.nexus.core.R.drawable.ic_star
-                                ),
-                                contentDescription = "Favorite",
-                                colorFilter = ColorFilter.tint(
-                                    if (isStarred) Color(0xFFFFB300) else NexusTheme.colors.textPrimary
-                                ),
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .springBounceClick {
-                                        viewModel.toggleFavorite { nowStarred ->
-                                            val msg = if (nowStarred) "Added to Favorites" else "Removed from Favorites"
-                                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                    .padding(NexusTheme.spacing.xs)
+                            // Search Action
+                            NexusViewerActionButton(
+                                painter = painterResource(id = com.nexus.core.R.drawable.ic_search),
+                                contentDescription = "Search",
+                                isActive = state.isSearchActive,
+                                onClick = { viewModel.toggleSearch() }
                             )
-
-                            // Share Action
-                            Image(
-                                painter = painterResource(id = com.nexus.core.R.drawable.ic_share),
-                                contentDescription = "Share",
-                                colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary),
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .springBounceClick { sharePresentation() }
-                                    .padding(NexusTheme.spacing.xs)
-                            )
-
-                            // Fullscreen Presentation Mode Action
-                            Image(
-                                painter = painterResource(id = com.nexus.core.R.drawable.ic_maximize),
-                                contentDescription = "Present",
-                                colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary),
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .springBounceClick { viewModel.toggleFullscreen() }
-                                    .padding(NexusTheme.spacing.xs)
-                            )
-
-                            // More Options Action
-                            Image(
+                            NexusViewerActionDivider()
+                            // More Options Action (Three dots)
+                            NexusViewerActionButton(
                                 painter = painterResource(id = com.nexus.core.R.drawable.ic_more_vert),
                                 contentDescription = "More options",
-                                colorFilter = ColorFilter.tint(NexusTheme.colors.textPrimary),
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .springBounceClick { showMenuSheet = true }
-                                    .padding(NexusTheme.spacing.xs)
+                                onClick = { showMenuSheet = true }
                             )
                         }
                     )
                 }
 
-                // ─── Floating Bottom Controls & Page Badge ─────────────────────────
+                // ─── 2.1 In-Slide Text Search Bar ─────────────────────────────────
                 AnimatedVisibility(
-                    visible = !isFullscreen,
+                    visible = state.isSearchActive && !isFullscreen,
+                    enter = slideInVertically { -it } + fadeIn(),
+                    exit = slideOutVertically { -it } + fadeOut(),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(top = 56.dp)
+                ) {
+                    ReaderSearchBar(
+                        visible = state.isSearchActive,
+                        query = state.searchQuery,
+                        onQueryChange = { viewModel.search(it) },
+                        matchCount = state.searchMatches.size,
+                        currentMatchIndex = state.currentMatchIndex,
+                        onPreviousMatch = { viewModel.previousSearchMatch() },
+                        onNextMatch = { viewModel.nextSearchMatch() },
+                        onClose = { viewModel.toggleSearch() },
+                        placeholderText = "Search slides, tables & notes..."
+                    )
+                }
+
+                // ─── 2.5 Auto-Play Slideshow Floating Indicator Banner ────────────
+                val slideshowTopPadding = when {
+                    isFullscreen -> 16.dp
+                    state.isSearchActive -> 120.dp
+                    else -> 64.dp
+                }
+                AnimatedVisibility(
+                    visible = state.isSlideshowActive,
+                    enter = slideInVertically { -it } + fadeIn(),
+                    exit = slideOutVertically { -it } + fadeOut(),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(top = slideshowTopPadding)
+                ) {
+                    NexusSurface(
+                        shape = NexusTheme.shapes.pill,
+                        color = NexusTheme.colors.surface.copy(alpha = 0.95f),
+                        elevation = 12.dp,
+                        borderWidth = 1.dp,
+                        borderColor = NexusTheme.colors.primary.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF00E676))
+                            )
+                            NexusText(
+                                text = "Slideshow (${state.slideshowIntervalSeconds}s${if (state.isSlideshowLoop) " • Loop" else ""})",
+                                style = NexusTheme.typography.body.copy(fontWeight = FontWeight.SemiBold, fontSize = 13.sp),
+                                color = NexusTheme.colors.primary
+                            )
+                            Icon(
+                                imageVector = Icons.Default.Timer,
+                                contentDescription = "Slideshow Settings",
+                                tint = NexusTheme.colors.textSecondary,
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clickable { showSlideshowSettings = true }
+                            )
+                            Icon(
+                                imageVector = Icons.Default.Pause,
+                                contentDescription = "Pause Slideshow",
+                                tint = NexusTheme.colors.textPrimary,
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clickable { viewModel.toggleSlideshow() }
+                            )
+                        }
+                    }
+                }
+
+                // ─── Floating Bottom Controls & Slide Navigation ─────────────────────────
+                AnimatedVisibility(
+                    visible = !isFullscreen && !state.showThumbnails,
                     enter = slideInVertically { it } + fadeIn(),
                     exit = slideOutVertically { it } + fadeOut(),
                     modifier = Modifier.align(Alignment.BottomCenter)
@@ -430,145 +548,259 @@ fun PresentationReaderScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .navigationBarsPadding()
-                            .padding(bottom = NexusTheme.spacing.xs),
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Floating Slide Badge Pill (Click to jump)
-                        Box(
-                            modifier = Modifier
-                                .shadow(
-                                    elevation = 8.dp,
-                                    shape = NexusTheme.shapes.pill,
-                                    spotColor = NexusTheme.colors.primary.copy(alpha = 0.16f),
-                                    ambientColor = Color.Black.copy(alpha = 0.10f)
-                                )
-                                .clip(NexusTheme.shapes.pill)
-                                .background(NexusTheme.colors.surface)
-                                .border(
-                                    width = 1.dp,
-                                    color = NexusTheme.colors.divider.copy(alpha = 0.7f),
-                                    shape = NexusTheme.shapes.pill
-                                )
-                                .springBounceClick {
-                                    jumpSlideInput = (state.currentSlideIndex + 1).toString()
-                                    showJumpDialog = true
-                                }
-                                .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.xs)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = com.nexus.core.R.drawable.ic_view_list),
-                                    contentDescription = null,
-                                    tint = NexusTheme.colors.primary,
-                                    modifier = Modifier.size(15.dp)
-                                )
-                                NexusText(
-                                    text = "Slide ${state.currentSlideIndex + 1}",
-                                    style = NexusTheme.typography.body.copy(fontWeight = FontWeight.Bold, fontSize = 13.5.sp),
-                                    color = NexusTheme.colors.primary
-                                )
-                                NexusText(
-                                    text = "of ${state.slideCount}",
-                                    style = NexusTheme.typography.label,
-                                    color = NexusTheme.colors.textSecondary
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Floating Dock Toolbar Container
-                        Box(
+                        // Max width constraint container (matches width: min(100%, 420px))
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .wrapContentWidth(Alignment.CenterHorizontally)
-                                .widthIn(max = 560.dp)
-                                .padding(horizontal = NexusTheme.spacing.sm, vertical = NexusTheme.spacing.xs)
-                                .shadow(
-                                    elevation = 16.dp,
-                                    shape = NexusTheme.shapes.large,
-                                    spotColor = NexusTheme.colors.primary.copy(alpha = if (isDark) 0.28f else 0.14f),
-                                    ambientColor = Color.Black.copy(alpha = if (isDark) 0.40f else 0.10f)
-                                )
-                                .clip(NexusTheme.shapes.large)
-                                .background(NexusTheme.colors.surface.copy(alpha = 0.95f))
-                                .border(
-                                    width = 1.dp,
-                                    color = NexusTheme.colors.divider.copy(alpha = 0.65f),
-                                    shape = NexusTheme.shapes.large
-                                )
-                                .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xxs)
+                                .widthIn(max = 420.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Row(
+                            // ── Slide Navigation (Arrows + Counter Pill + Progress Track) ──
+                            val canGoBack = pagerState.currentPage > 0
+                            val canGoForward = pagerState.currentPage < state.slideCount - 1
+                            val currentFormatted = String.format("%02d", (state.currentSlideIndex + 1).coerceAtLeast(1))
+                            val totalFormatted = String.format("%02d", state.slideCount.coerceAtLeast(1))
+
+                            Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceEvenly
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                // Slide Strip Toggle
-                                PresentationBottomActionItem(
-                                    modifier = Modifier.weight(1f),
-                                    iconPainter = painterResource(id = com.nexus.core.R.drawable.ic_view_list),
-                                    label = "Slides",
-                                    contentDescription = "Slides",
-                                    tint = NexusTheme.colors.primary,
-                                    isActive = state.showThumbnails,
-                                    onClick = { viewModel.toggleThumbnails() }
-                                )
-
-                                // Jump to Slide Action
-                                PresentationBottomActionItem(
-                                    modifier = Modifier.weight(1f),
-                                    iconPainter = painterResource(id = com.nexus.core.R.drawable.ic_arrow_right),
-                                    label = "Jump",
-                                    contentDescription = "Jump Slide",
-                                    tint = NexusTheme.colors.textPrimary,
-                                    onClick = {
-                                        jumpSlideInput = (state.currentSlideIndex + 1).toString()
-                                        showJumpDialog = true
+                                Row(
+                                    modifier = Modifier.wrapContentWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                ) {
+                                    // Previous Slide Button (44dp circular)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .shadow(
+                                                elevation = 6.dp,
+                                                shape = CircleShape,
+                                                spotColor = NexusTheme.colors.primary.copy(alpha = if (isDark) 0.24f else 0.08f),
+                                                ambientColor = Color.Black.copy(alpha = if (isDark) 0.35f else 0.06f)
+                                            )
+                                            .hazeGlassBackground(
+                                                hazeState = hazeState,
+                                                shape = CircleShape,
+                                                borderWidth = 1.dp,
+                                                borderColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE4E6EE)
+                                            )
+                                            .alpha(if (canGoBack) 1f else 0.35f)
+                                            .springBounceClick(enabled = canGoBack) {
+                                                if (canGoBack) {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    scope.launch {
+                                                        pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                                                    }
+                                                }
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                            contentDescription = "Previous Slide",
+                                            tint = NexusTheme.colors.textPrimary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
                                     }
-                                )
 
-                                // Favorite Action
-                                PresentationBottomActionItem(
-                                    modifier = Modifier.weight(1f),
-                                    iconPainter = painterResource(
-                                        id = if (isStarred) com.nexus.core.R.drawable.ic_star_filled else com.nexus.core.R.drawable.ic_star
-                                    ),
-                                    label = if (isStarred) "Starred" else "Favorite",
-                                    contentDescription = "Favorite",
-                                    tint = Color(0xFFFFB300),
-                                    isActive = isStarred,
-                                    activeBadgeColor = Color(0xFFFFB300).copy(alpha = 0.16f),
-                                    onClick = {
-                                        viewModel.toggleFavorite { nowStarred ->
-                                            val msg = if (nowStarred) "Added to Favorites" else "Removed from Favorites"
-                                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    // Slide Counter Pill (Click to jump / overview)
+                                    Box(
+                                        modifier = Modifier
+                                            .defaultMinSize(minWidth = 112.dp)
+                                            .height(44.dp)
+                                            .shadow(
+                                                elevation = 6.dp,
+                                                shape = CircleShape,
+                                                spotColor = NexusTheme.colors.primary.copy(alpha = if (isDark) 0.24f else 0.08f),
+                                                ambientColor = Color.Black.copy(alpha = if (isDark) 0.35f else 0.06f)
+                                            )
+                                            .hazeGlassBackground(
+                                                hazeState = hazeState,
+                                                shape = CircleShape,
+                                                borderWidth = 1.dp,
+                                                borderColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE4E6EE)
+                                            )
+                                            .springBounceClick {
+                                                jumpSlideInput = (state.currentSlideIndex + 1).toString()
+                                                showJumpDialog = true
+                                            }
+                                            .padding(horizontal = 18.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            NexusText(
+                                                text = currentFormatted,
+                                                style = NexusTheme.typography.body.copy(
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp
+                                                ),
+                                                color = NexusTheme.colors.textPrimary
+                                            )
+                                            NexusText(
+                                                text = "/ $totalFormatted",
+                                                style = NexusTheme.typography.body.copy(
+                                                    fontWeight = FontWeight.Normal,
+                                                    fontSize = 14.sp
+                                                ),
+                                                color = NexusTheme.colors.textSecondary
+                                            )
                                         }
                                     }
+
+                                    // Next Slide Button (44dp circular)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .shadow(
+                                                elevation = 6.dp,
+                                                shape = CircleShape,
+                                                spotColor = NexusTheme.colors.primary.copy(alpha = if (isDark) 0.24f else 0.08f),
+                                                ambientColor = Color.Black.copy(alpha = if (isDark) 0.35f else 0.06f)
+                                            )
+                                            .hazeGlassBackground(
+                                                hazeState = hazeState,
+                                                shape = CircleShape,
+                                                borderWidth = 1.dp,
+                                                borderColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE4E6EE)
+                                            )
+                                            .alpha(if (canGoForward) 1f else 0.35f)
+                                            .springBounceClick(enabled = canGoForward) {
+                                                if (canGoForward) {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    scope.launch {
+                                                        pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                                    }
+                                                }
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                            contentDescription = "Next Slide",
+                                            tint = NexusTheme.colors.textPrimary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Progress Bar Track
+                                val progressTarget = if (state.slideCount > 0) {
+                                    ((state.currentSlideIndex + 1).toFloat() / state.slideCount.toFloat()).coerceIn(0f, 1f)
+                                } else 0f
+                                val animatedProgress by animateFloatAsState(
+                                    targetValue = progressTarget,
+                                    animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+                                    label = "pptSlideProgress"
                                 )
 
-                                // Share Action
-                                PresentationBottomActionItem(
-                                    modifier = Modifier.weight(1f),
-                                    iconPainter = painterResource(id = com.nexus.core.R.drawable.ic_share),
-                                    label = "Share",
-                                    contentDescription = "Share",
-                                    tint = NexusTheme.colors.textPrimary,
-                                    onClick = { sharePresentation() }
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(3.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE1E3ED))
+                                ) {
+                                    if (animatedProgress > 0.001f) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(animatedProgress.coerceIn(0.001f, 1f))
+                                                .fillMaxHeight()
+                                                .clip(CircleShape)
+                                                .background(NexusTheme.colors.primary)
+                                        )
+                                    }
+                                }
+                            }
 
-                                // Fullscreen Presentation Mode
-                                PresentationBottomActionItem(
-                                    modifier = Modifier.weight(1f),
-                                    iconPainter = painterResource(id = com.nexus.core.R.drawable.ic_maximize),
-                                    label = "Present",
-                                    contentDescription = "Present",
-                                    tint = NexusTheme.colors.textPrimary,
-                                    onClick = { viewModel.toggleFullscreen() }
-                                )
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // ── Floating Bottom Toolbar (5 tools) ──
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .shadow(
+                                        elevation = 16.dp,
+                                        shape = RoundedCornerShape(25.dp),
+                                        spotColor = NexusTheme.colors.primary.copy(alpha = if (isDark) 0.28f else 0.10f),
+                                        ambientColor = Color.Black.copy(alpha = if (isDark) 0.40f else 0.08f)
+                                    )
+                                    .hazeGlassBackground(
+                                        hazeState = hazeState,
+                                        shape = RoundedCornerShape(25.dp),
+                                        borderWidth = 1.dp,
+                                        borderColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE6E7EF)
+                                    )
+                                    .padding(7.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    // 1. Slides
+                                    PresentationBottomActionItem(
+                                        modifier = Modifier.weight(1f),
+                                        iconPainter = painterResource(id = com.nexus.core.R.drawable.ic_view_list),
+                                        label = "Slides",
+                                        contentDescription = "Slides",
+                                        isActive = state.showThumbnails,
+                                        onClick = { viewModel.toggleThumbnails() }
+                                    )
+
+                                    // 2. Grid
+                                    PresentationBottomActionItem(
+                                        modifier = Modifier.weight(1f),
+                                        iconPainter = rememberVectorPainter(Icons.Default.GridView),
+                                        label = "Grid",
+                                        contentDescription = "Grid Sorter",
+                                        isActive = state.isGridSorterVisible,
+                                        onClick = { viewModel.toggleGridSorter() }
+                                    )
+
+                                    // 3. Notes
+                                    PresentationBottomActionItem(
+                                        modifier = Modifier.weight(1f),
+                                        iconPainter = rememberVectorPainter(Icons.AutoMirrored.Filled.Notes),
+                                        label = "Notes",
+                                        contentDescription = "Speaker Notes",
+                                        isActive = state.showSpeakerNotes,
+                                        onClick = { viewModel.toggleSpeakerNotes() }
+                                    )
+
+                                    // 4. Play/Pause
+                                    PresentationBottomActionItem(
+                                        modifier = Modifier.weight(1f),
+                                        iconPainter = rememberVectorPainter(
+                                            if (state.isSlideshowActive) Icons.Default.Pause else Icons.Default.PlayArrow
+                                        ),
+                                        label = if (state.isSlideshowActive) "Pause" else "Play",
+                                        contentDescription = "Slideshow",
+                                        isActive = state.isSlideshowActive,
+                                        activeBadgeColor = if (state.isSlideshowActive) Color(0xFF00E676).copy(alpha = 0.16f) else NexusTheme.colors.primary.copy(alpha = 0.12f),
+                                        activeTint = if (state.isSlideshowActive) Color(0xFF00C853) else NexusTheme.colors.primary,
+                                        onClick = { viewModel.toggleSlideshow() }
+                                    )
+
+                                    // 5. Present
+                                    PresentationBottomActionItem(
+                                        modifier = Modifier.weight(1f),
+                                        iconPainter = painterResource(id = com.nexus.core.R.drawable.ic_maximize),
+                                        label = "Present",
+                                        contentDescription = "Present",
+                                        isActive = false,
+                                        onClick = { viewModel.toggleFullscreen() }
+                                    )
+                                }
                             }
                         }
                     }
@@ -594,17 +826,44 @@ fun PresentationReaderScreen(
                                 RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
                             )
                     ) {
-                        Column(modifier = Modifier.padding(top = 10.dp, bottom = 12.dp)) {
-                            // Top Drag handle
-                            Box(
+                        Column(modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)) {
+                            // Header Row: Title, drag handle & close button
+                            Row(
                                 modifier = Modifier
-                                    .size(36.dp, 4.dp)
-                                    .clip(CircleShape)
-                                    .background(NexusTheme.colors.divider)
-                                    .align(Alignment.CenterHorizontally)
-                            )
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                NexusText(
+                                    text = "Slides (${state.slideCount})",
+                                    style = NexusTheme.typography.label.copy(fontWeight = FontWeight.Bold),
+                                    color = NexusTheme.colors.textSecondary
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp, 4.dp)
+                                        .clip(CircleShape)
+                                        .background(NexusTheme.colors.divider)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(NexusTheme.colors.surfaceVariant)
+                                        .springBounceClick { viewModel.toggleThumbnails() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Image(
+                                        painter = painterResource(id = com.nexus.core.R.drawable.ic_close),
+                                        contentDescription = "Close thumbnails",
+                                        colorFilter = ColorFilter.tint(NexusTheme.colors.textSecondary),
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                }
+                            }
 
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
                             LazyRow(
                                 modifier = Modifier.fillMaxWidth(),
@@ -612,17 +871,19 @@ fun PresentationReaderScreen(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                itemsIndexed(state.slides) { idx, slide ->
+                                itemsIndexed(state.slides, key = { idx, _ -> idx }) { idx, slide ->
                                     val isSelected = idx == state.currentSlideIndex
+                                    val safeRatio = slide.aspectRatio.takeIf { !it.isNaN() && it in 0.5f..2.5f } ?: (16f / 9f)
+                                    val thumbWidth = (76.dp * safeRatio).coerceIn(60.dp, 160.dp)
                                     Box(
                                         modifier = Modifier
-                                            .height(76.dp)
-                                            .aspectRatio(slide.aspectRatio)
+                                            .size(width = thumbWidth, height = 76.dp)
                                             .shadow(if (isSelected) 8.dp else 2.dp, RoundedCornerShape(8.dp))
                                             .clip(RoundedCornerShape(8.dp))
                                             .background(
-                                                if (isSelected) NexusTheme.colors.primary.copy(alpha = 0.16f)
-                                                else NexusTheme.colors.surfaceVariant
+                                                slide.backgroundColorArgb?.let { Color(it) }
+                                                    ?: if (isSelected) NexusTheme.colors.primary.copy(alpha = 0.16f)
+                                                    else NexusTheme.colors.surfaceVariant
                                             )
                                             .border(
                                                 width = if (isSelected) 2.dp else 1.dp,
@@ -631,19 +892,27 @@ fun PresentationReaderScreen(
                                             )
                                             .clickable {
                                                 scope.launch {
-                                                    pagerState.animateScrollToPage(idx)
+                                                    if (idx in 0 until pagerState.pageCount) {
+                                                        pagerState.animateScrollToPage(idx)
+                                                    }
                                                 }
-                                            },
-                                        contentAlignment = Alignment.Center
+                                            }
                                     ) {
-                                        NexusText(
-                                            text = "${idx + 1}",
-                                            style = NexusTheme.typography.body.copy(
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                fontSize = 14.sp
-                                            ),
-                                            color = if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.textSecondary
+                                        AsyncSlideThumbnail(
+                                            slide = slide,
+                                            viewModel = viewModel,
+                                            aspectRatio = safeRatio,
+                                            modifier = Modifier.fillMaxSize()
                                         )
+
+                                        // Selection overlay highlight
+                                        if (isSelected) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(NexusTheme.colors.primary.copy(alpha = 0.10f))
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -720,128 +989,173 @@ fun PresentationReaderScreen(
 
                 // ─── More Options Bottom Sheet ─────────────────────────────────────
                 if (showMenuSheet) {
-                    val sheetState = rememberModalBottomSheetState()
-                    ModalBottomSheet(
-                        onDismissRequest = { showMenuSheet = false },
-                        sheetState = sheetState,
-                        containerColor = NexusTheme.colors.surface,
-                        contentColor = NexusTheme.colors.textPrimary,
-                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 12.dp)
-                                .navigationBarsPadding()
-                        ) {
+                    PresentationOptionsBottomSheet(
+                        displayName = if (state.fileName.isNotBlank()) state.fileName else decodedFileName,
+                        isPpt = decodedFileName.endsWith(".ppt", ignoreCase = true),
+                        slideCount = state.slideCount,
+                        isStarred = isStarred,
+                        isLandscapeLocked = state.isLandscapeLocked,
+                        onDismiss = { showMenuSheet = false },
+                        onInfo = {
+                            showMenuSheet = false
+                            showInfoSheet = true
+                        },
+                        onFavorite = {
+                            showMenuSheet = false
+                            viewModel.toggleFavorite { nowStarred ->
+                                val msg = if (nowStarred) "Added to Favorites" else "Removed from Favorites"
+                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        onLandscapeLock = {
+                            showMenuSheet = false
+                            viewModel.toggleLandscapeLock()
+                        },
+                        onJumpToSlide = {
+                            showMenuSheet = false
+                            jumpSlideInput = (state.currentSlideIndex + 1).toString()
+                            showJumpDialog = true
+                        },
+                        onShare = {
+                            showMenuSheet = false
+                            sharePresentation()
+                        }
+                    )
+                }
+
+                // ─── 2.2 Speaker Notes Drawer Sheet ────────────────────────────────
+                if (state.showSpeakerNotes) {
+                    val currentSlide = state.slides.getOrNull(state.currentSlideIndex)
+                    SpeakerNotesDrawer(
+                        slideIndex = state.currentSlideIndex,
+                        slideTitle = currentSlide?.title,
+                        notes = currentSlide?.notes,
+                        fontSizeSp = state.speakerNotesFontSize,
+                        onIncreaseFontSize = { viewModel.increaseSpeakerNotesFontSize() },
+                        onDecreaseFontSize = { viewModel.decreaseSpeakerNotesFontSize() },
+                        onDismissRequest = { viewModel.toggleSpeakerNotes() }
+                    )
+                }
+
+                // ─── 2.3 Lightbox Grid Sorter Sheet ────────────────────────────────
+                if (state.isGridSorterVisible) {
+                    SlideGridSorterSheet(
+                        slides = state.slides,
+                        currentSlideIndex = state.currentSlideIndex,
+                        viewModel = viewModel,
+                        onSelectSlide = { idx ->
+                            viewModel.setCurrentSlide(idx)
+                            scope.launch { pagerState.animateScrollToPage(idx) }
+                            viewModel.toggleGridSorter()
+                        },
+                        onDismissRequest = { viewModel.toggleGridSorter() }
+                    )
+                }
+
+                // ─── 2.5 Slideshow Settings Dialog ─────────────────────────────────
+                if (showSlideshowSettings) {
+                    val intervals = listOf(3, 5, 10, 15)
+                    AlertDialog(
+                        onDismissRequest = { showSlideshowSettings = false },
+                        title = {
                             NexusText(
-                                text = decodedFileName,
+                                text = "Slideshow Settings",
                                 style = NexusTheme.typography.title,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                color = NexusTheme.colors.textPrimary
                             )
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // Details
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(NexusTheme.shapes.medium)
-                                    .clickable {
-                                        showMenuSheet = false
-                                        showInfoSheet = true
-                                    }
-                                    .padding(vertical = 12.dp, horizontal = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = com.nexus.core.R.drawable.ic_info),
-                                    contentDescription = null,
-                                    tint = NexusTheme.colors.primary,
-                                    modifier = Modifier.size(20.dp)
+                        },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                NexusText(
+                                    text = "Advance slide every:",
+                                    style = NexusTheme.typography.body,
+                                    color = NexusTheme.colors.textSecondary
                                 )
-                                Spacer(modifier = Modifier.width(14.dp))
-                                NexusText("Document Details", style = NexusTheme.typography.body)
-                            }
-
-                            // Jump to Slide
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(NexusTheme.shapes.medium)
-                                    .clickable {
-                                        showMenuSheet = false
-                                        jumpSlideInput = (state.currentSlideIndex + 1).toString()
-                                        showJumpDialog = true
-                                    }
-                                    .padding(vertical = 12.dp, horizontal = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = com.nexus.core.R.drawable.ic_arrow_right),
-                                    contentDescription = null,
-                                    tint = NexusTheme.colors.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(14.dp))
-                                NexusText("Jump to Slide", style = NexusTheme.typography.body)
-                            }
-
-                            // Share
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(NexusTheme.shapes.medium)
-                                    .clickable {
-                                        showMenuSheet = false
-                                        sharePresentation()
-                                    }
-                                    .padding(vertical = 12.dp, horizontal = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = com.nexus.core.R.drawable.ic_share),
-                                    contentDescription = null,
-                                    tint = NexusTheme.colors.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(14.dp))
-                                NexusText("Share Presentation", style = NexusTheme.typography.body)
-                            }
-
-                            // Favorite
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(NexusTheme.shapes.medium)
-                                    .clickable {
-                                        showMenuSheet = false
-                                        viewModel.toggleFavorite { nowStarred ->
-                                            val msg = if (nowStarred) "Added to Favorites" else "Removed from Favorites"
-                                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    for (interval in intervals) {
+                                        val isSelected = (state.slideshowIntervalSeconds == interval)
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(NexusTheme.shapes.small)
+                                                .background(if (isSelected) NexusTheme.colors.primary else NexusTheme.colors.surfaceVariant)
+                                                .clickable { viewModel.setSlideshowInterval(interval) }
+                                                .padding(vertical = 10.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            NexusText(
+                                                text = "${interval}s",
+                                                style = NexusTheme.typography.buttonLabel,
+                                                color = if (isSelected) NexusTheme.colors.onPrimary else NexusTheme.colors.textPrimary
+                                            )
                                         }
                                     }
-                                    .padding(vertical = 12.dp, horizontal = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (isStarred) com.nexus.core.R.drawable.ic_star_filled else com.nexus.core.R.drawable.ic_star
-                                    ),
-                                    contentDescription = null,
-                                    tint = Color(0xFFFFB300),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(14.dp))
+                                }
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(NexusTheme.shapes.small)
+                                        .clickable { viewModel.toggleSlideshowLoop() }
+                                        .padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        NexusText(
+                                            text = "Auto-Loop Presentation",
+                                            style = NexusTheme.typography.body,
+                                            color = NexusTheme.colors.textPrimary
+                                        )
+                                        NexusText(
+                                            text = "Restarts from Slide 1 upon reaching the end",
+                                            style = NexusTheme.typography.caption,
+                                            color = NexusTheme.colors.textSecondary
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(if (state.isSlideshowLoop) NexusTheme.colors.primary else NexusTheme.colors.surfaceVariant),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (state.isSlideshowLoop) {
+                                            Icon(
+                                                imageVector = Icons.Default.PlayArrow,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showSlideshowSettings = false
+                               
+                                if (!state.isSlideshowActive) {
+                                    viewModel.toggleSlideshow()
+                                }
+                            }) {
                                 NexusText(
-                                    if (isStarred) "Remove from Favorites" else "Add to Favorites",
-                                    style = NexusTheme.typography.body
+                                    text = if (state.isSlideshowActive) "Update" else "Start Slideshow",
+                                    color = NexusTheme.colors.primary
                                 )
                             }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-                        }
-                    }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showSlideshowSettings = false }) {
+                                NexusText("Close", color = NexusTheme.colors.textSecondary)
+                            }
+                        },
+                        containerColor = NexusTheme.colors.surface
+                    )
                 }
             }
         }
@@ -855,57 +1169,58 @@ private fun PresentationBottomActionItem(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tint: Color = NexusTheme.colors.textPrimary,
+    activeTint: Color = NexusTheme.colors.primary,
+    inactiveTint: Color = NexusTheme.colors.textSecondary,
     isActive: Boolean = false,
-    activeBadgeColor: Color = NexusTheme.colors.primary.copy(alpha = 0.14f),
+    activeBadgeColor: Color = NexusTheme.colors.primary.copy(alpha = 0.12f),
     enabled: Boolean = true
 ) {
     val haptic = LocalHapticFeedback.current
-    val animatedBadgeColor by animateColorAsState(
+    val animatedBgColor by animateColorAsState(
         targetValue = if (isActive) activeBadgeColor else Color.Transparent,
-        animationSpec = tween(200),
-        label = "presentationBadgeColor"
+        animationSpec = tween(180),
+        label = "presentationItemBg"
     )
     val animatedTint by animateColorAsState(
-        targetValue = if (isActive) tint else if (!enabled) NexusTheme.colors.textSecondary.copy(alpha = 0.35f) else NexusTheme.colors.textPrimary.copy(alpha = 0.85f),
-        animationSpec = tween(200),
-        label = "presentationIconTint"
+        targetValue = if (!enabled) {
+            inactiveTint.copy(alpha = 0.35f)
+        } else if (isActive) {
+            activeTint
+        } else {
+            inactiveTint
+        },
+        animationSpec = tween(180),
+        label = "presentationItemTint"
     )
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
         modifier = modifier
-            .clip(NexusTheme.shapes.medium)
+            .defaultMinSize(minHeight = 58.dp)
+            .clip(RoundedCornerShape(17.dp))
+            .background(animatedBgColor)
             .springBounceClick(enabled = enabled) {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
             }
-            .padding(horizontal = 2.dp, vertical = NexusTheme.spacing.xxs)
+            .padding(horizontal = 2.dp, vertical = 6.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(animatedBadgeColor),
-            contentAlignment = Alignment.Center
-        ) {
-            if (iconPainter != null) {
-                Image(
-                    painter = iconPainter,
-                    contentDescription = contentDescription,
-                    colorFilter = ColorFilter.tint(animatedTint),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+        if (iconPainter != null) {
+            Image(
+                painter = iconPainter,
+                contentDescription = contentDescription,
+                colorFilter = ColorFilter.tint(animatedTint),
+                modifier = Modifier.size(21.dp)
+            )
         }
-        Spacer(modifier = Modifier.height(2.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         NexusText(
             text = label,
             style = NexusTheme.typography.caption.copy(
-                fontSize = 10.5.sp,
+                fontSize = 11.sp,
                 fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Medium,
-                letterSpacing = 0.15.sp
+                letterSpacing = 0.1.sp
             ),
             color = animatedTint,
             maxLines = 1,
@@ -913,3 +1228,74 @@ private fun PresentationBottomActionItem(
         )
     }
 }
+
+@Composable
+private fun PresentationOptionsBottomSheet(
+    displayName: String,
+    isPpt: Boolean,
+    slideCount: Int,
+    isStarred: Boolean,
+    isLandscapeLocked: Boolean,
+    onDismiss: () -> Unit,
+    onInfo: () -> Unit,
+    onFavorite: () -> Unit,
+    onLandscapeLock: () -> Unit,
+    onJumpToSlide: () -> Unit,
+    onShare: () -> Unit
+) {
+    val metaText = if (slideCount > 0) {
+        if (isPpt) "Legacy PowerPoint (.ppt) · $slideCount slides"
+        else "PowerPoint Document (.pptx) · $slideCount slides"
+    } else {
+        if (isPpt) "Legacy PowerPoint (.ppt)"
+        else "PowerPoint Document (.pptx)"
+    }
+
+    val group1 = listOf(
+        DocumentOptionItem(
+            title = "File info",
+            subtitle = "View presentation properties",
+            iconRes = com.nexus.core.R.drawable.ic_info,
+            onClick = onInfo
+        ),
+        DocumentOptionItem(
+            title = if (isStarred) "Starred" else "Star file",
+            subtitle = "Add or remove bookmark",
+            iconRes = if (isStarred) com.nexus.core.R.drawable.ic_star_filled else com.nexus.core.R.drawable.ic_star,
+            isStarred = isStarred,
+            showChevron = false,
+            onClick = onFavorite
+        ),
+        DocumentOptionItem(
+            title = "Share",
+            subtitle = "Share this presentation",
+            iconRes = com.nexus.core.R.drawable.ic_share,
+            onClick = onShare
+        )
+    )
+
+    val groupTools = mutableListOf(
+        DocumentOptionItem(
+            title = "Jump to Slide",
+            subtitle = "Navigate directly to slide number",
+            iconRes = com.nexus.core.R.drawable.ic_arrow_right,
+            onClick = onJumpToSlide
+        ),
+        DocumentOptionItem(
+            title = "Force Landscape",
+            subtitle = if (isLandscapeLocked) "Landscape locked (Tap to unlock)" else "Lock screen orientation to landscape",
+            iconRes = com.nexus.core.R.drawable.ic_rotate,
+            onClick = onLandscapeLock
+        )
+    )
+
+    DocumentOptionsBottomSheet(
+        sheetTitle = "Document Options",
+        fileName = displayName,
+        fileMeta = metaText,
+        docType = DocumentType.PPTX,
+        groups = listOf(group1, groupTools),
+        onDismiss = onDismiss
+    )
+}
+

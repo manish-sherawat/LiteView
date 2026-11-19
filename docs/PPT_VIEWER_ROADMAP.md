@@ -6,14 +6,14 @@ This document outlines the architectural enhancements, visual rendering upgrades
 
 ## 1. Visual Rendering & Graphic Fidelity
 
-### 1.1 Vector AutoShape Geometry
+### 1.1 Vector AutoShape Geometry `[Completed]`
 - **Objective:** Render common PowerPoint shapes (rectangles, rounded banners, callout bubbles, arrows, polygons, flowchart elements) natively.
 - **Implementation Strategy:**
   - In Apache POI / OOXML, shapes contain predefined shape types (`XSLFAutoShape.getShapeType()`) and preset geometries.
   - Map preset geometry paths to Jetpack Compose `Path` and draw them using `Canvas(modifier = Modifier.fillMaxSize())`.
   - Support shape fill colors (solid RGB, linear gradients) and outline strokes (`border`).
 
-### 1.2 Rich Text Formatting & Typography
+### 1.2 Rich Text Formatting & Typography `[Completed]`
 - **Objective:** Preserve inline font styles, weights, colors, and paragraph alignment.
 - **Capabilities:**
   - Character-level spans: bold, italic, underline, strikethrough, superscript, subscript.
@@ -21,7 +21,7 @@ This document outlines the architectural enhancements, visual rendering upgrades
   - Paragraph formatting: left, center, right, justified alignments, line spacing, and paragraph indentation.
   - Hyperlinks: clickable external URLs or internal slide links.
 
-### 1.3 Advanced Table Layout
+### 1.3 Advanced Table Layout `[Completed]`
 - **Objective:** Support complex presentation tables with cell spans and shading.
 - **Capabilities:**
   - Row and column spanning (`gridSpan` / `rowSpan`).
@@ -29,24 +29,24 @@ This document outlines the architectural enhancements, visual rendering upgrades
   - Custom cell borders (line thickness, color, dashed styles).
   - Vertical cell text alignment (top, center, bottom).
 
-### 1.4 Charts & Diagrams (SmartArt)
+### 1.4 Charts & Diagrams (SmartArt) `[Completed]`
 - **Objective:** Render embedded PowerPoint charts (bar, column, line, pie) directly in slides.
 - **Capabilities:**
   - Parse chart XML (`c:chart` in OOXML parts).
   - Extract categories, series labels, and numeric values.
   - Render with hardware-accelerated Compose Canvas or integrated chart primitives.
 
-### 1.5 Media Elements & Audio/Video
+### 1.5 Media Elements & Audio/Video `[Completed]`
 - **Objective:** Enable multimedia playback inside slides.
 - **Capabilities:**
   - Extract embedded `.mp4` and `.mp3` media streams from the presentation archive.
   - Provide an in-place video player overlay with playback controls.
 
-### 1.6 LibreOfficeKit Native Rendering (Long-Term Full Parity)
+### 1.6 LibreOfficeKit Native Rendering (Long-Term Full Parity) `[In Progress / Bridge Active]`
 - **Objective:** 100% pixel-perfect desktop Office rendering parity.
 - **Capabilities:**
   - Pre-built `liblo-native-code.so` drop-in into `src/main/jniLibs/`.
-  - JNI tile rendering with multi-threaded bitmap rendering.
+  - JNI tile rendering with multi-threaded bitmap rendering cache in `PresentationReaderViewModel`.
   - Exact kerning, complex WordArt, formula equations, and SmartArt diagrams.
 
 ---

@@ -21,6 +21,17 @@ class LOKitManager @Inject constructor(
     private var isInitialized = false
 
     /**
+     * Checks if LibreOffice native binaries are packaged and loadable on this device.
+     */
+    fun isAvailable(): Boolean {
+        return LOKitBridge.isNativeLoaded() && try {
+            LOKitBridge.nativeIsEngineAvailable()
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    /**
      * Initializes the LibreOffice runtime.
      * Ensures any necessary bootstrap files (program, services.rdb) are unpacked.
      */

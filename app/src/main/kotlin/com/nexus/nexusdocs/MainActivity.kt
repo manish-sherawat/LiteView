@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -39,6 +40,7 @@ import com.nexus.core.navigation.NexusRoute
 import com.nexus.core.preferences.ThemeMode
 import com.nexus.core.preferences.HomeStyle
 import com.nexus.core.preferences.UserPreferencesRepository
+import com.nexus.core.theme.NexusTheme
 
 import android.net.Uri
 
@@ -47,6 +49,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import com.nexus.core.ui.components.NexusFloatingBottomNav
 import com.nexus.core.ui.components.NexusNavItem
 import com.nexus.core.ui.components.rememberFloatingTabBarScrollConnection
+import com.nexus.core.ui.liquidglass.NexusLiquidBottomNav
+import com.nexus.core.ui.liquidglass.backdrops.layerBackdrop
+import com.nexus.core.ui.liquidglass.backdrops.rememberLayerBackdrop
 import com.nexus.core.ui.utils.LocalAppBackdrop
 import com.nexus.core.ui.utils.LocalGlassEffectConfig
 import com.nexus.core.ui.utils.readerNavGlassConfig
@@ -87,6 +92,21 @@ class MainActivity : ComponentActivity() {
 
             val hapticFeedbackEnabled by preferencesRepository.hapticFeedbackEnabled
                 .collectAsStateWithLifecycle(initialValue = true)
+
+            val useLiquidBottomNav by preferencesRepository.useLiquidBottomNav
+                .collectAsStateWithLifecycle(initialValue = true)
+
+            val navCornerRadius by preferencesRepository.bottomNavCornerRadius
+                .collectAsStateWithLifecycle(initialValue = 28f)
+
+            val navBlurRadius by preferencesRepository.bottomNavBlurRadius
+                .collectAsStateWithLifecycle(initialValue = 10f)
+
+            val navRefractionHeight by preferencesRepository.bottomNavRefractionHeight
+                .collectAsStateWithLifecycle(initialValue = 20f)
+
+            val navRefractionAmount by preferencesRepository.bottomNavRefractionAmount
+                .collectAsStateWithLifecycle(initialValue = 22f)
 
             val isFirstLaunchState = preferencesRepository.isFirstLaunch
                 .collectAsStateWithLifecycle(initialValue = null)
@@ -155,8 +175,10 @@ class MainActivity : ComponentActivity() {
                     onCollapseChanged = { isNavCollapsed = it }
                 )
 
-                // Bottom nav is shown on Dashboard and Settings screens when not in selection mode or permission request screen
-                val showBottomNav = (currentRoute == NexusRoute.Dashboard.route || currentRoute == NexusRoute.Settings.route)
+                // Bottom nav is shown on Dashboard, Tools, and Settings screens when not in selection mode or permission request screen
+                val showBottomNav = (currentRoute == NexusRoute.Dashboard.route ||
+                        currentRoute == NexusRoute.Tools.route ||
+                        currentRoute == NexusRoute.Settings.route)
                         && !isSelectionMode
                         && !isPermissionScreenShowing
 
@@ -168,6 +190,12 @@ class MainActivity : ComponentActivity() {
                         route = NexusRoute.Dashboard.route
                     ),
                     NexusNavItem(
+                        label = "Tools",
+                        selectedIconRes = R.drawable.ic_tools_filled,
+                        unselectedIconRes = R.drawable.ic_tools_outline,
+                        route = NexusRoute.Tools.route
+                    ),
+                    NexusNavItem(
                         label = "Settings",
                         selectedIconRes = R.drawable.ic_settings_filled,
                         unselectedIconRes = R.drawable.ic_settings_outline,
@@ -176,10 +204,11 @@ class MainActivity : ComponentActivity() {
                 )
 
                 val hazeState = remember { dev.chrisbanes.haze.HazeState() }
+                val contentBackdrop = rememberLayerBackdrop()
 
                 CompositionLocalProvider(
                     LocalGlassEffectConfig provides readerNavGlassConfig,
-                    LocalAppBackdrop provides null,
+                    LocalAppBackdrop provides contentBackdrop,
                     LocalHazeState provides hazeState,
                 ) {
                     // ── Root Box: content fills full size, nav pill is a Z-ordered overlay ──
@@ -195,11 +224,12 @@ class MainActivity : ComponentActivity() {
                     ) {
 
                         // ── Layer 0: main content ────────────────────────────────────────────
-                        // No bottomBar innerPadding here. Each screen's LazyColumn already
-                        // carries its own contentPadding(bottom = 120.dp) to clear the pill.
+                        // Recorded into contentBackdrop so the liquid glass bottom nav can refract it
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
+                                .background(NexusTheme.colors.background)
+                                .layerBackdrop(contentBackdrop)
                                 .haze(hazeState)
                         ) {
                             NexusNavHost(
@@ -243,27 +273,58 @@ class MainActivity : ComponentActivity() {
                                 )
                             )
                         ) {
-                        NexusFloatingBottomNav(
-                            items = navItems,
-                            currentRoute = currentRoute,
-                            homeStyle = homeStyle,
-                            isCollapsed = isNavCollapsed,
-                            onScrollToTop = { dashboardViewModel.scrollToTop() },
-                            onItemSelected = { item ->
-                                // Same-tab re-selection on Dashboard = scroll to top (#10/#14)
-                                if (item.route == currentRoute && item.route == NexusRoute.Dashboard.route) {
-                                    dashboardViewModel.scrollToTop()
-                                    return@NexusFloatingBottomNav
-                                }
-                                navController.navigate(item.route) {
-                                    popUpTo(NexusRoute.Dashboard.route) {
-                                        saveState = true
+                        if (useLiquidBottomNav) {
+                            NexusLiquidBottomNav(
+                                items = navItems,
+                                currentRoute = currentRoute,
+                                backdrop = contentBackdrop,
+                                isCollapsed = isNavCollapsed,
+                                cornerRadius = navCornerRadius.dp,
+                                blurRadius = navBlurRadius.dp,
+                                refractionHeight = navRefractionHeight.dp,
+                                refractionAmount = navRefractionAmount.dp,
+                                onScrollToTop = { dashboardViewModel.scrollToTop() },
+                                onItemSelected = { item ->
+                                    if (item.route == currentRoute) {
+                                        if (item.route == NexusRoute.Dashboard.route) {
+                                            dashboardViewModel.scrollToTop()
+                                        }
+                                        return@NexusLiquidBottomNav
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
+                                    navController.navigate(item.route) {
+                                        popUpTo(NexusRoute.Dashboard.route) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        } else {
+                            NexusFloatingBottomNav(
+                                items = navItems,
+                                currentRoute = currentRoute,
+                                homeStyle = homeStyle,
+                                isCollapsed = isNavCollapsed,
+                                onScrollToTop = { dashboardViewModel.scrollToTop() },
+                                onItemSelected = { item ->
+                                    // Same-tab re-selection: scroll to top on Dashboard, ignore for others
+                                    if (item.route == currentRoute) {
+                                        if (item.route == NexusRoute.Dashboard.route) {
+                                            dashboardViewModel.scrollToTop()
+                                        }
+                                        return@NexusFloatingBottomNav
+                                    }
+                                    navController.navigate(item.route) {
+                                        popUpTo(NexusRoute.Dashboard.route) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }

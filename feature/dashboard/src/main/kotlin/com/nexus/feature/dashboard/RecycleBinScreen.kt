@@ -620,6 +620,7 @@ private fun TrashedDocumentCard(
         lowerName.endsWith(".pdf") -> Pair(R.drawable.ic_file_pdf_new, DocumentAccentColors.PDF)
         lowerName.endsWith(".docx") || lowerName.endsWith(".doc") -> Pair(R.drawable.ic_file_word_new, DocumentAccentColors.DOCX)
         lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls") -> Pair(R.drawable.ic_file_sheet_new, DocumentAccentColors.XLSX)
+        lowerName.endsWith(".pptx") || lowerName.endsWith(".ppt") -> Pair(com.nexus.core.R.drawable.ic_file_ppt_new, DocumentAccentColors.PPTX)
         lowerName.endsWith(".txt") -> Pair(R.drawable.ic_file_txt_new, DocumentAccentColors.TXT)
         else -> Pair(R.drawable.ic_file_gen_new, NexusTheme.colors.primary)
     }

@@ -219,6 +219,11 @@ interface DocumentReaderRouter {
     fun navigateToDashboard()
     
     /**
+     * Navigate to the Tools Hub Screen.
+     */
+    fun navigateToTools()
+
+    /**
      * Navigate to the Document Scanner.
      */
     fun navigateToScanner()

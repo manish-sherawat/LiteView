@@ -9,10 +9,10 @@ This task tracker outlines the step-by-step engineering work for implementing ad
 | Phase | Focus Area | Tasks | Status |
 | :--- | :--- | :--- | :--- |
 | **Phase 1** | Foundation & Design Integration | `PPT-001` to `PPT-004` | **Completed** |
-| **Phase 2** | In-Slide Search & Speaker Notes | `PPT-005` to `PPT-007` | **Planned** |
+| **Phase 2** | In-Slide Search & Speaker Notes | `PPT-005` to `PPT-007` | **Completed** |
 | **Phase 3** | Exporting & Document Actions | `PPT-008` to `PPT-010` | **Planned** |
-| **Phase 4** | Advanced Rendering & Shapes | `PPT-011` to `PPT-013` | **Planned** |
-| **Phase 5** | Interactive Slideshow & Inking | `PPT-014` to `PPT-016` | **Planned** |
+| **Phase 4** | Advanced Rendering & Shapes | `PPT-011` to `PPT-013` | **Completed** |
+| **Phase 5** | Interactive Slideshow & Inking | `PPT-014` to `PPT-016` | **Completed** |
 | **Phase 6** | Native LOKit Engine Drop-in | `PPT-017` to `PPT-018` | **Planned** |
 
 ---
@@ -55,38 +55,40 @@ This task tracker outlines the step-by-step engineering work for implementing ad
 ## Phase 2: In-Slide Search & Speaker Notes
 
 ### `PPT-005` — Extract Slide Speaker Notes
-- **Status:** `Planned` (Priority: High)
+- **Status:** `Completed`
 - **Target Files:**
   - `.../engine/PresentationDocument.kt`
   - `.../engine/poi/PoiPresentationParser.kt`
 - **Description:**
   - Extract speaker notes from `XSLFSlide.getNotes()` and legacy `HSLFSlide.getNotesSheet()`.
-  - Store notes text in `PresentationSlideInfo.speakerNotes`.
+  - Store notes text in `PresentationSlideInfo.notes`.
 - **Acceptance Criteria:**
-  - Presentations with presenter notes have non-null `speakerNotes`.
+  - Presentations with presenter notes have non-null `notes`.
   - Slides without notes return null cleanly without errors.
 
 ### `PPT-006` — Speaker Notes Collapsible Drawer UI
-- **Status:** `Planned` (Priority: High)
+- **Status:** `Completed`
 - **Target Files:**
   - `.../ui/PresentationReaderScreen.kt`
-  - `.../ui/components/SpeakerNotesBottomSheet.kt`
+  - `.../ui/components/SpeakerNotesDrawer.kt`
 - **Description:**
   - Add a "Notes" action toggle in the floating dock and more options menu.
-  - Display speaker notes in a sleek bottom sheet or split panel with adjustable text size.
+  - Display speaker notes in a sleek bottom sheet with adjustable text size scaling (A- / A+).
 - **Acceptance Criteria:**
   - Tapping "Notes" opens the drawer with the current slide's presenter notes.
   - Changing slides updates the notes drawer content reactively.
 
 ### `PPT-007` — In-Slide Text Search Integration
-- **Status:** `Planned` (Priority: High)
+- **Status:** `Completed`
 - **Target Files:**
   - `.../ui/PresentationReaderViewModel.kt`
   - `.../ui/PresentationReaderScreen.kt`
+  - `.../ui/components/SlideViewport.kt`
+  - `.../ui/components/SlideRichText.kt`
 - **Description:**
   - Integrate `ReaderSearchBar` into `PresentationReaderScreen`.
   - Implement full-text search across titles, bullets, table cells, and speaker notes.
-  - Highlight search result count and provide next/previous match jump navigation.
+  - Highlight search result count, provide next/previous match jump navigation, and show yellow highlight bounding boxes over matching text.
 - **Acceptance Criteria:**
   - Search queries instantly navigate to the matching slide.
   - Counter reflects current match index out of total matches found.
@@ -135,7 +137,7 @@ This task tracker outlines the step-by-step engineering work for implementing ad
 ## Phase 4: Advanced Rendering & Shapes
 
 ### `PPT-011` — AutoShape Geometry & Fill Rendering
-- **Status:** `Planned` (Priority: High)
+- **Status:** `Completed` (Priority: High)
 - **Target Files:**
   - `.../engine/poi/PoiPresentationParser.kt`
   - `.../ui/components/SlideShapeRenderer.kt`
@@ -146,10 +148,11 @@ This task tracker outlines the step-by-step engineering work for implementing ad
   - Standard PowerPoint flowchart boxes, arrows, and banners render cleanly on the slide canvas.
 
 ### `PPT-012` — Enhanced Inline Typography & Font Styling
-- **Status:** `Planned` (Priority: Medium)
+- **Status:** `Completed` (Priority: Medium)
 - **Target Files:**
   - `.../engine/PresentationDocument.kt`
   - `.../ui/components/SlideViewport.kt`
+  - `.../ui/components/SlideRichText.kt`
 - **Description:**
   - Parse per-character formatting: custom RGB text colors, italic, underline, strikethrough, superscript, and subscript.
   - Construct Compose `AnnotatedString` with `SpanStyle` for each text block.
@@ -157,10 +160,11 @@ This task tracker outlines the step-by-step engineering work for implementing ad
   - Colored text, mixed bold/italic runs, and links display with correct styles.
 
 ### `PPT-013` — Table Spans & Borders
-- **Status:** `Planned` (Priority: Medium)
+- **Status:** `Completed` (Priority: Medium)
 - **Target Files:**
   - `.../engine/poi/PoiPresentationParser.kt`
   - `.../ui/components/SlideViewport.kt`
+  - `.../ui/components/SlideTableRenderer.kt`
 - **Description:**
   - Support `colSpan` / `rowSpan` in table models.
   - Parse table borders (color, thickness) and background cell shading colors.

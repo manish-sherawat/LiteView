@@ -23,13 +23,16 @@ android {
         applicationId = "com.nexus.nexusdocs"
         minSdk = 26
         targetSdk = 36
-        versionCode = 405
-        versionName = "4.0.5"
+        versionCode = 500
+        versionName = "5.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        // Optimize APK size by stripping unneeded language resources from dependencies
+        resourceConfigurations += listOf("en")
     }
 
     signingConfigs {
@@ -73,11 +76,15 @@ android {
         compose = true
     }
 
+    ndkVersion = "28.2.13676358"
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
-        jniLibs.useLegacyPackaging = true
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
 }
 

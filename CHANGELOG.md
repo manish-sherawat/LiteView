@@ -1,3 +1,44 @@
+Version 4.5.0
+
+🚀 New Features & Tools Expansion
+- **PowerPoint to PDF**: Convert `.pptx` and `.ppt` presentation slides into multi-page PDFs with Apache POI rendering.
+- **Excel to PDF**: Convert `.xlsx`, `.xls`, `.xlsm`, and `.csv` spreadsheets into structured PDF tables with automatic pagination.
+- **Text to PDF**: Convert plain text, markdown notes, source code, and logs into formatted PDFs with custom typography and page margins.
+- **Rotate PDF Pages**: Interactive visual page grid to rotate individual pages or the entire document in 90°/180°/270° increments.
+- **Protect PDF**: Secure and lock sensitive documents with AES-256 password encryption and granular permissions (print, copy, edit).
+- **Repair PDF**: Inspect corrupt or damaged PDFs, reconstruct missing cross-reference (XREF) tables and object streams, and recover intact pages.
+- **100% On-Device & Private**: All 15 tools process completely offline without uploading any data to external servers.
+
+🎨 UI & Design Enhancements
+- **Minimalist Tools Hub**: Full visual overhaul eliminating boxed containers in favor of uniform subtle card fills and crisp outlined vector styling.
+- **Dedicated Tool Icons**: Integrated 15 custom 512×512 icons with transparent squircle geometry for all tools in the Tools tab.
+- **Streamlined Home Screen**: Removed the static search bar and tab ribbon; introduced fixed floating top-right action buttons for Starred files filter and an expandable search bar.
+- **Unified Pitch-Black AMOLED Dark Mode**: Replaced the previous gray Dark theme with true AMOLED Pitch Black (`#000000`) as the app's default Dark theme for optimal OLED power efficiency and deep contrast.
+- **Compact Floating Navbar**: Reduced padding and spacing between bottom navigation tabs across Home, Tools, and Settings for a more ergonomic feel.
+- **Dynamic Theme Reactivity**: Full dynamic theme synchronization across all screens with the active app theme (Light, Dark, Sepia, Forest, Sunset, System).
+
+---
+
+Version 4.2.0
+
+0
+- Added Extract Pages: Pick specific pages or type custom ranges (e.g. 187-230, 1,5,10-20) to save as a new PDF.
+- Added Page Reorder: Interactive drag-and-drop page sorting, high-res preview dialog, and custom page order exports.
+- Added Sign PDF: Sign documents by drawing on canvas, typing with signature fonts (Allura, Great Vibes, Dancing Script, Caveat), or uploading transparent signatures with drag & resize controls.
+- Added Merge PDFs: Combine multiple PDF documents into a single unified file with reordering and instant sharing.
+- Added Compress PDF: Reduce oversized PDF file sizes with 3 smart compression presets (Extreme, Recommended, Less Compression).
+- Added PDF to Images: Export PDF pages or extract images into JPEG, PNG, or WEBP with custom DPI, quality sliders, and ZIP archive bundling.
+- Added Watermark PDF: Stamp custom text watermarks across every page with full opacity, font size, angle, and color controls.
+- Overhauled Image to PDF: Enhanced image cropping, page margins, orientation toggles, and quality settings.
+- 100% On-Device & Private: All PDF tools process completely offline without uploading your files to any external servers.
+
+🎨 UI & Design Improvements
+- Modernized Tools Dashboard with cohesive line-art vector icons (matching new icons for Image to PDF, Word to PDF, Extract Pages, Sign PDF, and Compress PDF).
+- Added live stepper indicators and responsive grid previews across all new PDF tools.
+- Added floating bottom export bars for smooth access when scrolling lengthy documents.
+
+---
+
 Version 4.0.0
 
 🚀 Major Updates & Features

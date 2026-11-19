@@ -27,3 +27,22 @@ fun NexusText(
         overflow = overflow
     )
 }
+
+@Composable
+fun NexusText(
+    text: androidx.compose.ui.text.AnnotatedString,
+    modifier: Modifier = Modifier,
+    style: TextStyle = NexusTheme.typography.body,
+    color: Color = NexusTheme.colors.textPrimary,
+    textAlign: TextAlign = TextAlign.Unspecified,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip
+) {
+    BasicText(
+        text = text,
+        modifier = modifier,
+        style = style.copy(color = color, textAlign = textAlign),
+        maxLines = maxLines,
+        overflow = overflow
+    )
+}

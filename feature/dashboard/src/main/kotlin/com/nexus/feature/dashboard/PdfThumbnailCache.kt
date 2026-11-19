@@ -7,6 +7,7 @@ import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import android.util.LruCache
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.sync.Semaphore
@@ -22,7 +23,35 @@ object PdfThumbnailCache {
         }
     }
 
+    private val colorCache = object : LruCache<String, Color>(40) {
+        override fun sizeOf(key: String, value: Color): Int = 1
+    }
+
     private var isRegistered = false
+
+    fun getCachedDominantColor(uriString: String): Color? = colorCache.get(uriString)
+
+    private fun extractDominantColor(bitmap: Bitmap): Color? {
+        var bestColor: Color? = null
+        var maxSaturation = 0.22f
+        val hsv = FloatArray(3)
+        val stepX = (bitmap.width / 12).coerceAtLeast(1)
+        val stepY = (bitmap.height / 12).coerceAtLeast(1)
+        val sampleHeight = (bitmap.height * 0.75f).toInt()
+        for (y in 0 until sampleHeight step stepY) {
+            for (x in 0 until bitmap.width step stepX) {
+                val pixel = bitmap.getPixel(x, y)
+                android.graphics.Color.colorToHSV(pixel, hsv)
+                val saturation = hsv[1]
+                val value = hsv[2]
+                if (saturation > maxSaturation && value in 0.25f..0.92f) {
+                    maxSaturation = saturation
+                    bestColor = Color(pixel)
+                }
+            }
+        }
+        return bestColor
+    }
 
     suspend fun getThumbnail(context: Context, uriString: String): ImageBitmap? {
         if (!isRegistered) {
@@ -31,11 +60,13 @@ object PdfThumbnailCache {
                 override fun onTrimMemory(level: Int) {
                     if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
                         memoryCache.evictAll()
+                        colorCache.evictAll()
                     }
                 }
                 override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {}
                 override fun onLowMemory() {
                     memoryCache.evictAll()
+                    colorCache.evictAll()
                 }
             })
         }
@@ -65,6 +96,11 @@ object PdfThumbnailCache {
                         renderer.close()
                         fd.close()
 
+                        val dominantColor = extractDominantColor(bitmap)
+                        if (dominantColor != null) {
+                            colorCache.put(uriString, dominantColor)
+                        }
+
                         val imageBitmap = bitmap.asImageBitmap()
                         memoryCache.put(uriString, imageBitmap)
                         return@withPermit imageBitmap
@@ -78,5 +114,11 @@ object PdfThumbnailCache {
                 }
             }
         }
+    }
+
+    suspend fun getThumbnailAndColor(context: Context, uriString: String): Pair<ImageBitmap?, Color?> {
+        val bitmap = getThumbnail(context, uriString)
+        val color = colorCache.get(uriString)
+        return Pair(bitmap, color)
     }
 }

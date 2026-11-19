@@ -52,6 +52,7 @@ import com.nexus.core.ui.animations.shimmerEffect
 import com.nexus.core.ui.animations.springBounceClick
 
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -94,6 +95,13 @@ import com.nexus.core.ui.components.NexusButton
 import com.nexus.core.ui.NexusSurface
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.components.NexusTopBar
+import com.nexus.core.ui.components.NexusViewerTopBar
+import com.nexus.core.ui.components.NexusViewerActionButton
+import com.nexus.core.ui.components.NexusViewerActionDivider
+import com.nexus.core.ui.components.NexusFloatingIconButton
+import com.nexus.core.ui.utils.hazeGlassBackground
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import kotlin.math.roundToInt
@@ -142,6 +150,7 @@ fun PdfReaderScreen(
     val density = LocalDensity.current
     val screenWidthPx = with(density) { configuration.screenWidthDp.dp.roundToPx() }
     
+    val hazeState = remember { HazeState() }
     var isImmersiveMode by remember { mutableStateOf(false) }
     var isSearchMode by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
@@ -268,13 +277,14 @@ fun PdfReaderScreen(
                         }
                     }
                     is PdfReaderUiState.Success -> {
-                        Box(modifier = Modifier.fillMaxSize()) {
+                        Box(modifier = Modifier.fillMaxSize().hazeSource(hazeState)) {
                             val bottomInset = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                             val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 16.dp else if (isSearchMode) 160.dp else 90.dp)
                             val bottomPadding by animateDpAsState(targetValue = if (isImmersiveMode) bottomInset else bottomInset + 80.dp)
                             
                             val coroutineScope = rememberCoroutineScope()
                             var scale by remember { mutableFloatStateOf(1f) }
+                            var settledScale by remember { mutableFloatStateOf(1f) }
                             var offsetX by remember { mutableFloatStateOf(0f) }
                             var offsetY by remember { mutableFloatStateOf(0f) }
                             var snapJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
@@ -282,6 +292,31 @@ fun PdfReaderScreen(
                             val screenWidthDp = configuration.screenWidthDp.dp
                             val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
                             val screenWidthPxInt = screenWidthPx
+                            
+                            // Debounce zoom settling so high-res re-rendering only runs after user finishes pinching/zooming
+                            LaunchedEffect(scale) {
+                                if (scale > 1.15f) {
+                                    kotlinx.coroutines.delay(260)
+                                    settledScale = scale
+                                } else if (scale <= 1.05f && settledScale != 1f) {
+                                    settledScale = 1f
+                                }
+                            }
+                            
+                            // Dynamically re-render visible pages at high resolution when settled scale changes
+                            LaunchedEffect(settledScale, listState.firstVisibleItemIndex) {
+                                if (settledScale > 1.15f) {
+                                    val visibleItems = listState.layoutInfo.visibleItemsInfo
+                                    val baseW = screenWidthPx - with(density) { 32.dp.roundToPx() }
+                                    val zoomTargetW = (baseW * settledScale).toInt().coerceIn(1200, 2400)
+                                    for (item in visibleItems) {
+                                        val pageIdx = item.index
+                                        if (pageIdx in 0 until state.pageCount) {
+                                            viewModel.renderPage(pageIdx, zoomTargetW)
+                                        }
+                                    }
+                                }
+                            }
                             
                             Box(
                                 modifier = Modifier
@@ -325,16 +360,22 @@ fun PdfReaderScreen(
                                             snapJob?.cancel()
                                             do {
                                                 val event = awaitPointerEvent()
-                                                val zoomChange = event.calculateZoom()
-                                                val panChange = event.calculatePan()
-                                                val centroid = event.calculateCentroid()
-                                                
                                                 val isMultiTouch = event.changes.size > 1
+                                                
                                                 if ((scale > 1f && !isDrawMode) || isMultiTouch) {
+                                                    val centroid = event.calculateCentroid()
                                                     if (centroid != Offset.Unspecified) {
                                                         val oldScale = scale
-                                                        scale = (oldScale * zoomChange).coerceIn(1f, maxZoom)
-                                                        val actualZoom = scale / oldScale
+                                                        val zoomChange = if (isMultiTouch) event.calculateZoom() else 1f
+                                                        val panChange = event.calculatePan()
+                                                        
+                                                        val newScale = if (isMultiTouch) {
+                                                            (oldScale * zoomChange).coerceIn(1f, maxZoom)
+                                                        } else {
+                                                            oldScale
+                                                        }
+                                                        val actualZoom = newScale / oldScale
+                                                        scale = newScale
                                                         
                                                         val rawOffsetX = centroid.x - (centroid.x - offsetX) * actualZoom + panChange.x
                                                         val rawOffsetY = centroid.y - (centroid.y - offsetY) * actualZoom + panChange.y
@@ -344,33 +385,23 @@ fun PdfReaderScreen(
                                                         val maxOffsetY = 0f
                                                         val minOffsetY = -(screenHeightPx * scale - screenHeightPx)
                                                         
-                                                        val shouldConsume = if (isMultiTouch) true else {
-                                                            if (!isHorizontalLayout) {
-                                                                !(rawOffsetY > maxOffsetY && panChange.y > 0) && !(rawOffsetY < minOffsetY && panChange.y < 0)
-                                                            } else {
-                                                                !(rawOffsetX > maxOffsetX && panChange.x > 0) && !(rawOffsetX < minOffsetX && panChange.x < 0)
-                                                            }
-                                                        }
-
                                                         offsetX = if (rawOffsetX > maxOffsetX) {
-                                                            maxOffsetX + (rawOffsetX - maxOffsetX) * 0.3f
+                                                            maxOffsetX + (rawOffsetX - maxOffsetX) * 0.25f
                                                         } else if (rawOffsetX < minOffsetX) {
-                                                            minOffsetX + (rawOffsetX - minOffsetX) * 0.3f
+                                                            minOffsetX + (rawOffsetX - minOffsetX) * 0.25f
                                                         } else {
                                                             rawOffsetX
                                                         }
                                                         
                                                         offsetY = if (rawOffsetY > maxOffsetY) {
-                                                            maxOffsetY + (rawOffsetY - maxOffsetY) * 0.3f
+                                                            maxOffsetY + (rawOffsetY - maxOffsetY) * 0.25f
                                                         } else if (rawOffsetY < minOffsetY) {
-                                                            minOffsetY + (rawOffsetY - minOffsetY) * 0.3f
+                                                            minOffsetY + (rawOffsetY - minOffsetY) * 0.25f
                                                         } else {
                                                             rawOffsetY
                                                         }
                                                         
-                                                        if (shouldConsume || scale != oldScale) {
-                                                            event.changes.forEach { it.consume() }
-                                                        }
+                                                        event.changes.forEach { it.consume() }
                                                     }
                                                 }
                                             } while (event.changes.any { it.pressed })
@@ -391,8 +422,8 @@ fun PdfReaderScreen(
                                                 
                                                 if (offsetX != clampedOffsetX || offsetY != clampedOffsetY) {
                                                     snapJob = coroutineScope.launch {
-                                                        if (offsetX != clampedOffsetX) launch { Animatable(offsetX).animateTo(clampedOffsetX) { offsetX = value } }
-                                                        if (offsetY != clampedOffsetY) launch { Animatable(offsetY).animateTo(clampedOffsetY) { offsetY = value } }
+                                                        if (offsetX != clampedOffsetX) launch { Animatable(offsetX).animateTo(clampedOffsetX, animationSpec = tween(200)) { offsetX = value } }
+                                                        if (offsetY != clampedOffsetY) launch { Animatable(offsetY).animateTo(clampedOffsetY, animationSpec = tween(200)) { offsetY = value } }
                                                     }
                                                 }
                                             }
@@ -409,16 +440,6 @@ fun PdfReaderScreen(
                                 val colorFilter = remember(backgroundMode) {
                                     when (backgroundMode) {
                                         PdfBackgroundMode.Original -> null
-                                        PdfBackgroundMode.Paper -> ColorFilter.colorMatrix(
-                                            ColorMatrix(
-                                                floatArrayOf(
-                                                    0.393f, 0.769f, 0.189f, 0f, 0f,
-                                                    0.349f, 0.686f, 0.168f, 0f, 0f,
-                                                    0.272f, 0.534f, 0.131f, 0f, 0f,
-                                                    0f, 0f, 0f, 1f, 0f
-                                                )
-                                            )
-                                        )
                                         PdfBackgroundMode.EyeComfort -> ColorFilter.colorMatrix(
                                             ColorMatrix(
                                                 floatArrayOf(
@@ -444,10 +465,20 @@ fun PdfReaderScreen(
 
                                 val searchHighlightColor = NexusTheme.colors.searchHighlight
                                 val pdfContent: LazyListScope.() -> Unit = {
-                                    items(state.pageCount) { pageIndex ->
+                                    items(
+                                        count = state.pageCount,
+                                        key = { it },
+                                        contentType = { "pdf_page" }
+                                    ) { pageIndex ->
                                         LaunchedEffect(pageIndex) {
-                                            kotlinx.coroutines.delay(100) // Render debouncer
-                                            viewModel.renderPage(pageIndex, screenWidthPx - with(density) { 32.dp.roundToPx() })
+                                            if (!renderedPages.containsKey(pageIndex)) {
+                                                kotlinx.coroutines.delay(40) // Fast debouncer for fling scroll
+                                                if (!renderedPages.containsKey(pageIndex)) {
+                                                    val baseW = screenWidthPx - with(density) { 32.dp.roundToPx() }
+                                                    val currentTargetW = if (settledScale > 1.15f) (baseW * settledScale).toInt().coerceIn(1200, 2400) else baseW
+                                                    viewModel.renderPage(pageIndex, currentTargetW)
+                                                }
+                                            }
                                         }
                                     
                                         val bitmap = renderedPages[pageIndex]
@@ -475,6 +506,7 @@ fun PdfReaderScreen(
                                                         contentDescription = null,
                                                         contentScale = ContentScale.Fit,
                                                         colorFilter = colorFilter,
+                                                        filterQuality = FilterQuality.Low,
                                                         modifier = Modifier
                                                             .fillMaxWidth()
                                                             .aspectRatio(
@@ -1063,6 +1095,21 @@ fun PdfReaderScreen(
                                     sliderValue = currentPage.toFloat()
                                 }
                             }
+
+                            // Prefetch adjacent pages to ensure zero flicker when scrolling
+                            LaunchedEffect(currentPage, state.pageCount) {
+                                val currentIdx = currentPage - 1
+                                val baseW = screenWidthPx - with(density) { 32.dp.roundToPx() }
+                                val targetW = if (settledScale > 1.15f) (baseW * settledScale).toInt().coerceIn(1200, 2400) else baseW
+                                val nextIdx = currentIdx + 1
+                                if (nextIdx in 0 until state.pageCount && !renderedPages.containsKey(nextIdx)) {
+                                    viewModel.renderPage(nextIdx, targetW)
+                                }
+                                val prevIdx = currentIdx - 1
+                                if (prevIdx in 0 until state.pageCount && !renderedPages.containsKey(prevIdx)) {
+                                    viewModel.renderPage(prevIdx, targetW)
+                                }
+                            }
                             
                             // Right-edge Vertical Scrollbar
                             if (state.pageCount > 1) {
@@ -1288,11 +1335,8 @@ fun PdfReaderScreen(
                                                      spotColor = NexusTheme.colors.primary.copy(alpha = 0.16f),
                                                      ambientColor = Color.Black.copy(alpha = 0.10f)
                                                  )
-                                                 .clip(NexusTheme.shapes.pill)
-                                                 .background(NexusTheme.colors.surface)
-                                                 .border(
-                                                     width = 1.dp,
-                                                     color = NexusTheme.colors.divider.copy(alpha = 0.7f),
+                                                 .hazeGlassBackground(
+                                                     hazeState = hazeState,
                                                      shape = NexusTheme.shapes.pill
                                                  )
                                                  .springBounceClick {
@@ -1331,16 +1375,16 @@ fun PdfReaderScreen(
                                              .padding(horizontal = NexusTheme.spacing.sm, vertical = NexusTheme.spacing.xs)
                                              .shadow(
                                                  elevation = 16.dp,
-                                                 shape = NexusTheme.shapes.large,
-                                                 spotColor = NexusTheme.colors.primary.copy(alpha = if (isDarkTheme) 0.28f else 0.14f),
-                                                 ambientColor = Color.Black.copy(alpha = if (isDarkTheme) 0.40f else 0.10f)
+                                                 shape = RoundedCornerShape(25.dp),
+                                                 spotColor = NexusTheme.colors.primary.copy(alpha = if (isDarkTheme) 0.28f else 0.10f),
+                                                 ambientColor = Color.Black.copy(alpha = if (isDarkTheme) 0.40f else 0.08f)
                                              )
-                                             .clip(NexusTheme.shapes.large)
-                                             .background(NexusTheme.colors.surface.copy(alpha = 0.95f))
-                                             .border(
-                                                 width = 1.dp,
-                                                 color = NexusTheme.colors.divider.copy(alpha = 0.65f),
-                                                 shape = NexusTheme.shapes.large
+                                             .hazeGlassBackground(
+                                                 hazeState = hazeState,
+                                                 shape = RoundedCornerShape(25.dp),
+                                                 blurRadius = 28.dp,
+                                                 borderWidth = 1.dp,
+                                                 borderColor = if (isDarkTheme) Color.White.copy(alpha = 0.12f) else Color(0xFFE6E7EF)
                                              )
                                              .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xxs)
                                      ) {
@@ -1550,55 +1594,22 @@ fun PdfReaderScreen(
                     enter = expandVertically() + fadeIn(),
                     exit = shrinkVertically() + fadeOut()
                 ) {
-                    NexusTopBar(
+                    NexusViewerTopBar(
                         title = displayName,
-                        titleStyle = com.nexus.core.theme.NexusTheme.typography.body,
-                        navigationIcon = {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .clickable { onBack() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                androidx.compose.foundation.Image(
-                                    painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_back),
-                                    contentDescription = "Back",
-                                    modifier = Modifier.size(24.dp),
-                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(com.nexus.core.theme.NexusTheme.colors.textPrimary)
-                                )
-                            }
-                        },
+                        hazeState = hazeState,
+                        onBack = onBack,
                         actions = {
-                            Image(
+                            NexusViewerActionButton(
                                 painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_search),
                                 contentDescription = "Search",
-                                colorFilter = ColorFilter.tint(com.nexus.core.theme.NexusTheme.colors.textPrimary),
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .springBounceClick { isSearchMode = !isSearchMode }
-                                    .padding(NexusTheme.spacing.xs)
+                                isActive = isSearchMode,
+                                onClick = { isSearchMode = !isSearchMode }
                             )
-                            Image(
-                                painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_rotate),
-                                contentDescription = "Rotate",
-                                colorFilter = ColorFilter.tint(com.nexus.core.theme.NexusTheme.colors.textPrimary),
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .springBounceClick { pageRotation = (pageRotation + 90) % 360 }
-                                    .padding(NexusTheme.spacing.xs)
-                            )
-                            Image(
+                            NexusViewerActionDivider()
+                            NexusViewerActionButton(
                                 painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_more_vert),
                                 contentDescription = "More",
-                                colorFilter = ColorFilter.tint(com.nexus.core.theme.NexusTheme.colors.textPrimary),
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .springBounceClick { showMenu = true }
-                                    .padding(NexusTheme.spacing.xs)
+                                onClick = { showMenu = true }
                             )
                         }
                     )
@@ -1948,7 +1959,6 @@ private fun PdfOptionsBottomSheet(
 
 enum class PdfBackgroundMode(val label: String) {
     Original("Original Color"),
-    Paper("Paper (Sepia)"),
     EyeComfort("Eye Comfort (Forest)"),
     Inverts("Inverts")
 }
@@ -2208,7 +2218,6 @@ fun ViewSettingsModal(
                                             .background(
                                                 when(mode) {
                                                     PdfBackgroundMode.Original -> Color.White
-                                                    PdfBackgroundMode.Paper -> com.nexus.core.theme.sepiaNexusColors.background
                                                     PdfBackgroundMode.EyeComfort -> com.nexus.core.theme.forestNexusColors.background
                                                     PdfBackgroundMode.Inverts -> Color.Black
                                                 }

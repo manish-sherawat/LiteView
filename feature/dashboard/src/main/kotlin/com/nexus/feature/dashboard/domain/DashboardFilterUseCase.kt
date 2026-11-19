@@ -72,6 +72,7 @@ class DashboardFilterUseCase @Inject constructor() {
                 DocumentTypeFilter.ALL -> true
                 DocumentTypeFilter.PDF -> type == DocumentType.PDF || doc.fileName.endsWith(".pdf", ignoreCase = true)
                 DocumentTypeFilter.DOCX -> type == DocumentType.DOCX || doc.fileName.endsWith(".docx", ignoreCase = true) || doc.fileName.endsWith(".doc", ignoreCase = true)
+                DocumentTypeFilter.PPT -> type == DocumentType.PPTX || doc.fileName.endsWith(".pptx", ignoreCase = true) || doc.fileName.endsWith(".ppt", ignoreCase = true)
                 DocumentTypeFilter.XLSX -> type == DocumentType.XLSX || doc.fileName.endsWith(".xlsx", ignoreCase = true) || doc.fileName.endsWith(".xls", ignoreCase = true)
                 DocumentTypeFilter.TXT -> type == DocumentType.TXT || DocumentType.fromUri(Uri.parse("file:///${doc.fileName}")) == DocumentType.TXT
             }
@@ -106,22 +107,41 @@ class DashboardFilterUseCase @Inject constructor() {
             )
         }
 
+        val trimmedQuery = query.trim()
+        val queryWords = if (trimmedQuery.isBlank()) emptyList() else trimmedQuery.lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
+
+        val searchMatchedDocs = if (queryWords.isEmpty()) {
+            baseDocs
+        } else {
+            baseDocs.filter { doc ->
+                val docTags = uriToTagNamesMap[doc.uri] ?: emptyList()
+                val fileNameLower = doc.fileName.lowercase()
+                val docTypeLower = doc.documentType.lowercase()
+
+                queryWords.all { word ->
+                    fileNameLower.contains(word) ||
+                    docTypeLower.contains(word) ||
+                    docTags.any { it.contains(word, ignoreCase = true) }
+                }
+            }
+        }
+
         val counts = mapOf(
-            DocumentTypeFilter.ALL to baseDocs.size,
-            DocumentTypeFilter.PDF to baseDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.PDF) },
-            DocumentTypeFilter.DOCX to baseDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.DOCX) },
-            DocumentTypeFilter.XLSX to baseDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.XLSX) },
-            DocumentTypeFilter.TXT to baseDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.TXT) }
+            DocumentTypeFilter.ALL to searchMatchedDocs.size,
+            DocumentTypeFilter.PDF to searchMatchedDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.PDF) },
+            DocumentTypeFilter.DOCX to searchMatchedDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.DOCX) },
+            DocumentTypeFilter.PPT to searchMatchedDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.PPT) },
+            DocumentTypeFilter.XLSX to searchMatchedDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.XLSX) },
+            DocumentTypeFilter.TXT to searchMatchedDocs.count { isDocMatchingFilter(it, DocumentTypeFilter.TXT) }
         )
 
-        val filteredDocs = baseDocs.filter { doc ->
+        val filteredDocs = searchMatchedDocs.filter { doc ->
             val matchesType = if (fileFilter == DocumentTypeFilter.ALL) true else isDocMatchingFilter(doc, fileFilter)
             val matchesTag = if (activeTag == null) true else (uriToTagNamesMap[doc.uri] ?: emptyList()).contains(activeTag)
             matchesType && matchesTag
         }
 
         val mapped = filteredDocs
-            .filter { it.fileName.contains(query, ignoreCase = true) }
             .map { doc ->
                 RecentDocumentUiModel(
                     doc = doc,
