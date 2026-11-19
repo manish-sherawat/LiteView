@@ -30,10 +30,10 @@
 
 <div align="center">
 
-# LiteView — Document Viewer, Scanner & Annotation Suite
+# LiteView — Document Viewer, Scanner & Offline PDF Tools Suite
 
-**A fast, elegant, and feature-rich Android document reader & annotation workspace.**
-View PDFs, Office files, PowerPoint presentations, and text documents. Annotate PDFs with stamps, text boxes, and precision measurement rulers. Scan physical documents directly with your camera.
+**A fast, private, and ultra-high-fidelity Android document reader, annotation workspace & offline PDF toolbox.**  
+Read PDFs, Microsoft Office files (`.docx`, `.xlsx`), PowerPoint presentations (`.pptx`, `.ppt`), and plain text documents. Annotate PDFs with stamps, text boxes, and precision blueprint measurement rulers. Scan physical documents directly with your camera. Convert, merge, split, encrypt, sign, and repair documents with 20+ built-in offline tools.
 
 <br/>
 
@@ -45,35 +45,104 @@ View PDFs, Office files, PowerPoint presentations, and text documents. Annotate 
 
 ---
 
+## ⚡ What's New in v4.2.0
+
+* **🔍 Ultra-Sharp Multi-Scale PDF Zoom Engine**: Dynamic multi-resolution rasterization ensures crisp vector quality even at 4x, 8x, or 16x zoom without pixelation, accompanied by smooth, lag-free 60fps pan and scroll gestures.
+* **🌊 Nexus Liquid Glass Navigation Dock**: Real-time hardware-accelerated frosted glass bottom navigation bar with customizable corner radius, blur radius, refraction height, and refraction amount shaders.
+* **🛠️ 20+ Built-In Offline PDF Tools**: Complete offline workshop to convert (Images, Word, Excel, PPT, Text to PDF), manipulate (Merge, Split, Rotate, Reorder, Delete, Extract, Crop), secure (Encrypt, Sign, Watermark), and optimize (Compress, Repair, Number, Header/Footer) documents without internet or third-party servers.
+* **📽️ PowerPoint (`.pptx` & `.ppt`) Presentation Studio**: Dual-engine rendering (Zero-AWT POI + Native LibreOfficeKit C++ NDK bridge) with fullscreen presentation mode, slide thumbnail sorter grid, slide inking overlay, and speaker notes drawer.
+* **🎨 Solid Minimalist Top Bar Experience**: Restored distraction-free, high-contrast top bars across all readers with unified pill action badges for back, search, favorites, and contextual actions.
+* **🔎 Instant Search & High-Contrast Navigation**: Real-time multi-criteria file search with animated transitions, instant keyboard triggering, and one-tap query dismissal.
+
+---
+
 ## ✨ Key Features
 
 | Feature | Description |
 |---|---|
-| 📑 **PDF Reader & Viewer** | High-fidelity PDF rendering powered by **MuPDF 1.23** with page rotation, night modes, and search |
-| 🧲 **Edge-Docking Toolbar** | Modular floating PDF toolbar with 4-edge smart snapping (**Left**, **Right**, **Top**, **Bottom**) and avatar mode |
-| ✍️ **PDF Annotation Suite** | Rich annotation tools including Pen, Translucent Highlighter, Shapes (Rectangles, Ovals, Lines, Arrows) |
-| 📝 **Free Text & Stamps** | Single-tap Free Text box insertion and 1-tap Business Stamps (**APPROVED**, **CONFIDENTIAL**, **DRAFT**, **FINAL**, **REJECTED**, **SIGN HERE**) |
-| 📏 **Distance Measurement** | Precision blueprint ruler rendering end ticks and calculating live distance in centimeters (`%.1f cm`) |
-| 🧹 **Target-Filtered Eraser** | Intelligent eraser engine supporting `Erase All`, `Pen Only`, `Highlighter Only`, and `Shapes Only` filter modes |
-| 📽️ **PowerPoint Viewer (PPT/PPTX)** | Fast offline slide presentation reader with fullscreen present mode, thumbnail drawer, and dual-engine POI + LOKit bridge |
-| 📊 **Word & Excel Suite** | View `.docx` and `.xlsx` documents via **Apache POI** with dark mode, freeze panes, and jump-to-cell |
-| 📝 **Code & Text Viewer** | Clean and readable plain text file reader with syntax highlighting and word wrap toggles |
-| 📸 **Document Scanner** | Scan physical pages to PDF or JPEG via **ML Kit Document Scanner** |
-| 🔍 **OCR (Text Recognition)** | Extract text from scanned images using **ML Kit Text Recognition** |
-| ⭐ **Universal Favorites** | Pin your most-used documents with instant gold star indicators across all reader toolbars |
+| 📑 **PDF Reader & High-Fidelity Viewer** | High-performance PDF rendering powered by **MuPDF 1.23** with multi-scale dynamic zoom, page rotation, night modes, and search |
+| 🧲 **Edge-Docking Annotation Toolbar** | Modular floating PDF toolbar with 4-edge smart snapping (**Left**, **Right**, **Top**, **Bottom**) and avatar minimization mode |
+| ✍️ **PDF Annotation Suite** | Rich annotation tools including Pen, Translucent Highlighter, and geometric shapes (Rectangles, Ovals, Lines, Arrows) |
+| 📝 **Free Text & Business Stamps** | 1-tap Free Text box insertion and business review stamps (**APPROVED**, **CONFIDENTIAL**, **DRAFT**, **FINAL**, **REJECTED**, **SIGN HERE**) |
+| 📏 **Distance Measurement Ruler** | Precision blueprint measurement ruler rendering end ticks and calculating live distance in centimeters (`%.1f cm`) |
+| 🧹 **Target-Filtered Smart Eraser** | Intelligent eraser engine supporting `Erase All`, `Pen Only`, `Highlighter Only`, and `Shapes Only` filter modes |
+| 🛠️ **20+ Offline PDF Tools Suite** | Full conversion, page editing, encryption, signing, watermarking, compression, and document repair tools |
+| 📽️ **PowerPoint Viewer (PPT/PPTX)** | Fast offline slide presentation reader with fullscreen present mode, thumbnail drawer, slide sorter, and dual-engine POI + LOKit bridge |
+| 📊 **Word & Excel Suite** | View `.docx` and `.xlsx` documents via **Apache POI** with dark mode, freeze panes, and jump-to-cell navigation |
+| 📝 **Code & Text Viewer** | Clean and readable plain text file reader with syntax highlighting, line numbering, and word wrap toggles |
+| 📸 **Document Scanner** | Scan physical documents directly to PDF or JPEG using **ML Kit Document Scanner** |
+| 🔍 **OCR (Text Recognition)** | Extract selectable text from scanned camera pages using on-device **ML Kit Text Recognition** |
+| ⭐ **Universal Starred Sync** | Pin favorite documents with instant gold star indicators synchronized across all reader toolbars and home tabs |
 | 📂 **Auto-Recording Recents** | Opening documents via SAF pickers or external intents auto-registers them in the Recent tab |
-| 🎨 **Glassmorphic UI** | Luxury frosted glass surfaces, custom floating pill toolbars, and spring-animated micro-interactions |
-| 🗂️ **Smart Dashboard** | View All, Recent, and Starred files with real-time list sync, sorting, and search |
+| 🌊 **Liquid Glass Navigation Dock** | Luxury frosted glass surfaces with real-time blur and refraction shaders, customizable in Settings |
+| 🗂️ **Smart Dashboard** | View All, Recent, and Starred files with real-time list sync, multi-filter chips, and instant search |
 | 🔲 **Multi-Select Actions** | Long-press to select multiple files, then share or delete them in bulk |
-| 🏷️ **Tag System** | Create custom color + emoji tags, filter the dashboard by tag, and manage all tags in the Tag Library |
-| 🗑️ **Permanent File Delete & Trash** | Safe file deletion with 10-second undo countdown and Recycle Bin management |
-| 🌓 **Dark & Light Mode** | Full system theme support, AMOLED Deep Black, and reader background modes |
-| 🔄 **In-App Updater** | Checks for new releases via GitHub REST API with session dismissal memory & in-app APK installer |
-| 🔃 **Pull to Refresh** | Swipe down to re-scan the file system for new documents |
+| 🏷️ **Tag Organization System** | Create custom color + emoji tags, filter the dashboard by tag, and manage all tags in the Tag Library |
+| 🗑️ **Recycle Bin & Safe Delete** | Safe file deletion with 10-second undo countdown and Recycle Bin management |
+| 🌓 **5 Curated Themes** | Full system theme support, Light Slate, AMOLED Deep Black, Forest Sage, and Sunset Peach |
+| 🔄 **In-App GitHub Updater** | Checks for new releases via GitHub REST API with session dismissal memory & direct in-app APK installer |
+| 🔃 **Pull to Refresh** | Swipe down to re-scan the file system for newly downloaded or modified documents |
 
 ---
 
-## 📱 Screenshots
+## 🛠️ Offline PDF Tools Suite
+
+LiteView includes a built-in, completely offline document toolkit. All operations execute directly on-device using local engines—ensuring **100% privacy, zero data upload, and zero internet requirement**.
+
+<div align="center">
+
+### 🔄 Document Conversion Suite
+
+| Icon | Tool | Status | Purpose & Capabilities |
+|:---:|---|:---:|---|
+| <img src="assets/tools_icon/image_to_pdf.png" width="46" alt="Image to PDF" /> | **Image to PDF** | `Available` | Convert single or multi-image galleries into a unified, high-resolution PDF document with custom margins and quality settings. |
+| <img src="assets/tools_icon/word_to_pdf.png" width="46" alt="Word to PDF" /> | **Word to PDF** | `Available` | Render `.docx` documents into vector-clean, print-ready PDF files with fonts, tables, and styles preserved. |
+| <img src="assets/tools_icon/excel_to_pdf.png" width="46" alt="Excel to PDF" /> | **Excel to PDF** | `Available` | Transform `.xlsx`, `.xls`, `.xlsm`, and `.csv` spreadsheets into formatted PDF reports with sheet selection and table borders. |
+| <img src="assets/tools_icon/ppt_to_pdf.png" width="46" alt="PowerPoint to PDF" /> | **PPT to PDF** | `Available` | Convert PowerPoint presentations (`.pptx`, `.ppt`) into multi-page PDF slide decks for offline sharing and printing. |
+| <img src="assets/tools_icon/text_to_pdf.png" width="46" alt="Text to PDF" /> | **Text to PDF** | `Available` | Convert plain text files, developer notes, markdown, and code snippets into clean, paginated PDF documents. |
+| <img src="assets/tools_icon/pdf_to_image.png" width="46" alt="PDF to Image" /> | **PDF to Images** | `Available` | Extract individual pages or embedded figures as high-resolution PNG/JPEG images directly to device storage. |
+| <img src="assets/tools_icon/pdf_to_word.png" width="46" alt="PDF to Word" /> | **PDF to Word** | `Available` | Extract structured paragraphs, tables, and text from PDF documents into editable `.docx` files. |
+
+<br/>
+
+### 📑 Page Editing & Organization
+
+| Icon | Tool | Status | Purpose & Capabilities |
+|:---:|---|:---:|---|
+| <img src="assets/tools_icon/merge_pdf.png" width="46" alt="Merge PDF" /> | **Merge PDFs** | `Available` | Combine multiple PDF files into one continuous document with custom file ordering and bookmark retention. |
+| <img src="assets/tools_icon/split_pdf.png" width="46" alt="Split PDF" /> | **Split PDF** | `Available` | Split large documents into individual pages, equal chunks, or custom page intervals (`1-5`, `8-12`). |
+| <img src="assets/tools_icon/extract_pages.png" width="46" alt="Extract Pages" /> | **Extract Pages** | `Available` | Select specific pages from a PDF via visual thumbnail picker and export them into a brand-new standalone PDF. |
+| <img src="assets/tools_icon/pdf_rotate.png" width="46" alt="Rotate Pages" /> | **Rotate Pages** | `Available` | Fix sideways or inverted pages with 90°, 180°, or 270° clockwise rotation applied selectively or document-wide. |
+| <img src="assets/tools_icon/reorder_pages.png" width="46" alt="Reorder Pages" /> | **Reorder Pages** | `Available` | Reorganize page sequences with an interactive drag-and-drop thumbnail grid and immediate preview. |
+| <img src="assets/tools_icon/pdf_page_delete.png" width="46" alt="Delete Pages" /> | **Delete Pages** | `Available` | Purge blank, confidential, or unwanted pages from any PDF document with single-tap page removal. |
+| <img src="assets/tools_icon/pdf_crop.png" width="46" alt="Crop Pages" /> | **Crop Pages** | `Available` | Trim unwanted margins, printer crop marks, or white spaces around page content for compact viewing. |
+
+<br/>
+
+### 🔒 Security, Signing & Protection
+
+| Icon | Tool | Status | Purpose & Capabilities |
+|:---:|---|:---:|---|
+| <img src="assets/tools_icon/protect_pdf.png" width="46" alt="Protect PDF" /> | **Protect & Encrypt** | `Available` | Encrypt PDF files with standard AES-128/256 password protection and configure printing or copying permissions. |
+| <img src="assets/tools_icon/pdf_sign.png" width="46" alt="Sign PDF" /> | **Sign PDF** | `Available` | Draw, type, or import signature stamps and place them onto any document page with smooth vector scaling. |
+| <img src="assets/tools_icon/wattermark.png" width="46" alt="Watermark PDF" /> | **Watermark PDF** | `Available` | Stamp customizable diagonal or horizontal text watermarks (`CONFIDENTIAL`, `DRAFT`, `COPYRIGHT`) with opacity and color control. |
+
+<br/>
+
+### ⚡ Optimization & Document Layout
+
+| Icon | Tool | Status | Purpose & Capabilities |
+|:---:|---|:---:|---|
+| <img src="assets/tools_icon/compress_pdf.png" width="46" alt="Compress PDF" /> | **Compress PDF** | `Available` | Reduce PDF file sizes with balanced DPI and image downsampling profiles for quick email sharing. |
+| <img src="assets/tools_icon/repair_pdf.png" width="46" alt="Repair PDF" /> | **Repair PDF** | `Available` | Diagnose damaged or unreadable PDFs, rebuild corrupted cross-reference tables (XREF), and restore accessible pages. |
+| <img src="assets/tools_icon/page_number.png" width="46" alt="Page Numbers" /> | **Page Numbers** | `Available` | Stamp sequential page numbers (`Page X of Y`, `X`) at top/bottom corners or centers with custom fonts and margins. |
+| <img src="assets/tools_icon/header_footer.png" width="46" alt="Header & Footer" /> | **Header & Footer** | `Available` | Insert consistent headers, footers, revision dates, and company titles across every page. |
+
+</div>
+
+---
+
+## 📱 Screenshots & App Screens
 
 <div align="center">
 
@@ -89,31 +158,39 @@ View PDFs, Office files, PowerPoint presentations, and text documents. Annotate 
 
 </div>
 
+### 🌟 New Specialized Screens
+
+* **🛠️ Offline Tools Workshop (`ToolsScreen.kt`)**: Categorized grid of all 21 PDF conversion, page editing, encryption, signing, and optimization tools with intuitive drag-and-drop file dropzones.
+* **🌊 Liquid Glass Customizer (`SettingsScreen.kt`)**: Real-time slider controls to fine-tune your frosted glass dock: corner radius, blur radius, refraction height, and refraction intensity shaders.
+* **🏷️ Tag Management Studio (`TagManagerScreen.kt`)**: Create custom color and emoji tags to organize contracts, invoices, school notes, or blueprints.
+* **🗑️ Recycle Bin & Trash Recovery (`RecycleBinScreen.kt`)**: Safeguard deleted documents with safe storage, soft-delete restoration, and permanent shredding.
+* **📋 File Metadata Inspector (`FileDetailsSheet.kt`)**: Inspect file system URIs, file size in bytes, MIME types, creation dates, and checksum details.
+* **📽️ Slide Sorter Grid (`SlideGridSorterSheet.kt`)**: Overview of all presentation slides for quick navigation during speaking engagements.
+
 ---
 
 ## 🏗️ Architecture & Tech Stack
 
-LiteView is built with a clean, scalable, multi-module architecture following **MVVM** and **Clean Architecture** principles.
+LiteView is built with a multi-module architecture adhering to Google's **Modern Android Architecture**, **MVI / MVVM**, and **Clean Architecture** patterns.
 
 ### Module Structure
 
 ```
 NexusDocsViewer/
 ├── app/                      # Application entry point, DI graph, Navigation host
-├── core/                     # Shared UI design system, theme, navigation contracts, database
+├── core/                     # Shared UI design system, liquid glass, theme, navigation contracts, database
 └── feature/
-    ├── dashboard/            # Home screen, Recent/Starred/All file lists, Settings, Trash, Tags
-    ├── reader-pdf/           # MuPDF PDF experience, annotation engine, edge-docking toolbar
+    ├── dashboard/            # Home screen, Recent/Starred/All file lists, Settings, Trash, Tags, Tools Suite
+    ├── reader-pdf/           # MuPDF PDF experience, multi-scale zoom engine, annotation engine, edge-docking toolbar
     ├── reader-office/        # Apache POI Office document viewer (.docx, .xlsx)
-    ├── reader-presentation/  # PowerPoint (.pptx, .ppt) viewer, LOKit NDK bridge, POI parser
-    ├── reader-text/          # Plain text file reader with syntax highlighting
+    ├── reader-presentation/  # PowerPoint (.pptx, .ppt) viewer, LOKit NDK bridge, POI parser, slide sorter
+    ├── reader-text/          # Plain text & code file reader with syntax highlighting
     └── scanner/              # ML Kit document scanning & OCR
 ```
 
 ### 🧭 Architecture Flowchart & Mindmap
 
 ```mermaid
-%% Generated by https://gitdiagram.com/manish-sherawat/liteview
 flowchart TD
 
 subgraph group_app["App and navigation"]
@@ -129,7 +206,7 @@ subgraph group_workspace["Document workspace"]
   node_history["Recents and tags"]
   node_trash["Trash management<br/>[TrashRepository.kt]"]
   node_tagui["Tag library"]
-  node_tools["PDF conversion tools<br/>[ToolsScreen.kt]"]
+  node_tools["Offline PDF tools<br/>[ToolsScreen.kt]"]
   node_database[("Room database<br/>[NexusDatabase.kt]")]
 end
 
@@ -149,7 +226,7 @@ end
 
 subgraph group_shared["Shared services"]
   node_preferences[("User preferences")]
-  node_theme["Design system<br/>[NexusTheme.kt]"]
+  node_theme["Design system & Liquid Glass<br/>[NexusTheme.kt]"]
   node_updater["In-app updater"]
 end
 
@@ -166,7 +243,7 @@ node_dashboard -->|"acts on files"| node_fileops
 node_dashboard -->|"shows recents"| node_history
 node_dashboard -->|"opens recycle bin"| node_trash
 node_dashboard -->|"manages tags"| node_tagui
-node_dashboard -->|"offers tools"| node_tools
+node_dashboard -->|"launches tools"| node_tools
 node_history -->|"persists records"| node_database
 node_trash -->|"stores trash records"| node_database
 node_router -->|"routes PDF"| node_pdf
@@ -221,8 +298,6 @@ class node_preferences,node_theme,node_updater,node_github,node_mlkit toneIndigo
 
 ### 🏛️ Architectural Principles
 
-LiteView follows Google's recommended Modern Android Architecture (MVI / MVVM with Clean Architecture):
-
 - **Unidirectional Data Flow (UDF)** — State flows down via immutable Kotlin Coroutines `StateFlow`, while user actions flow up through typed UI events.
 - **Strict Multi-Module Decoupling** — Feature modules (`feature:reader-pdf`, `feature:reader-presentation`, etc.) never depend on each other. Navigation and reader launches are resolved via the `DocumentReaderRouter` interface in `:core`.
 - **Hybrid High-Performance Rendering** — Pairs native C/C++ NDK engines (MuPDF 1.23 and LibreOfficeKit) for high-speed document rasterization with Jetpack Compose Canvas overlays for smooth vector drawing, annotations, and blueprint measurement.
@@ -236,7 +311,7 @@ LiteView follows Google's recommended Modern Android Architecture (MVI / MVVM wi
 | **Compiler & Codegen** | Kotlin KSP | `2.0.21-1.0.28` | High-performance annotation processing for Room & Hilt |
 | **Build System** | Android Gradle Plugin (AGP) | `8.10.0` | Multi-module build optimization and R8 resource shrinking |
 | **UI Toolkit** | Jetpack Compose | BOM `2025.06.00` | Declarative UI framework with Material Design 3 |
-| **Glassmorphism** | ChrisBanes Haze | `1.3.0` | Hardware-accelerated frosted glass backdrop blurs |
+| **Glassmorphism** | Nexus Liquid Glass + Haze | `1.3.0` | Custom RuntimeShader refraction & ChrisBanes Haze blurs |
 | **Dependency Injection** | Dagger Hilt | `2.55` | Compile-time dependency injection across modules |
 | **Navigation** | Navigation Compose | `2.8.5` | Type-safe declarative in-app navigation routes |
 | **Database & Cache** | Room SQLite | `2.6.1` | Local persistence for recents, custom tags & trash history |
@@ -244,7 +319,7 @@ LiteView follows Google's recommended Modern Android Architecture (MVI / MVVM wi
 | **Concurrency & Async** | Coroutines & Flow | `1.9.0` | Reactive state management with `StateFlow` and structured concurrency |
 | **Lifecycle** | AndroidX Lifecycle | `2.8.7` | `collectAsStateWithLifecycle` & ViewModel lifecycle scopes |
 | **PDF Engine** | MuPDF (fitz) | `1.23.0` | Ultra-fast native C/C++ vector PDF rasterization engine |
-| **PDF Tooling** | PDFBox-Android | `2.0.27.0` | Blueprint scale calculations and PDF document utilities |
+| **PDF Tooling** | PDFBox-Android | `2.0.27.0` | Document scaling, blueprint ruler math & PDF utilities |
 | **Office Suite Parser** | Apache POI | `5.2.5` | Offline DOCX, XLSX, and PPTX document parsing (`aalto-xml 1.3.2`) |
 | **Presentation Engine** | LibreOfficeKit Bridge | Native NDK | C++ JNI bridge (`libnexus_presentation_engine.so`) for desktop slide fidelity |
 | **Vision & ML** | Google ML Kit | `16.0.0` / `19.0.0` | Document Scanner edge detection & on-device Text OCR |
@@ -252,6 +327,115 @@ LiteView follows Google's recommended Modern Android Architecture (MVI / MVVM wi
 | **Animations** | Jetpack Compose + Lottie | `6.6.2` | Spring-physics micro-interactions and vector animations |
 | **Permissions** | Accompanist Permissions | `0.36.0` | Seamless runtime storage and camera permission management |
 
+---
+
+## 📁 Project Deep Dive
+
+### `core` Module
+
+The foundation of the entire app:
+- **`NexusTheme`** — Custom design system (colors, typography, shapes, spacing)
+- **`NexusLiquidBottomNav`** & **`liquidglass/`** — Native refraction and blur shaders (`RuntimeShader`), layer backdrops, and interactive docks
+- **`NexusComponents`** — Reusable UI components (`NexusSurface`, `NexusText`, `NexusButton`, `NexusTopBar`, `NexusCollapsingTopBar`, etc.)
+- **`navigation/`** — Navigation contracts, `DocumentReaderRouter`, `DocumentType` enum
+- **`preferences/`** — `UserPreferencesRepository` (DataStore-backed settings for theme, home style, refraction, blur)
+
+### `feature/dashboard` Module
+
+The main workspace and offline document laboratory:
+- **`DashboardScreen`** — File list (All / Recent / Starred tabs), instant search, sorting, pull-to-refresh
+- **`DashboardViewModel`** — Manages UI state, storage scanning, multi-select batch actions
+- **`FileListItem` & `FileGridItem`** — Animated file card components with high-res thumbnails
+- **`FileDetailsSheet`** — Detailed metadata sheet with quick actions (Share, Rename, Star, Delete)
+- **`ToolsScreen` & `tools/`** — 20+ dedicated offline PDF manipulation and conversion tools
+- **`RecycleBinScreen`** — Trash and soft-delete recovery management
+- **`TagManagerScreen`** — Custom color and emoji tag categorization
+- **`SettingsScreen`** — App settings, Liquid Glass shader controls, cache manager, AMOLED mode, changelog viewer
+
+### `feature/reader-pdf` Module
+
+Full-featured PDF reader powered by **MuPDF**:
+- **Multi-Resolution Dynamic Zoom Engine** — Renders anti-aliased vector details at any zoom scale without blur or stutter
+- **Decoupled Gesture Pan & Scroll** — 60fps buttery-smooth touch handling during pan and navigation
+- **Smart Edge Drag-Docking Toolbar** (`PdfAnnotationPill`) — Snap to 4 screen edges with avatar collapse mode
+- **Annotation Canvas Overlay** — Pen, Translucent Highlighter, Shapes (Rectangles, Ovals, Lines, Arrows)
+- **Free Text Box & Business Stamps** — Interactive text dialogs and 1-tap review badges
+- **Distance Measurement Ruler** — Real-time blueprint scale calculation in centimeters (`%.1f cm`)
+- **Target-Filtered Eraser** — Filter modes (`Erase All`, `Pen Only`, `Highlighter Only`, `Shapes Only`)
+- Synchronized page rotation (90°, 180°, 270°) and PDF thumbnail caching
+
+### `feature/reader-presentation` Module
+
+PowerPoint (`.pptx` & `.ppt`) presentation reader:
+- **Zero-AWT Apache POI Parser** — Offline presentation parser extracting slides, titles, bullets, tables, and images without runtime crashes
+- **Native LibreOfficeKit Bridge** — C++ JNI bridge (`libnexus_presentation_engine.so`) ready for desktop slide fidelity
+- **Luxury Presenter UI** — Floating slide badge, jump-to-slide dialog, bottom dock toolbar, thumbnail drawer, slide sorter grid, slide inking, and speaker notes drawer
+
+### `feature/reader-office` Module
+
+Office document reader using **Apache POI**:
+- Supports `.docx` and `.xlsx` formats
+- Renders Word documents in a responsive HTML WebView with Dark Mode adaptation
+- Renders Excel spreadsheets with interactive freeze panes, sheet tab switching, and cell jumping
+
+### `feature/reader-text` Module
+
+Plain text and source code viewer:
+- Fast rendering of `.txt` and code files with line numbering and syntax highlighting
+- Configurable word wrap and font scaling
+
+### `feature/scanner` Module
+
+Physical document scanning powered by **Google ML Kit**:
+- Automatic edge detection, perspective correction, and image filters
+- Saves output as **PDF** or **JPEG**
+- OCR text extraction from scanned images using `TextRecognition`
+
+---
+
+## 🎨 Design System
+
+LiteView features the **Nexus Design System**, designed exclusively for modern Android:
+
+* **🌊 Liquid Glass Shaders**: Custom Android AGSL RuntimeShaders powering refraction and backdrop blur effects on the bottom navigation dock.
+* **🛡️ Solid Minimalist Top Bars**: Clean, non-distracting solid surfaces with 0.8dp borders and 3dp elevation across all document readers.
+* **✨ Spring Micro-Interactions**: Physical spring animations (`springBounceClick`) on buttons, tabs, chips, and cards.
+* **🎨 5 Curated Theme Palettes**:
+  * **Light Theme** — Clean slate canvas with high-contrast text.
+  * **Dark AMOLED** — True pitch black (`#000000`) for battery efficiency on OLED displays.
+  * **Forest Sage** — Calming sage-green surfaces with deep teal accents.
+  * **Sunset Peach** — Warm peach surfaces with sunset-orange accents.
+  * **System Default** — Automatically conforms to device appearance.
+* **🏷️ Document Accent Colors**: Distinct accent colors for instant recognition across file formats:
+  * <img src="assets/file_type_icons/pdf_icon.png" width="18" /> **PDF**: `Vibrant Red` (`#FF3B30`)
+  * <img src="assets/file_type_icons/word_icon.png" width="18" /> **DOCX**: `Vibrant Blue` (`#0A84FF`)
+  * <img src="assets/file_type_icons/excel_icon.png" width="18" /> **XLSX**: `Vibrant Green` (`#32D74B`)
+  * <img src="assets/file_type_icons/ppt_icon.png" width="18" /> **PPTX**: `Vibrant Orange` (`#FF9500`)
+  * <img src="assets/file_type_icons/text_icon.png" width="18" /> **TXT**: `Vibrant Purple` (`#BF5AF2`)
+
+---
+
+## 🗺️ Roadmap & Milestones
+
+See engineering documentation in `docs/`:
+- **[PPT_VIEWER_ROADMAP.md](docs/PPT_VIEWER_ROADMAP.md)** — Architectural roadmap for PowerPoint rendering and presentation tools
+- **[PPT_VIEWER_TASKS.md](docs/PPT_VIEWER_TASKS.md)** — Engineering task tracker
+
+### ✅ Completed Milestones
+- [x] **v4.2.0** — **Offline PDF Tools Suite & Multi-Scale PDF Zoom** (20+ conversion, page editing, encryption, signing, and repair tools; multi-resolution dynamic PDF zoom; liquid glass navigation dock; solid reader top bars; top-right search close controls)
+- [x] **v3.2.0** — **PowerPoint (`.pptx` / `.ppt`) Viewer** (Zero-AWT POI parser, native LOKit NDK bridge, floating dock, jump-to-slide, thumbnail drawer, fullscreen present mode)
+- [x] **v3.1.0** — **Recycle Bin & Safe Delete** (Soft-delete with 10-second undo countdown, trash restoration, permanent shredding)
+- [x] **v3.0.3** — **Tag Library & Organization** (Custom color & emoji tags, dashboard category filters, bulk tag assignment)
+- [x] **v3.0.0** — **PDF Measurement & Blueprint Tools** (Live distance ruler in cm, 1-tap business stamps, target-filtered eraser)
+- [x] **v2.9.0** — **Universal Starred & Recent Sync** (SAF & external intent auto-recording, synchronized gold star status across all readers)
+- [x] **v2.8.0** — **In-App Updater & Multi-Select** (GitHub Release asset checks, direct APK installation, bulk sharing and batch deletion)
+
+### 🚀 Planned & In Progress
+- [ ] **AI Document Copilot** — On-device / hybrid Gemini API integration for document summarization, key takeaway extraction, and interactive Q&A
+- [ ] **Presentation In-Slide Text Search** — Live search query highlighting across slide titles and body text
+- [ ] **Slide Export Suite** — Convert presentation decks into multi-page PDF or individual high-resolution PNG slides
+- [ ] **Vector AutoShape Rendering** — Native Compose Canvas drawing for PowerPoint callouts, flowcharts, and geometric connectors
+- [ ] **Cloud Storage Hub** — Direct integration with Google Drive, Nextcloud, and Dropbox for seamless document synchronization
 
 ---
 
@@ -295,106 +479,6 @@ git clone https://github.com/manish-sherawat/LiteView.git
 # The signed APK will be located at:
 # app/build/outputs/apk/release/app-release.apk
 ```
-
----
-
-## 📁 Project Deep Dive
-
-### `core` Module
-
-The foundation of the app. Contains:
-- **`NexusTheme`** — Custom design system (colors, typography, shapes, spacing)
-- **`NexusComponents`** — Reusable UI components (`NexusSurface`, `NexusText`, `NexusButton`, `NexusTopBar`, `NexusCollapsingTopBar`, etc.)
-- **`NexusBottomNav`** — Custom animated bottom navigation bar
-- **`navigation/`** — Navigation contracts, `DocumentReaderRouter`, `DocumentType` enum
-- **`preferences/`** — `UserPreferencesRepository` (DataStore-backed user settings)
-
-### `feature/dashboard` Module
-
-The main home screen workspace. Contains:
-- **`DashboardScreen`** — File list (All / Recent / Starred tabs), search, sort, pull-to-refresh
-- **`DashboardViewModel`** — Manages UI state, file scanning, multi-select mode
-- **`FileListItem` & `FileGridItem`** — Animated file card components with high-res thumbnails
-- **`FileOptionsDialog`** — Contextual action sheet (Share, Rename, Star, Details, Delete)
-- **`RecycleBinScreen`** — Trash and file recovery management
-- **`TagManagerScreen`** — Custom color and emoji tag categorization
-- **`ToolsScreen`** — Built-in PDF tools (Images to PDF, Word to PDF)
-- **`SettingsScreen`** — App settings, cache management, AMOLED mode, changelog viewer
-
-### `feature/reader-pdf` Module
-
-Full-featured PDF reader powered by **MuPDF**:
-- **Smart Edge Drag-Docking Toolbar** (`PdfAnnotationPill`) — Snap to 4 screen edges with avatar collapse mode
-- **Annotation Canvas Overlay** — Pen, Translucent Highlighter, Shapes (Rectangles, Ovals, Lines, Arrows)
-- **Free Text Box & Business Stamps** — Interactive text dialogs and 1-tap review badges
-- **Distance Measurement Ruler** — Real-time blueprint scale calculation in centimeters (`%.1f cm`)
-- **Target-Filtered Eraser** — Filter modes (`Erase All`, `Pen Only`, `Highlighter Only`, `Shapes Only`)
-- Page rotation synchronization (90°, 180°, 270°)
-- Scroll position persistence and PDF thumbnail caching
-
-### `feature/reader-presentation` Module
-
-PowerPoint (`.pptx` & `.ppt`) presentation reader:
-- **Zero-AWT Apache POI Parser** — Offline presentation parser extracting slides, titles, bullets, tables, and images without runtime crashes
-- **Native LibreOfficeKit Bridge** — C++ JNI bridge (`libnexus_presentation_engine.so`) ready for precompiled LOKit desktop rendering
-- **Luxury Presenter UI** — Floating slide badge, jump-to-slide dialog, bottom dock toolbar, thumbnail drawer, pinch/double-tap zoom, and fullscreen presentation mode
-
-### `feature/reader-office` Module
-
-Office document reader using **Apache POI**:
-- Supports `.docx` and `.xlsx` formats
-- Renders Word documents in a responsive HTML WebView with Dark Mode adaptation
-- Renders Excel spreadsheets with interactive freeze panes, sheet tab switching, and cell jumping
-
-### `feature/reader-text` Module
-
-Plain text and source code viewer:
-- Fast rendering of `.txt` files with line numbering and syntax highlighting
-- Configurable word wrap and font scaling
-
-### `feature/scanner` Module
-
-Physical document scanning powered by **Google ML Kit**:
-- Automatic edge detection, perspective correction, and image filters
-- Saves output as **PDF** or **JPEG**
-- OCR text extraction from scanned images using `TextRecognition`
-
----
-
-## 🎨 Design System
-
-LiteView uses a bespoke design language called **Nexus Design System**, implemented entirely in Jetpack Compose:
-
-- **Glassmorphism** — Frosted glass effect on floating UI surfaces (multi-select action bar, floating snackbars, bottom docks)
-- **Shared Element Transitions** — Hero animations from file card thumbnail to full reader
-- **Spring-Based Micro-Interactions** — Bouncy, responsive press animations (`springBounceClick`) on all interactive elements
-- **AMOLED Dark Mode** — Pitch-black dark mode for OLED displays
-- **Document Accent Colors** — Each file type (PDF, DOCX, XLSX, PPTX, TXT) has its own curated accent color
-
----
-
-## 🗺️ Roadmap & Milestones
-
-See the detailed engineering documentation in the `docs/` folder:
-- **[PPT_VIEWER_ROADMAP.md](docs/PPT_VIEWER_ROADMAP.md)** — Architectural roadmap for PowerPoint rendering, vector graphics, and presentation tools
-- **[PPT_VIEWER_TASKS.md](docs/PPT_VIEWER_TASKS.md)** — Step-by-step engineering task tracker
-
-### ✅ Completed Milestones
-- [x] **v3.2.0** — **PowerPoint (`.pptx` / `.ppt`) Viewer** (Zero-AWT POI parser, native LOKit NDK bridge, luxury floating dock, jump-to-slide, thumbnail drawer, fullscreen present mode)
-- [x] **v3.1.0** — **Recycle Bin & Safe Delete** (Soft-delete with 10-second undo countdown, trash restoration, permanent shredding)
-- [x] **v3.0.3** — **Tag Library & Organization** (Custom color & emoji tags, dashboard category filters, bulk tag assignment)
-- [x] **v3.0.0** — **PDF Measurement & Blueprint Tools** (Live distance ruler in cm, 1-tap business stamps, target-filtered eraser)
-- [x] **v2.9.0** — **Universal Starred & Recent Sync** (SAF & external intent auto-recording, synchronized gold star status across all readers)
-- [x] **v2.8.0** — **In-App Updater & Multi-Select** (GitHub Release asset checks, direct APK installation, bulk sharing and batch deletion)
-
-### 🚀 Planned & In Progress
-- [ ] **Presentation In-Slide Text Search** — Live search query highlighting across slide titles and body text
-- [ ] **Speaker Notes Drawer for PPTX** — Expandable bottom sheet displaying slide notes and presenter cues
-- [ ] **Slide Export Suite** — Convert presentation decks into multi-page PDF or individual high-resolution PNG slides
-- [ ] **Vector AutoShape Rendering** — Native Compose Canvas drawing for PowerPoint callouts, flowcharts, and geometric connectors
-- [ ] **AI Document Copilot** — On-device / hybrid Gemini API integration for document summarization, key takeaway extraction, and interactive Q&A
-- [ ] **Cloud Storage Hub** — Direct integration with Google Drive, Nextcloud, and Dropbox for seamless document synchronization
-
 
 ---
 
