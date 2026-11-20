@@ -31,11 +31,11 @@
 
 ## 1. 🔗 Pipeline / Connection Errors
 
-### PC-001 — MuPDF temp-file leak on content:// URIs
-**Severity**: 🟠 High  
+### PC-001 — ~~MuPDF temp-file leak on content:// URIs~~ (FIXED)
+**Severity**: ✅ RESOLVED  
 **Location**: `PdfReaderViewModel.kt:303–317`  
-**Description**: When a PDF is opened via a `content://` URI, the ViewModel copies the entire file into a temp file at `context.cacheDir/mupdf_*.pdf`. The `tempFile` reference is set, but if `loadPdf()` is called a second time (e.g., user opens another document) while a render operation is still in progress, `tempFile?.delete()` runs inside `renderMutex.withLock { }` **before** the previous render coroutine finishes, potentially deleting the file that is still being read by MuPDF, causing a native crash or corrupted page rendering.  
-**Fix Prompt**: Null-check `tempFile` before `delete()` and move temp-file deletion to `onCleared()`. Use a unique filename suffix keyed by URI hash to prevent collisions between rapid document switches.
+**Description**: When a PDF was opened via a `content://` URI, the temp file deletion ran prematurely inside `renderMutex.withLock` during `loadPdf()`, potentially deleting an active file in use by background render coroutines.  
+**Fix Applied**: Deletion moved safely to `onCleared()`, all temp files tracked via `tempFiles` list with existence/null checks, and temp files created using unique filename suffix keyed by URI hash (`_${uriHash}.pdf`) to eliminate collisions between rapid document switches.
 
 ---
 
@@ -567,7 +567,7 @@ Or mark it `internal` and restrict to the core module.
 
 | ID | Category | Severity | Status |
 |---|---|---|---|
-| PC-001 | Pipeline | 🟠 High | Open |
+| PC-001 | Pipeline | ✅ Fixed | Resolved |
 | PC-002 | Pipeline | 🟡 Medium | Open |
 | PC-003 | Pipeline | 🟡 Medium | Open |
 | PC-004 | Pipeline | 🟡 Medium | Open |

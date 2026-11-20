@@ -209,6 +209,7 @@ class PdfReaderViewModel @Inject constructor(
     private var mupdfDocument: Document? = null
     private val renderMutex = Mutex()
     private var tempFile: File? = null
+    private val tempFiles = java.util.concurrent.CopyOnWriteArrayList<File>()
 
     init {
         viewModelScope.launch {
@@ -249,8 +250,6 @@ class PdfReaderViewModel @Inject constructor(
                 renderMutex.withLock {
                     mupdfDocument?.destroy()
                     mupdfDocument = null
-                    tempFile?.delete()
-                    tempFile = null
                 }
             }
             
@@ -307,11 +306,13 @@ class PdfReaderViewModel @Inject constructor(
                         // Copy to temp file
                         val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
                         if (inputStream != null) {
-                            val temp = File.createTempFile("mupdf_", ".pdf", context.cacheDir)
+                            val uriHash = (uriStrDecoded.hashCode().toLong() and 0xFFFFFFFFL).toString(16)
+                            val temp = File.createTempFile("mupdf_", "_${uriHash}.pdf", context.cacheDir)
                             val out = FileOutputStream(temp)
                             inputStream.copyTo(out)
                             out.close()
                             inputStream.close()
+                            tempFiles.add(temp)
                             tempFile = temp
                             filePathToOpen = temp.absolutePath
                         }
@@ -780,7 +781,23 @@ class PdfReaderViewModel @Inject constructor(
         inFlightPages.clear()
         _renderedPages.value = emptyMap()
         mupdfDocument?.destroy()
-        tempFile?.delete()
+        mupdfDocument = null
+        tempFiles.forEach { file ->
+            try {
+                if (file.exists()) {
+                    file.delete()
+                }
+            } catch (_: Exception) {}
+        }
+        tempFiles.clear()
+        tempFile?.let { file ->
+            try {
+                if (file.exists()) {
+                    file.delete()
+                }
+            } catch (_: Exception) {}
+        }
+        tempFile = null
     }
 
     fun saveAnnotations(pageIndex: Int, strokes: List<List<android.graphics.PointF>>, color: Int = android.graphics.Color.RED, onResult: (Boolean) -> Unit) {
