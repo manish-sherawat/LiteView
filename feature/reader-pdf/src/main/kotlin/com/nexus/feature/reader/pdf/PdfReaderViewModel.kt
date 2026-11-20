@@ -332,10 +332,9 @@ class PdfReaderViewModel @Inject constructor(
 
                     mupdfDocument = doc
                     val count = doc.countPages()
-                    context.getSharedPreferences("nexus_page_counts", Context.MODE_PRIVATE)
-                        .edit()
-                        .putInt(uriStr, count)
-                        .apply()
+                    try {
+                        recentDocumentDao.updatePageCount(uriStr, count)
+                    } catch (_: Exception) {}
 
                     // Extract Text using MuPDF safely under lock
                     try {
@@ -383,7 +382,8 @@ class PdfReaderViewModel @Inject constructor(
                                 lastOpenedAt = System.currentTimeMillis(),
                                 documentType = "PDF",
                                 lastScrollIndex = existing?.lastScrollIndex ?: 0,
-                                lastScrollOffset = existing?.lastScrollOffset ?: 0
+                                lastScrollOffset = existing?.lastScrollOffset ?: 0,
+                                pageCount = count
                             )
                         )
                     } catch (_: Exception) {}

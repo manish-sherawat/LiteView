@@ -277,7 +277,8 @@ class OfficeReaderViewModel @Inject constructor(
                                     lastOpenedAt = System.currentTimeMillis(),
                                     documentType = docType.uppercase(),
                                     lastScrollIndex = recentDoc?.lastScrollIndex ?: 0,
-                                    lastScrollOffset = recentDoc?.lastScrollOffset ?: 0
+                                    lastScrollOffset = recentDoc?.lastScrollOffset ?: 0,
+                                    pageCount = count
                                 )
                             )
                         } catch (_: Exception) {}

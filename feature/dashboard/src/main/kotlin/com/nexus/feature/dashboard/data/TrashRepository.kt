@@ -298,5 +298,28 @@ class TrashRepository @Inject constructor(
         }
 
         trashedDao.deleteExpired(cutoffTimestamp)
+        pruneOrphanPageCountEntries()
+        expiredList.size
+    }
+
+    private suspend fun pruneOrphanPageCountEntries() {
+        try {
+            val prefs = context.getSharedPreferences("nexus_page_counts", Context.MODE_PRIVATE)
+            val allKeys = prefs.all.keys
+            if (allKeys.isNotEmpty()) {
+                val activeUris = recentDocDao.observeAll().first().map { it.uri }.toSet()
+                val editor = prefs.edit()
+                var removedCount = 0
+                allKeys.forEach { uriKey ->
+                    if (!activeUris.contains(uriKey)) {
+                        editor.remove(uriKey)
+                        removedCount++
+                    }
+                }
+                if (removedCount > 0) {
+                    editor.apply()
+                }
+            }
+        } catch (_: Exception) {}
     }
 }

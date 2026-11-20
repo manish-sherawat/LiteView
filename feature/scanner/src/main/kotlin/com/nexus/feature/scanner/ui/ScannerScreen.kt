@@ -26,6 +26,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions.RESULT_FORMAT_JPEG
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions.RESULT_FORMAT_PDF
@@ -43,8 +45,10 @@ fun ScannerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scannedPages by viewModel.scannedPages.collectAsStateWithLifecycle()
+    val scanError by viewModel.scanError.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    var scanTrigger by remember { mutableIntStateOf(0) }
 
     val scannerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
@@ -65,7 +69,7 @@ fun ScannerScreen(
 
     when (uiState) {
         ScannerState.CAMERA -> {
-            LaunchedEffect(Unit) {
+            LaunchedEffect(scanTrigger) {
                 val options = GmsDocumentScannerOptions.Builder()
                     .setGalleryImportAllowed(true)
                     .setResultFormats(RESULT_FORMAT_JPEG, RESULT_FORMAT_PDF)
@@ -77,9 +81,9 @@ fun ScannerScreen(
                     .addOnSuccessListener { intentSender ->
                         scannerLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
                     }
-                    .addOnFailureListener {
-                        Toast.makeText(context, "Failed to start scanner", Toast.LENGTH_SHORT).show()
-                        onBack()
+                    .addOnFailureListener { e ->
+                        android.util.Log.e("ScannerScreen", "Failed to start document scanner", e)
+                        viewModel.onScanError(e)
                     }
             }
             
@@ -159,6 +163,97 @@ fun ScannerScreen(
         ScannerState.DONE -> {
             LaunchedEffect(Unit) {
                 onBack()
+            }
+        }
+    }
+
+    scanError?.let { error ->
+        when (error) {
+            is ScannerError.PlayServicesUnavailable -> {
+                AlertDialog(
+                    onDismissRequest = {
+                        viewModel.clearScanError()
+                        onBack()
+                    },
+                    title = {
+                        NexusText(
+                            text = "Google Play Services Required",
+                            style = NexusTheme.typography.title,
+                            color = NexusTheme.colors.textPrimary
+                        )
+                    },
+                    text = {
+                        NexusText(
+                            text = "The document scanner relies on Google Play Services, which is missing or needs an update on this device.",
+                            style = NexusTheme.typography.body,
+                            color = NexusTheme.colors.textSecondary
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                viewModel.clearScanError()
+                                onBack()
+                            }
+                        ) {
+                            NexusText(
+                                text = "OK",
+                                color = NexusTheme.colors.primary,
+                                style = NexusTheme.typography.label
+                            )
+                        }
+                    }
+                )
+            }
+            is ScannerError.TransientError -> {
+                AlertDialog(
+                    onDismissRequest = {
+                        viewModel.clearScanError()
+                        onBack()
+                    },
+                    title = {
+                        NexusText(
+                            text = "Scanner Unavailable",
+                            style = NexusTheme.typography.title,
+                            color = NexusTheme.colors.textPrimary
+                        )
+                    },
+                    text = {
+                        NexusText(
+                            text = "${error.message}\n\nWould you like to try again?",
+                            style = NexusTheme.typography.body,
+                            color = NexusTheme.colors.textSecondary
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                viewModel.clearScanError()
+                                scanTrigger++
+                            }
+                        ) {
+                            NexusText(
+                                text = "Try Again",
+                                color = NexusTheme.colors.primary,
+                                style = NexusTheme.typography.label
+                            )
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                viewModel.clearScanError()
+                                onBack()
+                            }
+                        ) {
+                            NexusText(
+                                text = "Cancel",
+                                color = NexusTheme.colors.textSecondary,
+                                style = NexusTheme.typography.label
+                            )
+                        }
+                    }
+                )
             }
         }
     }

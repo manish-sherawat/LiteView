@@ -39,6 +39,10 @@ interface RecentDocumentDao {
     @Query("UPDATE recent_documents SET lastScrollIndex = :index, lastScrollOffset = :offset WHERE uri = :uri")
     suspend fun updateScrollPosition(uri: String, index: Int, offset: Int)
 
+    /** Update the page count of a specific document. */
+    @Query("UPDATE recent_documents SET pageCount = :pageCount WHERE uri = :uri")
+    suspend fun updatePageCount(uri: String, pageCount: Int)
+
     /** Wipe all scroll positions across all documents. */
     @Query("UPDATE recent_documents SET lastScrollIndex = 0, lastScrollOffset = 0")
     suspend fun clearAllScrollPositions()

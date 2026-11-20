@@ -17,5 +17,6 @@ data class RecentDocument(
     val lastOpenedAt: Long = System.currentTimeMillis(),
     val documentType: String,   // Mirrors DocumentType.name
     val lastScrollIndex: Int = 0,
-    val lastScrollOffset: Int = 0
+    val lastScrollOffset: Int = 0,
+    val pageCount: Int = 0
 )

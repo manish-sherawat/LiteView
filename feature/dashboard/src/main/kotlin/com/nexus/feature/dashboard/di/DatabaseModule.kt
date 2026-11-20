@@ -83,6 +83,12 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_7_8 = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE recent_documents ADD COLUMN pageCount INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideNexusDatabase(
@@ -91,7 +97,7 @@ object DatabaseModule {
         context,
         NexusDatabase::class.java,
         "nexus_docs.db"
-    ).addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+    ).addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
      .fallbackToDestructiveMigration()
      .build()
 

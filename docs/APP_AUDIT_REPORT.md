@@ -39,19 +39,19 @@
 
 ---
 
-### PC-002 — Scanner failure silently swallowed
-**Severity**: 🟡 Medium  
-**Location**: `ScannerScreen.kt:80–83`  
-**Description**: When Google ML Kit's `GmsDocumentScanning.getStartScanIntent()` fails, only a `Toast.makeText("Failed to start scanner")` is shown before `onBack()` is called. No error details are logged, no retry option is offered, and there is no distinction between "Google Play Services not available" (permanent failure) and "scanner temporarily unavailable" (transient failure).  
-**Fix Prompt**: Log the exception, show an `AlertDialog` with a "Try Again" action for transient failures, and display a "Google Play Services required" dialog for permanent failures. Add `addOnFailureListener { e -> viewModel.onScanError(e) }` and handle via ViewModel state.
+### PC-002 — ~~Scanner failure silently swallowed~~ (FIXED)
+**Severity**: ✅ RESOLVED  
+**Location**: `ScannerScreen.kt:80–83`, `ScannerViewModel.kt`  
+**Description**: When Google ML Kit's `GmsDocumentScanning.getStartScanIntent()` failed, only a toast was shown before exiting, giving no retry option and no distinction for Google Play Services unavailability.  
+**Fix Applied**: Logged exception with `Log.e`, classified error state into `ScannerError.PlayServicesUnavailable` and `ScannerError.TransientError`, and presented a clear Material3 `AlertDialog` with "Try Again" retry action for transient errors and guidance for Play Services requirements.
 
 ---
 
-### PC-003 — PDF page count cached in SharedPreferences with URI as key (unbounded growth)
-**Severity**: 🟡 Medium  
-**Location**: `PdfReaderViewModel.kt:334–337`  
-**Description**: After a PDF is loaded, the page count is stored in `getSharedPreferences("nexus_page_counts")` using the URI string as the key. This cache is never pruned — over time it accumulates an entry per opened document and never evicts stale entries. SharedPreferences is not designed as a dictionary store for unbounded data.  
-**Fix Prompt**: Replace with a Room table column `pageCount` on the existing `RecentDocument` entity. Prune orphan entries during the trash-retention job.
+### PC-003 — ~~PDF page count cached in SharedPreferences with URI as key~~ (FIXED)
+**Severity**: ✅ RESOLVED  
+**Location**: `PdfReaderViewModel.kt:334–337`, `RecentDocument.kt`, `NexusDatabase.kt`  
+**Description**: Document page counts were previously written to unbounded SharedPreferences keyed by URI, accumulating indefinitely without eviction.  
+**Fix Applied**: Added `pageCount` column to `RecentDocument` Room entity with database migration (v7 -> v8, `MIGRATION_7_8`), updated DAOs and reader ViewModels, made item composables consume `doc.pageCount` with zero-overhead memory reads, and added orphan SharedPreferences cleanup during trash auto-purge jobs.
 
 ---
 
@@ -568,8 +568,8 @@ Or mark it `internal` and restrict to the core module.
 | ID | Category | Severity | Status |
 |---|---|---|---|
 | PC-001 | Pipeline | ✅ Fixed | Resolved |
-| PC-002 | Pipeline | 🟡 Medium | Open |
-| PC-003 | Pipeline | 🟡 Medium | Open |
+| PC-002 | Pipeline | ✅ Fixed | Resolved |
+| PC-003 | Pipeline | ✅ Fixed | Resolved |
 | PC-004 | Pipeline | 🟡 Medium | Open |
 | PC-005 | Pipeline | 🟡 Medium | Open |
 | PC-006 | Pipeline | 🟠 High | Open |

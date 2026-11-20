@@ -22,6 +22,11 @@ enum class ScannerState {
     CAMERA, REVIEW, SAVE_DETAILS, GENERATING_PDF, DONE
 }
 
+sealed interface ScannerError {
+    data class PlayServicesUnavailable(val message: String) : ScannerError
+    data class TransientError(val message: String) : ScannerError
+}
+
 data class ScannedPage(
     val originalUri: Uri,
     val croppedBitmap: Bitmap
@@ -44,6 +49,33 @@ class ScannerViewModel @Inject constructor() : ViewModel() {
     
     private val _ocrResult = MutableStateFlow<String?>(null)
     val ocrResult: StateFlow<String?> = _ocrResult
+
+    private val _scanError = MutableStateFlow<ScannerError?>(null)
+    val scanError: StateFlow<ScannerError?> = _scanError
+
+    fun onScanError(e: Throwable) {
+        val isPlayServicesIssue = when (e) {
+            is com.google.android.gms.common.api.ApiException -> {
+                e.statusCode in listOf(1, 2, 3, 9, 17) || e.message?.contains("Play Services", ignoreCase = true) == true
+            }
+            else -> e.message?.contains("Google Play", ignoreCase = true) == true ||
+                    e.message?.contains("Play Services", ignoreCase = true) == true
+        }
+
+        _scanError.value = if (isPlayServicesIssue) {
+            ScannerError.PlayServicesUnavailable(
+                e.localizedMessage ?: "Google Play Services is required for document scanning."
+            )
+        } else {
+            ScannerError.TransientError(
+                e.localizedMessage ?: "Failed to start document scanner."
+            )
+        }
+    }
+
+    fun clearScanError() {
+        _scanError.value = null
+    }
 
     fun onScanResult(context: Context, imageUris: List<Uri>, pdfUri: Uri?) {
         generatedPdfUri = pdfUri

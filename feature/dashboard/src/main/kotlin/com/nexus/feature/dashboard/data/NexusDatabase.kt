@@ -14,7 +14,7 @@ import androidx.room.RoomDatabase
         TagDefinition::class,
         TrashedDocument::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class NexusDatabase : RoomDatabase() {

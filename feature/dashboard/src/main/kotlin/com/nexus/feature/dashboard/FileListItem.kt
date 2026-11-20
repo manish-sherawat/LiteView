@@ -137,12 +137,12 @@ fun FileListItem(
         }
     }
 
-    val cachedPageCount by produceState<Int?>(initialValue = null, key1 = doc.uri) {
-        value = withContext(Dispatchers.IO) {
-            val prefs = context.getSharedPreferences("nexus_page_counts", Context.MODE_PRIVATE)
-            val count = prefs.getInt(doc.uri, -1)
-            if (count > 0) count else null
-        }
+    val cachedPageCount = if (doc.pageCount > 0) {
+        doc.pageCount
+    } else {
+        val prefs = remember { context.getSharedPreferences("nexus_page_counts", Context.MODE_PRIVATE) }
+        val count = remember(doc.uri) { prefs.getInt(doc.uri, -1) }
+        if (count > 0) count else null
     }
 
     val pageCountStr = if (cachedPageCount != null) " • $cachedPageCount pages" else ""
