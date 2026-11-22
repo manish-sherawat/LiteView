@@ -309,13 +309,21 @@ fun WordReaderScreen(
                     val typographyCss = """
                         body, .docx-page, h1, h2, h3, h4, h5, h6, p, li, td, th {
                             font-family: ${if (docxIsSerif) "Georgia, 'Times New Roman', serif" else "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"} !important;
+                            writing-mode: horizontal-tb !important;
+                            text-orientation: mixed !important;
+                        }
+                        p, li {
+                            font-size: ${docxFontSize}px !important;
                             word-break: normal !important;
                             overflow-wrap: break-word !important;
                             white-space: normal !important;
-                            min-width: 0 !important;
                         }
-                        p, li, td, th {
-                            font-size: ${docxFontSize}px !important;
+                        td, th {
+                            font-size: ${(docxFontSize * 0.9f).toInt()}px !important;
+                            word-break: normal !important;
+                            overflow-wrap: normal !important;
+                            white-space: normal !important;
+                            min-width: 64px !important;
                         }
                     """.trimIndent()
 

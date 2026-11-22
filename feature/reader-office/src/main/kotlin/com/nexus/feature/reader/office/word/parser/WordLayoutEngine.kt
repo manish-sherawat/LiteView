@@ -374,6 +374,8 @@ object WordLayoutEngine {
     line-height: 1.65;
     color: var(--text-color);
     background-color: var(--bg-canvas);
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed !important;
     word-wrap: normal;
     overflow-wrap: break-word;
     word-break: normal;
@@ -381,14 +383,31 @@ object WordLayoutEngine {
     -webkit-text-size-adjust: 100%;
   }
 
-  /* Prevent 1-letter vertical stacking & horizontal overflow */
-  h1, h2, h3, h4, h5, h6, p, li, blockquote, div, span, .docx-paragraph, .docx-list-item {
+  /* Structural Block Containers */
+  h1, h2, h3, h4, h5, h6, p, li, blockquote, div, .docx-paragraph, .docx-list-item {
     min-width: 0;
     max-width: 100% !important;
     box-sizing: border-box !important;
     word-break: normal !important;
     overflow-wrap: break-word !important;
     white-space: normal;
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed !important;
+  }
+
+  /* Inline Text Runs - Strict Inline Direction & Flow (Never stack vertically) */
+  span, .docx-run, a, .docx-hyperlink, em, strong, u, s, sub, sup {
+    display: inline !important;
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed !important;
+    direction: inherit !important;
+    unicode-bidi: isolate;
+    white-space: normal;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    max-width: none !important;
+    min-width: auto !important;
+    vertical-align: baseline;
   }
 
   pre, code, .diagram-code-content {
@@ -732,25 +751,28 @@ object WordLayoutEngine {
   .math-delim { font-size: 1.1em; font-weight: 500; }
   .math-func-name { font-style: normal; font-weight: 600; margin-right: 3px; }
 
-  /* ── Responsive Tables ── */
+  /* ── Responsive Tables & Safe Horizontal Flow ── */
   .table-container {
     width: 100%;
     max-width: 100%;
-    overflow-x: auto;
+    overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
     margin: 16px 0;
-    box-sizing: border-box;
+    box-sizing: border-box !important;
     border-radius: 8px;
     border: 1px solid var(--border-color);
   }
   table, .docx-table {
     width: 100%;
-    max-width: 100%;
+    min-width: 100%;
+    max-width: none !important; /* Never clamp to 100% inside overflow-x: auto, preventing vertical column squishing */
     border-collapse: collapse;
     table-layout: auto;
     font-size: 0.9em;
     margin: 0;
     display: table !important;
+    writing-mode: horizontal-tb !important;
+    direction: inherit !important;
   }
   thead tr, tr:first-child {
     background: var(--primary-light);
@@ -761,31 +783,75 @@ object WordLayoutEngine {
     font-weight: 600;
     border: 1px solid var(--border-color);
     color: #1e3a8a;
-    min-width: 44px;
-    word-break: normal;
-    overflow-wrap: break-word;
+    min-width: 64px;
+    box-sizing: border-box !important;
+    white-space: normal !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important; /* Prevents Chromium table engine from collapsing min-content to 1 character */
+    word-wrap: normal !important;
+    writing-mode: horizontal-tb !important;
+    direction: inherit !important;
   }
   td {
     padding: 8px 12px;
     border: 1px solid var(--border-color);
     vertical-align: top;
-    min-width: 44px;
-    word-break: normal;
-    overflow-wrap: break-word;
+    min-width: 64px;
+    box-sizing: border-box !important;
+    white-space: normal !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important; /* Prevents Chromium table engine from collapsing min-content to 1 character */
+    word-wrap: normal !important;
+    writing-mode: horizontal-tb !important;
+    direction: inherit !important;
   }
   tr:nth-child(even) td { background: rgba(0, 0, 0, 0.02); }
   tr:hover td { background: rgba(37, 99, 235, 0.04); }
 
-  /* ── Images & Rules ── */
-  img {
-    max-width: 100%;
-    height: auto;
-    object-fit: contain;
-    border-radius: 6px;
-    margin: 12px 0;
-    display: block;
+  /* ── Images & Figures (Strict Page Boundaries & Safe Auto-Scaling) ── */
+  .docx-figure-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 14px auto;
+    text-align: center;
+    overflow: hidden;
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+  img, .docx-image {
+    max-width: 100% !important;
+    max-height: calc(var(--page-height, 842pt) - var(--doc-margin-top, 54pt) - var(--doc-margin-bottom, 54pt) - 60pt) !important;
+    height: auto !important;
+    width: auto;
+    object-fit: contain;
+    object-position: center;
+    border-radius: 6px;
+    margin: 10px auto;
+    display: block;
+    box-sizing: border-box !important;
+    overflow: hidden;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .docx-image-frame {
+    display: inline-block;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    vertical-align: middle;
+    margin: 4px 0;
+    overflow: hidden;
+  }
+  .docx-image-frame img, .docx-inline-image {
+    display: inline-block;
+    vertical-align: middle;
+    max-width: 100% !important;
+    max-height: 80vh;
+    height: auto !important;
+    object-fit: contain;
+    box-sizing: border-box !important;
+    border-radius: 4px;
+    overflow: hidden;
   }
   a, .docx-hyperlink, a span, a strong, a em, a u, a s {
     color: var(--primary-color) !important;

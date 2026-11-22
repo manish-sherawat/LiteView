@@ -377,9 +377,19 @@ class PoiWordEngine @Inject constructor(
                                     val rowSpans = computeRowSpans(table)
                                     val tableHeaderHeight = if (table.rows.isNotEmpty()) WordLayoutEngine.estimateTableRowHeight(table.rows[0], printableWidth) else 24f
 
+                                    val tblAlignment = try {
+                                        table.tableAlignment?.toString()?.lowercase() ?:
+                                        table.ctTbl?.tblPr?.jc?.`val`?.toString()?.lowercase() ?: ""
+                                    } catch (_: Exception) { "" }
+                                    val tblAlignStyle = when {
+                                        tblAlignment.contains("center") -> "margin:14px auto;"
+                                        tblAlignment.contains("right")  -> "margin:14px 0 14px auto;"
+                                        else                            -> "margin:14px 0;"
+                                    }
+
                                     var inTablePage = false
                                     fun startTableChunk() {
-                                        currentPage.append("<div class=\"table-container\" style=\"max-width:100%;box-sizing:border-box;overflow-x:auto;\"><table class=\"docx-table\" style=\"max-width:100%;box-sizing:border-box;\">\n")
+                                        currentPage.append("<div class=\"table-container\" style=\"max-width:100%;box-sizing:border-box;overflow-x:auto;\"><table class=\"docx-table\" style=\"min-width:100%;box-sizing:border-box;$tblAlignStyle\">\n")
                                         inTablePage = true
                                     }
                                     fun endTableChunk() {
@@ -619,6 +629,20 @@ class PoiWordEngine @Inject constructor(
 
         // Paragraph shading & border constraints within page boundaries
         val pPr = try { para.ctp.pPr } catch (_: Exception) { null }
+        val isBidi = try {
+            val dom = pPr?.domNode
+            if (dom != null) {
+                val nl = dom.childNodes
+                (0 until nl.length).any { i ->
+                    val item = nl.item(i)
+                    val name = item.localName ?: item.nodeName
+                    name.equals("bidi", ignoreCase = true)
+                }
+            } else false
+        } catch (_: Exception) { false }
+
+        val dirStyle = if (isBidi) "direction:rtl;" else "direction:ltr;"
+
         val shdFill = try {
             val fill = pPr?.shd?.fill?.toString()
             if (!fill.isNullOrBlank() && fill != "auto" && fill != "none" && fill != "clear") {
@@ -635,6 +659,7 @@ class PoiWordEngine @Inject constructor(
 
         val pStyles = buildString {
             append("text-align:$alignStr;")
+            append("$dirStyle;writing-mode:horizontal-tb;")
             val safeLineHeight = spacingBetween ?: 1.35
             append("line-height:$safeLineHeight;")
             // Crucial: Use max-width: 100% and box-sizing: border-box WITHOUT width: 100% to prevent horizontal overflow
@@ -659,11 +684,17 @@ class PoiWordEngine @Inject constructor(
         }
 
         val rawText = try { para.text ?: "" } catch (_: Exception) { "" }
+        val hasPictures = para.runs.any { it.embeddedPictures.isNotEmpty() }
+        val isStandalonePicture = hasPictures && rawText.isBlank() && !hasMathNodes(para)
         val anchorsHtml = bookmarks.joinToString("") { "<a id=\"$it\"></a>" }
         val finalIdAttr = if (isHeading) "id=\"h_${headings.size}\"" else ""
 
         val tempSb = StringBuilder()
-        if (isHeading) {
+        if (isStandalonePicture) {
+            tempSb.append("""<div class="docx-figure-container" $finalIdAttr>$anchorsHtml""")
+            appendParagraphBodyContent(para, doc, tempSb)
+            tempSb.append("</div>\n")
+        } else if (isHeading) {
             val headingText = rawText.trim()
             if (headingText.isNotEmpty()) {
                 headings.add(DocxHeading(text = headingText, level = headingLevel, anchorId = "h_${headings.size}"))
@@ -689,7 +720,7 @@ class PoiWordEngine @Inject constructor(
             appendParagraphBodyContent(para, doc, tempSb)
             tempSb.append("</p>\n")
         } else {
-            if (rawText.isBlank() && !hasMathNodes(para) && para.runs.none { it.embeddedPictures.isNotEmpty() }) {
+            if (rawText.isBlank() && !hasMathNodes(para) && !hasPictures) {
                 tempSb.append("<p $finalIdAttr style=\"margin:4px 0;min-height:1em;max-width:100%;box-sizing:border-box;\">$anchorsHtml&nbsp;</p>\n")
             } else {
                 tempSb.append("""<p class="docx-paragraph" $finalIdAttr style="$pStyles">$anchorsHtml""")
@@ -760,7 +791,7 @@ class PoiWordEngine @Inject constructor(
                             else          -> "image/png"
                         }
                         val b64 = android.util.Base64.encodeToString(data, android.util.Base64.NO_WRAP)
-                        sb.append("""<img src="data:$mime;base64,$b64" style="max-width:100%;height:auto;display:inline-block;overflow:hidden;border-radius:4px;">""")
+                        sb.append("""<span class="docx-image-frame"><img class="docx-inline-image" src="data:$mime;base64,$b64" alt="Image" style="max-width:100%;height:auto;object-fit:contain;vertical-align:middle;border-radius:4px;overflow:hidden;"></span>""")
                     } catch (t: Throwable) {
                         Log.w(TAG, "Error decoding embedded picture: ${t.message}", t)
                     }
@@ -845,6 +876,7 @@ class PoiWordEngine @Inject constructor(
                 val escaped = htmlEscape(decodedText).replace("\t", "&nbsp;&nbsp;&nbsp;&nbsp;")
 
                 val styles = buildString {
+                    append("writing-mode:horizontal-tb;display:inline;")
                     if (colorHex != null && !isHyperlink) append("color:$colorHex;")
                     if (fontSize != null) append("font-size:${fontSize}pt;")
                     if (fontFamily != null) append("font-family:'$fontFamily';")
@@ -860,7 +892,7 @@ class PoiWordEngine @Inject constructor(
                 if (isStrike || isDoubleStrike) span = "<s>$span</s>"
                 if (isSubscript) span = "<sub>$span</sub>"
                 if (isSuperscript) span = "<sup>$span</sup>"
-                if (styles.isNotEmpty()) span = """<span style="$styles">$span</span>"""
+                if (styles.isNotEmpty()) span = """<span class="docx-run" style="$styles">$span</span>"""
                 if (isHyperlink || url != null) {
                     val href = url ?: "#"
                     span = """<a class="docx-hyperlink" href="${htmlEscape(href)}">$span</a>"""
@@ -941,12 +973,37 @@ class PoiWordEngine @Inject constructor(
                         else -> "top"
                     }
 
+                    val tcW = try { tcPr?.tcW } catch (_: Exception) { null }
+                    val rawW = try { tcW?.w?.toString()?.toFloatOrNull() } catch (_: Exception) { null }
+                    val wType = (try { tcW?.type?.toString()?.lowercase() } catch (_: Exception) { null }) ?: "dxa"
+                    val widthStyle = if (rawW != null && rawW > 0) {
+                        if (wType.contains("pct")) {
+                            val pct = (rawW / 50f).coerceIn(5f, 100f)
+                            "width:${pct}%;min-width:64px;"
+                        } else {
+                            val pt = (rawW / 20f).coerceIn(36f, 800f)
+                            "width:${pt}pt;min-width:${minOf(pt, 64f)}pt;"
+                        }
+                    } else {
+                        "min-width:64px;"
+                    }
+
+                    val cellParaAlign = cell.paragraphs.firstOrNull()?.let { p ->
+                        try { p.alignment } catch (_: Exception) { null }
+                    }
+                    val cellHAlignStr = when (cellParaAlign) {
+                        ParagraphAlignment.CENTER -> "text-align:center;"
+                        ParagraphAlignment.RIGHT  -> "text-align:right;"
+                        ParagraphAlignment.BOTH   -> "text-align:justify;"
+                        else                      -> "text-align:left;"
+                    }
+
                     val colSpanAttr = if (colSpan > 1) """ colspan="$colSpan"""" else ""
                     val rowSpanAttr = if (rSpan > 1) """ rowspan="$rSpan"""" else ""
                     val bgAttr = if (bgColor != null) "background-color:#$bgColor;" else ""
                     val alignAttr = "vertical-align:$vAlignStr;"
 
-                    sb.append("<$tag$colSpanAttr$rowSpanAttr style=\"$bgAttr$alignAttr;min-width:36px;box-sizing:border-box;word-break:normal;overflow-wrap:break-word;\">")
+                    sb.append("<$tag$colSpanAttr$rowSpanAttr style=\"$bgAttr$alignAttr$cellHAlignStr$widthStyle;box-sizing:border-box;word-break:normal;overflow-wrap:normal;white-space:normal;writing-mode:horizontal-tb;\">")
 
                     var firstPara = true
                     for (para in cell.paragraphs) {
@@ -963,7 +1020,7 @@ class PoiWordEngine @Inject constructor(
                     sb.append("</$tag>")
                 } catch (t: Throwable) {
                     Log.w(TAG, "Error parsing table cell <$cellNodeName> at ($rowIdx, $cIdx): ${t.message}", t)
-                    sb.append("<td style=\"padding:6px;border:1px solid var(--border-color);\">${htmlEscape(try { cell.text ?: "" } catch (_: Exception) { "" })}</td>")
+                    sb.append("<td style=\"padding:6px;border:1px solid var(--border-color);min-width:64px;word-break:normal;overflow-wrap:normal;white-space:normal;writing-mode:horizontal-tb;\">${htmlEscape(try { cell.text ?: "" } catch (_: Exception) { "" })}</td>")
                 }
             }
             sb.append("</tr>\n")
@@ -973,13 +1030,13 @@ class PoiWordEngine @Inject constructor(
     }
 
     private fun renderFallbackTable(table: XWPFTable, sb: StringBuilder) {
-        sb.append("<div class=\"table-container\" style=\"max-width:100%;box-sizing:border-box;overflow-x:auto;\"><table class=\"docx-table\" style=\"max-width:100%;box-sizing:border-box;\">\n")
+        sb.append("<div class=\"table-container\" style=\"max-width:100%;box-sizing:border-box;overflow-x:auto;\"><table class=\"docx-table\" style=\"min-width:100%;box-sizing:border-box;\">\n")
         for ((rIdx, row) in table.rows.withIndex()) {
             sb.append("<tr>")
             val tag = if (rIdx == 0) "th" else "td"
             for (cell in row.tableCells) {
                 val txt = try { cell.text ?: "" } catch (_: Exception) { "" }
-                sb.append("<$tag style=\"padding:6px;border:1px solid var(--border-color);box-sizing:border-box;\">${htmlEscape(txt)}</$tag>")
+                sb.append("<$tag style=\"padding:6px;border:1px solid var(--border-color);box-sizing:border-box;min-width:64px;word-break:normal;overflow-wrap:normal;white-space:normal;writing-mode:horizontal-tb;\">${htmlEscape(txt)}</$tag>")
             }
             sb.append("</tr>\n")
         }
@@ -999,7 +1056,7 @@ class PoiWordEngine @Inject constructor(
             var span = htmlEscape(decoded)
             if (isBold) span = "<strong>$span</strong>"
             if (isItalic) span = "<em>$span</em>"
-            sb.append(span)
+            sb.append("""<span class="docx-run" style="writing-mode:horizontal-tb;display:inline;">$span</span>""")
         }
     }
 
