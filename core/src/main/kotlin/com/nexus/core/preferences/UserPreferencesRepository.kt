@@ -66,6 +66,7 @@ class UserPreferencesRepository @Inject constructor(
         val BOTTOM_NAV_BLUR_RADIUS = floatPreferencesKey("bottom_nav_blur_radius")
         val BOTTOM_NAV_REFRACTION_HEIGHT = floatPreferencesKey("bottom_nav_refraction_height")
         val BOTTOM_NAV_REFRACTION_AMOUNT = floatPreferencesKey("bottom_nav_refraction_amount")
+        val USE_LIBREOFFICE_ENGINE = booleanPreferencesKey("use_libreoffice_engine")
     }
 
     private val repoScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -256,6 +257,9 @@ class UserPreferencesRepository @Inject constructor(
     /** Number of days before trashed items are permanently auto-purged (e.g. 30, 15, 7, or -1 for never). Default is 30. */
     val trashRetentionDays: Flow<Int> = context.dataStore.data.map { prefs -> prefs[Keys.TRASH_RETENTION_DAYS] ?: 30 }
     suspend fun setTrashRetentionDays(days: Int) { context.dataStore.edit { prefs -> prefs[Keys.TRASH_RETENTION_DAYS] = days } }
+
+    val useLibreOfficeEngine: Flow<Boolean> = context.dataStore.data.map { prefs -> prefs[Keys.USE_LIBREOFFICE_ENGINE] ?: true }
+    suspend fun setUseLibreOfficeEngine(value: Boolean) { context.dataStore.edit { prefs -> prefs[Keys.USE_LIBREOFFICE_ENGINE] = value } }
 
     suspend fun resetToDefaults() {
         context.dataStore.edit { prefs ->

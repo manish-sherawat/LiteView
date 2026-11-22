@@ -33,6 +33,10 @@ android {
 
         // Optimize APK size by stripping unneeded language resources from dependencies
         resourceConfigurations += listOf("en")
+
+        ndk {
+            abiFilters.add("arm64-v8a")
+        }
     }
 
     signingConfigs {

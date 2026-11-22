@@ -26,7 +26,9 @@ fun WordOptionsBottomSheet(
     onTogglePagedView: () -> Unit = {},
     paperSizeName: String? = null,
     onGoToPage: () -> Unit = {},
-    totalPages: Int = 1
+    totalPages: Int = 1,
+    useLibreOfficeEngine: Boolean = true,
+    onToggleEngine: () -> Unit = {}
 ) {
     val group1 = listOf(
         DocumentOptionItem(
@@ -52,6 +54,14 @@ fun WordOptionsBottomSheet(
     )
 
     val groupDocx = buildList {
+        add(
+            DocumentOptionItem(
+                title = if (useLibreOfficeEngine) "Engine: LibreOfficeKit" else "Engine: Legacy POI",
+                subtitle = if (useLibreOfficeEngine) "Desktop-grade high fidelity (Active)" else "HTML WebView layout (Legacy)",
+                iconRes = com.nexus.core.R.drawable.ic_settings_outline,
+                onClick = onToggleEngine
+            )
+        )
         add(
             DocumentOptionItem(
                 title = if (isPagedView) "Paged View Mode" else "Reflow View Mode",

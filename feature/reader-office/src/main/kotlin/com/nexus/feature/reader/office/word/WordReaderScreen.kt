@@ -101,6 +101,7 @@ import com.nexus.feature.reader.office.common.ImmersiveToggleInterface
 import com.nexus.feature.reader.office.common.OfficeBottomBarActionItem
 import com.nexus.feature.reader.office.common.OfficePasswordPromptCard
 import com.nexus.feature.reader.office.word.components.WordBookmarksBottomSheet
+import com.nexus.feature.reader.office.word.components.WordNativePageViewer
 import com.nexus.feature.reader.office.word.components.WordOptionsBottomSheet
 import com.nexus.feature.reader.office.word.components.WordOutlineBottomSheet
 import com.nexus.feature.reader.office.word.model.WordReaderUiState
@@ -151,6 +152,7 @@ fun WordReaderScreen(
     val isStarred by viewModel.isStarred.collectAsStateWithLifecycle()
     val docxFontSize by viewModel.docxFontSize.collectAsStateWithLifecycle()
     val docxIsSerif by viewModel.docxIsSerif.collectAsStateWithLifecycle()
+    val useLibreOfficeEngine by viewModel.useLibreOfficeEngine.collectAsStateWithLifecycle()
 
     DisposableEffect(keepScreenAwake) {
         val window = activity?.window
@@ -307,90 +309,102 @@ fun WordReaderScreen(
                     }
                 }
                 is WordReaderUiState.Ready -> {
-                    val typographyCss = """
-                        body, .docx-page, h1, h2, h3, h4, h5, h6, p, li, td, th {
-                            font-family: ${if (docxIsSerif) "Georgia, 'Times New Roman', serif" else "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"} !important;
-                            word-break: normal !important;
-                            overflow-wrap: break-word !important;
-                            white-space: normal !important;
-                            min-width: 0 !important;
-                        }
-                        p, li, td, th {
-                            font-size: ${docxFontSize}px !important;
-                        }
-                    """.trimIndent()
+                    if (state.convertedPdfPath != null) {
+                        WordNativePageViewer(
+                            pdfFilePath = state.convertedPdfPath,
+                            pageCount = state.pageCount,
+                            onPageChanged = { page, total ->
+                                currentPage = page
+                                if (total > 0) totalPages = total
+                            },
+                            modifier = Modifier.fillMaxSize().then(sharedElementModifier)
+                        )
+                    } else {
+                        val typographyCss = """
+                            body, .docx-page, h1, h2, h3, h4, h5, h6, p, li, td, th {
+                                font-family: ${if (docxIsSerif) "Georgia, 'Times New Roman', serif" else "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"} !important;
+                                word-break: normal !important;
+                                overflow-wrap: break-word !important;
+                                white-space: normal !important;
+                                min-width: 0 !important;
+                            }
+                            p, li, td, th {
+                                font-size: ${docxFontSize}px !important;
+                            }
+                        """.trimIndent()
 
-                    val htmlWithScript = remember(state.htmlContent, isPagedView, isDark, docxFontSize, docxIsSerif) {
-                        val modeClass = if (isPagedView) "mode-paged" else "mode-reflow"
-                        val darkClass = if (isDark) " dark-mode" else ""
-                        var html = state.htmlContent
-                        html = html.replace("<body class=\"mode-paged\">", "<body class=\"$modeClass$darkClass\">")
-                            .replace("<body>", "<body class=\"$modeClass$darkClass\">")
-                        val extraStyle = "<style>\n$typographyCss\n</style>"
-                        html.replace("</head>", "$extraStyle\n</head>")
-                    }
+                        val htmlWithScript = remember(state.htmlContent, isPagedView, isDark, docxFontSize, docxIsSerif) {
+                            val modeClass = if (isPagedView) "mode-paged" else "mode-reflow"
+                            val darkClass = if (isDark) " dark-mode" else ""
+                            var html = state.htmlContent
+                            html = html.replace("<body class=\"mode-paged\">", "<body class=\"$modeClass$darkClass\">")
+                                .replace("<body>", "<body class=\"$modeClass$darkClass\">")
+                            val extraStyle = "<style>\n$typographyCss\n</style>"
+                            html.replace("</head>", "$extraStyle\n</head>")
+                        }
 
-                    AndroidView(
-                        factory = { ctx ->
-                            WebView(ctx).apply {
-                                webViewRef = this
-                                setBackgroundColor(0)
-                                layoutParams = android.view.ViewGroup.LayoutParams(
-                                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                                    android.view.ViewGroup.LayoutParams.MATCH_PARENT
-                                )
-                                settings.javaScriptEnabled = true
-                                settings.setSupportZoom(true)
-                                settings.builtInZoomControls = true
-                                settings.displayZoomControls = false
-                                settings.useWideViewPort = true
-                                settings.loadWithOverviewMode = true
-                                settings.domStorageEnabled = true
-                                settings.layoutAlgorithm = WebSettings.LayoutAlgorithm.NORMAL
-                                setFindListener { activeMatchOrdinal, numberOfMatches, isDoneCounting ->
-                                    if (isDoneCounting) {
-                                        searchResultCount = numberOfMatches
-                                        currentSearchIndex = activeMatchOrdinal
-                                    }
-                                }
-                                addJavascriptInterface(
-                                    ImmersiveToggleInterface(
-                                        onToggle = { isImmersiveMode = !isImmersiveMode },
-                                        onPageChanged = { page, total ->
-                                            currentPage = page
-                                            if (total > 0) totalPages = total
+                        AndroidView(
+                            factory = { ctx ->
+                                WebView(ctx).apply {
+                                    webViewRef = this
+                                    setBackgroundColor(0)
+                                    layoutParams = android.view.ViewGroup.LayoutParams(
+                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                                    )
+                                    settings.javaScriptEnabled = true
+                                    settings.setSupportZoom(true)
+                                    settings.builtInZoomControls = true
+                                    settings.displayZoomControls = false
+                                    settings.useWideViewPort = true
+                                    settings.loadWithOverviewMode = true
+                                    settings.domStorageEnabled = true
+                                    settings.layoutAlgorithm = WebSettings.LayoutAlgorithm.NORMAL
+                                    setFindListener { activeMatchOrdinal, numberOfMatches, isDoneCounting ->
+                                        if (isDoneCounting) {
+                                            searchResultCount = numberOfMatches
+                                            currentSearchIndex = activeMatchOrdinal
                                         }
-                                    ),
-                                    "AndroidInterface"
-                                )
-                                setOnScrollChangeListener { v, _, scrollY, _, oldScrollY ->
-                                    val delta = scrollY - oldScrollY
-                                    if (delta > 20 && !isImmersiveMode) {
-                                        isImmersiveMode = true
-                                    } else if (delta < -20 && isImmersiveMode) {
-                                        isImmersiveMode = false
                                     }
-                                    val wv = v as? WebView
-                                    val totalContentHeight = (wv?.contentHeight?.toFloat() ?: 0f) * v.context.resources.displayMetrics.density
-                                    val scrollRange = totalContentHeight - v.height
-                                    if (scrollRange > 0f) {
-                                        readingProgress = (scrollY.toFloat() / scrollRange).coerceIn(0f, 1f)
+                                    addJavascriptInterface(
+                                        ImmersiveToggleInterface(
+                                            onToggle = { isImmersiveMode = !isImmersiveMode },
+                                            onPageChanged = { page, total ->
+                                                currentPage = page
+                                                if (total > 0) totalPages = total
+                                            }
+                                        ),
+                                        "AndroidInterface"
+                                    )
+                                    setOnScrollChangeListener { v, _, scrollY, _, oldScrollY ->
+                                        val delta = scrollY - oldScrollY
+                                        if (delta > 20 && !isImmersiveMode) {
+                                            isImmersiveMode = true
+                                        } else if (delta < -20 && isImmersiveMode) {
+                                            isImmersiveMode = false
+                                        }
+                                        val wv = v as? WebView
+                                        val totalContentHeight = (wv?.contentHeight?.toFloat() ?: 0f) * v.context.resources.displayMetrics.density
+                                        val scrollRange = totalContentHeight - v.height
+                                        if (scrollRange > 0f) {
+                                            readingProgress = (scrollY.toFloat() / scrollRange).coerceIn(0f, 1f)
+                                        }
                                     }
+                                    webViewClient = WebViewClient()
                                 }
-                                webViewClient = WebViewClient()
-                            }
-                        },
-                        update = { view ->
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                view.settings.forceDark = if (isDark) WebSettings.FORCE_DARK_ON else WebSettings.FORCE_DARK_OFF
-                            }
-                            if (view.tag != htmlWithScript) {
-                                view.loadDataWithBaseURL(null, htmlWithScript, "text/html", "UTF-8", null)
-                                view.tag = htmlWithScript
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize().then(sharedElementModifier)
-                    )
+                            },
+                            update = { view ->
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                    view.settings.forceDark = if (isDark) WebSettings.FORCE_DARK_ON else WebSettings.FORCE_DARK_OFF
+                                }
+                                if (view.tag != htmlWithScript) {
+                                    view.loadDataWithBaseURL(null, htmlWithScript, "text/html", "UTF-8", null)
+                                    view.tag = htmlWithScript
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize().then(sharedElementModifier)
+                        )
+                    }
                 }
                 is WordReaderUiState.PasswordRequired -> {
                     OfficePasswordPromptCard(
@@ -455,14 +469,18 @@ fun WordReaderScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
                     ) {
+                        val readyState = uiState as? WordReaderUiState.Ready
+                        val isLok = readyState?.convertedPdfPath != null
                         Icon(
-                            painter = painterResource(id = if (isPagedView) com.nexus.core.R.drawable.ic_book else com.nexus.core.R.drawable.ic_world),
-                            contentDescription = if (isPagedView) "Paged View mode" else "Reflow View mode",
+                            painter = painterResource(id = if (isLok || isPagedView) com.nexus.core.R.drawable.ic_book else com.nexus.core.R.drawable.ic_world),
+                            contentDescription = if (isLok) "Native View mode" else if (isPagedView) "Paged View mode" else "Reflow View mode",
                             tint = NexusTheme.colors.primary,
                             modifier = Modifier.size(15.dp)
                         )
-                        val badgeText = if (isPagedView) {
-                            val paperName = (uiState as? WordReaderUiState.Ready)?.paperSizeName ?: "A4"
+                        val badgeText = if (isLok) {
+                            if (totalPages > 1) "Page $currentPage of $totalPages · LibreOffice" else "LibreOffice Native"
+                        } else if (isPagedView) {
+                            val paperName = readyState?.paperSizeName ?: "A4"
                             if (totalPages > 1) "Page $currentPage of $totalPages · $paperName" else "Paged View · $paperName"
                         } else {
                             if (totalPages > 1) "Reflow · Page $currentPage of $totalPages" else "Reflow View"
@@ -503,14 +521,21 @@ fun WordReaderScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
+                        val isLok = (uiState as? WordReaderUiState.Ready)?.convertedPdfPath != null
                         OfficeBottomBarActionItem(
                             modifier = Modifier.weight(1f),
-                            iconPainter = painterResource(id = if (isPagedView) com.nexus.core.R.drawable.ic_book else com.nexus.core.R.drawable.ic_world),
-                            label = if (isPagedView) "Paged" else "Reflow",
+                            iconPainter = painterResource(id = if (isLok || isPagedView) com.nexus.core.R.drawable.ic_book else com.nexus.core.R.drawable.ic_world),
+                            label = if (isLok) "Native" else if (isPagedView) "Paged" else "Reflow",
                             contentDescription = "View Mode",
                             tint = NexusTheme.colors.primary,
-                            isActive = isPagedView,
-                            onClick = { isPagedView = !isPagedView }
+                            isActive = isLok || isPagedView,
+                            onClick = {
+                                if (isLok) {
+                                    viewModel.toggleEngine(docType)
+                                } else {
+                                    isPagedView = !isPagedView
+                                }
+                            }
                         )
 
                         OfficeBottomBarActionItem(
@@ -711,17 +736,65 @@ fun WordReaderScreen(
                 },
                 onPrint = {
                     showMenu = false
-                    webViewRef?.let {
+                    val readyState = uiState as? WordReaderUiState.Ready
+                    if (readyState?.convertedPdfPath != null) {
                         try {
                             val printManager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
-                            val jobName = "Print - $displayName"
-                            val printAdapter = it.createPrintDocumentAdapter(jobName)
-                            printManager.print(jobName, printAdapter, PrintAttributes.Builder().build())
+                            val file = File(readyState.convertedPdfPath)
+                            val printAdapter = object : android.print.PrintDocumentAdapter() {
+                                override fun onLayout(
+                                    oldAttributes: PrintAttributes?,
+                                    newAttributes: PrintAttributes?,
+                                    cancellationSignal: android.os.CancellationSignal?,
+                                    callback: LayoutResultCallback?,
+                                    extras: android.os.Bundle?
+                                ) {
+                                    if (cancellationSignal?.isCanceled == true) {
+                                        callback?.onLayoutCancelled()
+                                        return
+                                    }
+                                    val info = android.print.PrintDocumentInfo.Builder(displayName)
+                                        .setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
+                                        .setPageCount(totalPages)
+                                        .build()
+                                    callback?.onLayoutFinished(info, true)
+                                }
+
+                                override fun onWrite(
+                                    pages: Array<out android.print.PageRange>?,
+                                    destination: android.os.ParcelFileDescriptor?,
+                                    cancellationSignal: android.os.CancellationSignal?,
+                                    callback: WriteResultCallback?
+                                ) {
+                                    try {
+                                        java.io.FileInputStream(file).use { input ->
+                                            java.io.FileOutputStream(destination?.fileDescriptor).use { output ->
+                                                input.copyTo(output)
+                                            }
+                                        }
+                                        callback?.onWriteFinished(arrayOf(android.print.PageRange.ALL_PAGES))
+                                    } catch (e: Exception) {
+                                        callback?.onWriteFailed(e.message)
+                                    }
+                                }
+                            }
+                            printManager.print("Print - $displayName", printAdapter, PrintAttributes.Builder().build())
                         } catch (e: Exception) {
-                            showFeedback("Printing failed or is unsupported on this device.")
+                            showFeedback("Printing failed: ${e.localizedMessage}")
                         }
-                    } ?: run {
-                        showFeedback("Document is not fully loaded.")
+                    } else {
+                        webViewRef?.let {
+                            try {
+                                val printManager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
+                                val jobName = "Print - $displayName"
+                                val printAdapter = it.createPrintDocumentAdapter(jobName)
+                                printManager.print(jobName, printAdapter, PrintAttributes.Builder().build())
+                            } catch (e: Exception) {
+                                showFeedback("Printing failed or is unsupported on this device.")
+                            }
+                        } ?: run {
+                            showFeedback("Document is not fully loaded.")
+                        }
                     }
                 },
                 onShare = {
@@ -778,7 +851,12 @@ fun WordReaderScreen(
                     jumpPageInput = "$currentPage"
                     showJumpPageDialog = true
                 },
-                totalPages = totalPages
+                totalPages = totalPages,
+                useLibreOfficeEngine = useLibreOfficeEngine,
+                onToggleEngine = {
+                    showMenu = false
+                    viewModel.toggleEngine(docType)
+                }
             )
         }
 

@@ -32,7 +32,9 @@ sealed class WordReaderUiState {
         val paperSizeName: String = "A4",
         val paperDimensions: String = "210 × 297 mm",
         val orientation: String = "Portrait",
-        val marginsDescription: String = "Normal"
+        val marginsDescription: String = "Normal",
+        val convertedPdfPath: String? = null,
+        val activeEngineName: String = "LibreOfficeKit Native Core"
     ) : WordReaderUiState()
 
     data class PasswordRequired(

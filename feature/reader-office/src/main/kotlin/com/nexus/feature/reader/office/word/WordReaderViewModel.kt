@@ -42,6 +42,8 @@ import org.apache.poi.xwpf.usermodel.XWPFRun
 import org.apache.poi.xwpf.usermodel.XWPFTable
 import org.apache.poi.xwpf.usermodel.XWPFTableCell
 import org.apache.poi.xwpf.usermodel.XWPFTableRow
+import com.nexus.feature.reader.office.word.engine.WordEngineCoordinator
+import com.nexus.feature.reader.office.word.engine.WordEngineResult
 import org.w3c.dom.Node
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
@@ -52,8 +54,12 @@ class WordReaderViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val recentDocumentDao: RecentDocumentDao,
     private val bookmarkDao: DocumentBookmarkDao,
-    private val prefsRepository: UserPreferencesRepository
+    private val prefsRepository: UserPreferencesRepository,
+    private val coordinator: WordEngineCoordinator
 ) : ViewModel() {
+
+    val useLibreOfficeEngine: StateFlow<Boolean> = prefsRepository.useLibreOfficeEngine
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     private val _uiState = MutableStateFlow<WordReaderUiState>(WordReaderUiState.Loading())
     val uiState: StateFlow<WordReaderUiState> = _uiState.asStateFlow()
@@ -178,48 +184,91 @@ class WordReaderViewModel @Inject constructor(
                         }
                     }
 
-                    val result = when (docType.uppercase()) {
-                        "DOC"  -> parseDoc(inputStream)
-                        else   -> parseDocx(inputStream, password)
+                    val (engineResult, engineName) = coordinator.loadDocument(uri, docType, password)
+
+                    val readyResult = when (engineResult) {
+                        is WordEngineResult.ConvertedPdf -> {
+                            WordReaderUiState.Ready(
+                                htmlContent = "",
+                                headings = engineResult.headings,
+                                pageCount = engineResult.pageCount,
+                                convertedPdfPath = engineResult.pdfFile.absolutePath,
+                                activeEngineName = engineName
+                            )
+                        }
+                        is WordEngineResult.Html -> {
+                            WordReaderUiState.Ready(
+                                htmlContent = engineResult.htmlContent,
+                                headings = engineResult.headings,
+                                pageCount = engineResult.pageCount,
+                                wordCount = engineResult.wordCount,
+                                characterCount = engineResult.characterCount,
+                                readingTimeMinutes = engineResult.readingTimeMinutes,
+                                author = engineResult.author,
+                                creationDate = engineResult.creationDate,
+                                paperSizeName = engineResult.paperSizeName,
+                                paperDimensions = engineResult.paperDimensions,
+                                orientation = engineResult.orientation,
+                                marginsDescription = engineResult.marginsDescription,
+                                convertedPdfPath = null,
+                                activeEngineName = engineName
+                            )
+                        }
+                        is WordEngineResult.PasswordRequired -> {
+                            withContext(Dispatchers.Main) {
+                                _uiState.value = WordReaderUiState.PasswordRequired(encodedUri, docType, engineResult.isError)
+                            }
+                            return@withContext
+                        }
+                        is WordEngineResult.Error -> {
+                            withContext(Dispatchers.Main) {
+                                _uiState.value = WordReaderUiState.Error(engineResult.message)
+                            }
+                            return@withContext
+                        }
+                        else -> {
+                            withContext(Dispatchers.Main) {
+                                _uiState.value = WordReaderUiState.Error("Unsupported engine result")
+                            }
+                            return@withContext
+                        }
                     }
 
-                    val count = if (result is WordReaderUiState.Ready) result.pageCount else 0
+                    val count = readyResult.pageCount
                     if (count > 0) {
                         context.getSharedPreferences("nexus_page_counts", Context.MODE_PRIVATE)
                             .edit().putInt(uriStr, count).apply()
                     }
 
-                    if (result is WordReaderUiState.Ready) {
-                        try {
-                            val name = try {
-                                if (uri.scheme == "file") java.io.File(uri.path ?: "").name
-                                else {
-                                    context.contentResolver.query(uri, null, null, null, null)?.use { c ->
-                                        val idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                                        if (c.moveToFirst() && idx >= 0) c.getString(idx) else null
-                                    } ?: uri.lastPathSegment ?: "Word Document"
-                                }
-                            } catch (_: Exception) { "Word Document" }
+                    try {
+                        val name = try {
+                            if (uri.scheme == "file") java.io.File(uri.path ?: "").name
+                            else {
+                                context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+                                    val idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                                    if (c.moveToFirst() && idx >= 0) c.getString(idx) else null
+                                } ?: uri.lastPathSegment ?: "Word Document"
+                            }
+                        } catch (_: Exception) { "Word Document" }
 
-                            val recentDoc = recentDocumentDao.findByUri(uriStr)
-                            recentDocumentDao.upsert(
-                                RecentDocument(
-                                    uri = uriStr,
-                                    fileName = name,
-                                    mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                    fileSizeBytes = fileSize,
-                                    lastOpenedAt = System.currentTimeMillis(),
-                                    documentType = docType.uppercase(),
-                                    lastScrollIndex = recentDoc?.lastScrollIndex ?: 0,
-                                    lastScrollOffset = recentDoc?.lastScrollOffset ?: 0,
-                                    pageCount = count
-                                )
+                        val recentDoc = recentDocumentDao.findByUri(uriStr)
+                        recentDocumentDao.upsert(
+                            RecentDocument(
+                                uri = uriStr,
+                                fileName = name,
+                                mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                fileSizeBytes = fileSize,
+                                lastOpenedAt = System.currentTimeMillis(),
+                                documentType = docType.uppercase(),
+                                lastScrollIndex = recentDoc?.lastScrollIndex ?: 0,
+                                lastScrollOffset = recentDoc?.lastScrollOffset ?: 0,
+                                pageCount = count
                             )
-                        } catch (_: Exception) {}
-                    }
+                        )
+                    } catch (_: Exception) {}
 
                     withContext(Dispatchers.Main) {
-                        _uiState.value = result
+                        _uiState.value = readyResult
                     }
                 } catch (e: org.apache.poi.EncryptedDocumentException) {
                     withContext(Dispatchers.Main) {
@@ -254,6 +303,15 @@ class WordReaderViewModel @Inject constructor(
     fun increaseDocxFontSize() { _docxFontSize.value = (_docxFontSize.value + 2f).coerceAtMost(28f) }
     fun decreaseDocxFontSize() { _docxFontSize.value = (_docxFontSize.value - 2f).coerceAtLeast(12f) }
     fun toggleDocxSerif() { _docxIsSerif.value = !_docxIsSerif.value }
+
+    fun toggleEngine(docType: String = "DOCX") {
+        val uri = currentEncodedUri ?: return
+        viewModelScope.launch {
+            val current = prefsRepository.useLibreOfficeEngine.first()
+            prefsRepository.setUseLibreOfficeEngine(!current)
+            loadDocument(uri, docType)
+        }
+    }
 
     fun toggleDocxOutline() {
         val current = _uiState.value
