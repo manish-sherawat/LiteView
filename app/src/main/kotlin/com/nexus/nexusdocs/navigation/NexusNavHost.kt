@@ -32,6 +32,8 @@ import com.nexus.feature.dashboard.RecycleBinScreen
 import com.nexus.feature.dashboard.SettingsScreen
 import com.nexus.feature.dashboard.ToolsScreen
 import com.nexus.feature.reader.office.OfficeReaderScreen
+import com.nexus.feature.reader.office.word.WordReaderScreen
+import com.nexus.feature.reader.office.excel.ExcelReaderScreen
 import com.nexus.feature.reader.pdf.PdfReaderScreen
 import com.nexus.feature.reader.presentation.ui.PresentationReaderScreen
 import com.nexus.feature.reader.text.TextReaderScreen
@@ -597,6 +599,54 @@ private fun AnimatedVisibilityScope.PdfReaderRoute(
 }
 
 @Composable
+private fun AnimatedVisibilityScope.WordReaderRoute(
+    backStackEntry: NavBackStackEntry,
+    router: DocumentReaderRouter
+) {
+    AnimatedScreen {
+        val encodedUri = with(NavArgumentExtensions) { backStackEntry.getDecodedUri(NexusRoute.WordReader.ARG_URI) }
+        val fileName = with(NavArgumentExtensions) { backStackEntry.getFileNameArgument(NexusRoute.WordReader.ARG_FILE_NAME) }
+        val docType = with(NavArgumentExtensions) { backStackEntry.validateDocumentType(NexusRoute.WordReader.ARG_DOC_TYPE) }
+
+        if (encodedUri.isBlank()) {
+            Log.w("WordReader", "No URI provided, showing unsupported screen")
+            UnsupportedFileScreen(fileName = fileName, onBack = { router.navigateBack() })
+        } else {
+            WordReaderScreen(
+                encodedUri = encodedUri,
+                fileName = fileName,
+                docType = docType,
+                onBack = { router.navigateBack() }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AnimatedVisibilityScope.ExcelReaderRoute(
+    backStackEntry: NavBackStackEntry,
+    router: DocumentReaderRouter
+) {
+    AnimatedScreen {
+        val encodedUri = with(NavArgumentExtensions) { backStackEntry.getDecodedUri(NexusRoute.ExcelReader.ARG_URI) }
+        val fileName = with(NavArgumentExtensions) { backStackEntry.getFileNameArgument(NexusRoute.ExcelReader.ARG_FILE_NAME) }
+        val docType = with(NavArgumentExtensions) { backStackEntry.validateDocumentType(NexusRoute.ExcelReader.ARG_DOC_TYPE) }
+
+        if (encodedUri.isBlank()) {
+            Log.w("ExcelReader", "No URI provided, showing unsupported screen")
+            UnsupportedFileScreen(fileName = fileName, onBack = { router.navigateBack() })
+        } else {
+            ExcelReaderScreen(
+                encodedUri = encodedUri,
+                fileName = fileName,
+                docType = docType,
+                onBack = { router.navigateBack() }
+            )
+        }
+    }
+}
+
+@Composable
 private fun AnimatedVisibilityScope.OfficeReaderRoute(
     backStackEntry: NavBackStackEntry,
     router: DocumentReaderRouter
@@ -819,6 +869,28 @@ fun NexusNavHost(
                     popExitTransition = { readerBackExitTransition() }
                 ) { backStackEntry ->
                     PdfReaderRoute(backStackEntry, router)
+                }
+
+                // ─── Word Reader Screen (DOCX, DOC) ───────────────────────
+                composable(
+                    route = NexusRoute.WordReader.ROUTE,
+                    enterTransition = { readerEnterTransition() },
+                    exitTransition = { readerExitTransition() },
+                    popEnterTransition = { readerBackEnterTransition() },
+                    popExitTransition = { readerBackExitTransition() }
+                ) { backStackEntry ->
+                    WordReaderRoute(backStackEntry, router)
+                }
+
+                // ─── Excel Reader Screen (XLSX, XLS) ──────────────────────
+                composable(
+                    route = NexusRoute.ExcelReader.ROUTE,
+                    enterTransition = { readerEnterTransition() },
+                    exitTransition = { readerExitTransition() },
+                    popEnterTransition = { readerBackEnterTransition() },
+                    popExitTransition = { readerBackExitTransition() }
+                ) { backStackEntry ->
+                    ExcelReaderRoute(backStackEntry, router)
                 }
 
                 // ─── Office Reader Screen ─────────────────────────────────

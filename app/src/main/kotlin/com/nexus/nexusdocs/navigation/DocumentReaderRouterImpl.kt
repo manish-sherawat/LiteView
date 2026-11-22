@@ -85,9 +85,18 @@ class DocumentReaderRouterImpl @Inject constructor(
                         ).buildRoute()
                     )
                 }
-                DocumentType.DOCX, DocumentType.XLSX -> {
+                DocumentType.DOCX -> {
                     controller.navigate(
-                        NexusRoute.OfficeReader(
+                        NexusRoute.WordReader(
+                            encodedUri = encodedUri,
+                            fileName = encodedName,
+                            docType = docType.name
+                        ).buildRoute()
+                    )
+                }
+                DocumentType.XLSX -> {
+                    controller.navigate(
+                        NexusRoute.ExcelReader(
                             encodedUri = encodedUri,
                             fileName = encodedName,
                             docType = docType.name

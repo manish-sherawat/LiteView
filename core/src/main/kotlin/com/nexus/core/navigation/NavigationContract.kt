@@ -135,6 +135,38 @@ sealed class NexusRoute(val route: String) {
         fun buildRoute(): String = "reader/pdf/$encodedUri/${Uri.encode(fileName)}"
     }
 
+    // Word Reader (DOCX, DOC)
+    data class WordReader(
+        val encodedUri: String,
+        val fileName: String,
+        val docType: String = "DOCX"
+    ) : NexusRoute("reader/word/{encodedUri}/{fileName}/{docType}") {
+        companion object {
+            const val ROUTE = "reader/word/{encodedUri}/{fileName}/{docType}"
+            const val ARG_URI = "encodedUri"
+            const val ARG_FILE_NAME = "fileName"
+            const val ARG_DOC_TYPE = "docType"
+        }
+
+        fun buildRoute(): String = "reader/word/$encodedUri/${Uri.encode(fileName)}/$docType"
+    }
+
+    // Excel Reader (XLSX, XLS)
+    data class ExcelReader(
+        val encodedUri: String,
+        val fileName: String,
+        val docType: String = "XLSX"
+    ) : NexusRoute("reader/excel/{encodedUri}/{fileName}/{docType}") {
+        companion object {
+            const val ROUTE = "reader/excel/{encodedUri}/{fileName}/{docType}"
+            const val ARG_URI = "encodedUri"
+            const val ARG_FILE_NAME = "fileName"
+            const val ARG_DOC_TYPE = "docType"
+        }
+
+        fun buildRoute(): String = "reader/excel/$encodedUri/${Uri.encode(fileName)}/$docType"
+    }
+
     // Office Reader (DOCX, XLSX, PPTX)
     data class OfficeReader(
         val encodedUri: String,
