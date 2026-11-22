@@ -54,22 +54,6 @@ fun WordOptionsBottomSheet(
     )
 
     val groupDocx = buildList {
-        add(
-            DocumentOptionItem(
-                title = if (useLibreOfficeEngine) "Engine: LibreOfficeKit" else "Engine: Legacy POI",
-                subtitle = if (useLibreOfficeEngine) "Desktop-grade high fidelity (Active)" else "HTML WebView layout (Legacy)",
-                iconRes = com.nexus.core.R.drawable.ic_settings_outline,
-                onClick = onToggleEngine
-            )
-        )
-        add(
-            DocumentOptionItem(
-                title = if (isPagedView) "Paged View Mode" else "Reflow View Mode",
-                subtitle = if (isPagedView) "Distinct pages (${paperSizeName ?: "Standard"})" else "Continuous mobile scrolling",
-                iconRes = if (isPagedView) com.nexus.core.R.drawable.ic_book else com.nexus.core.R.drawable.ic_world,
-                onClick = onTogglePagedView
-            )
-        )
         if (totalPages > 1) {
             add(
                 DocumentOptionItem(

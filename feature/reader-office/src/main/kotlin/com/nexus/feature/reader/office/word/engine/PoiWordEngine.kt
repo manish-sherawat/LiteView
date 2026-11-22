@@ -19,6 +19,7 @@ import org.apache.poi.hwpf.HWPFDocument
 import org.apache.poi.poifs.crypt.Decryptor
 import org.apache.poi.poifs.crypt.EncryptionInfo
 import org.apache.poi.poifs.filesystem.POIFSFileSystem
+import org.apache.poi.xwpf.extractor.XWPFWordExtractor
 import org.apache.poi.xwpf.usermodel.BodyElementType
 import org.apache.poi.xwpf.usermodel.ParagraphAlignment
 import org.apache.poi.xwpf.usermodel.XWPFDocument
@@ -32,8 +33,19 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Legacy Apache POI + HTML/CSS layout engine for Word documents.
- * Retained as a reliable fallback when LibreOfficeKit is disabled or unavailable.
+ * Robust, production-grade Apache POI + HTML/CSS layout engine for Word documents.
+ * Produces clean, desktop-grade paginated HTML for the WebView reader.
+ *
+ * Key Capabilities:
+ * 1. Strict horizontal boundary constraints: all paragraph shading, borders, and containers
+ *    are constrained strictly within (page width - left margin - right margin).
+ * 2. Indentation math: line wrapping width for bulleted and indented paragraphs subtracts left
+ *    indent and hanging indent so justified text never clips on the right edge.
+ * 3. Style inheritance: hyperlinks and nested runs inherit base paragraph font size and spacing
+ *    without scaling up or applying unintended uppercase transforms; list items enforce proper
+ *    spacing after.
+ * 4. Granular error resilience: every XML node in the OOXML parser and pagination loop is wrapped
+ *    in isolated try-catch blocks with node-level logging and fallback recovery.
  */
 @Singleton
 class PoiWordEngine @Inject constructor(
@@ -44,7 +56,7 @@ class PoiWordEngine @Inject constructor(
         private const val TAG = "PoiWordEngine"
     }
 
-    override val engineName: String = "Apache POI Legacy Engine"
+    override val engineName: String = "Apache POI Paginated Engine"
 
     override suspend fun loadDocument(
         uri: Uri,
@@ -53,17 +65,20 @@ class PoiWordEngine @Inject constructor(
     ): WordEngineResult = withContext(Dispatchers.IO) {
         try {
             val stream = context.contentResolver.openInputStream(uri)
-                ?: return@withContext WordEngineResult.Error("Could not open file stream for $uri")
+                ?: return@withContext WordEngineResult.Error("Cannot open file stream for $uri")
 
             stream.use { s ->
-                if (docType.equals("DOC", ignoreCase = true)) {
+                val isDoc = docType.equals("DOC", ignoreCase = true) ||
+                    (uri.lastPathSegment ?: "").endsWith(".doc", ignoreCase = true)
+
+                if (isDoc) {
                     parseDoc(s)
                 } else {
                     parseDocx(s, password)
                 }
             }
         } catch (t: Throwable) {
-            Log.e(TAG, "POI engine failure", t)
+            Log.e(TAG, "POI engine failure for $uri: ${t.message}", t)
             WordEngineResult.Error("POI engine error: ${t.localizedMessage ?: "Parsing failure"}", t)
         }
     }
@@ -114,55 +129,61 @@ class PoiWordEngine @Inject constructor(
             }
 
             for (i in 0 until numParas) {
-                val para = range.getParagraph(i)
-                val rawText = para.text() ?: ""
-                val isDiagram = rawText.contains("┌") || rawText.contains("└") ||
-                    rawText.contains("├──") || rawText.contains("└──") ||
-                    Regex("""\+[-=]{2,}\+|\|[\s\w\W]{2,}\|""").containsMatchIn(rawText)
+                try {
+                    val para = range.getParagraph(i)
+                    val rawText = para.text() ?: ""
+                    val isDiagram = rawText.contains("┌") || rawText.contains("└") ||
+                        rawText.contains("├──") || rawText.contains("└──") ||
+                        Regex("""\+[-=]{2,}\+|\|[\s\w\W]{2,}\|""").containsMatchIn(rawText)
 
-                if (isDiagram) {
-                    consecutiveDiagramLines.add(rawText.trimEnd())
-                    continue
-                } else {
-                    flushDiagramLines()
+                    if (isDiagram) {
+                        consecutiveDiagramLines.add(rawText.trimEnd())
+                        continue
+                    } else {
+                        flushDiagramLines()
+                    }
+
+                    totalWords += rawText.split(Regex("\\s+")).count { it.isNotBlank() }
+                    totalChars += rawText.length
+
+                    val alignStr = when(para.justification) {
+                        1 -> "center"
+                        2 -> "right"
+                        3 -> "justify"
+                        else -> "left"
+                    }
+
+                    val charsPerLine = (printableWidth / 6.2f).toInt().coerceIn(24, 110)
+                    val lines = Math.max(1, Math.ceil(rawText.length.toDouble() / charsPerLine).toInt())
+                    val paraHeight = (lines * 19f) + 8f
+
+                    if (currentHeight + paraHeight > printableHeight && currentPage.isNotEmpty()) {
+                        sealPage()
+                    }
+
+                    val paraSb = StringBuilder()
+                    paraSb.append("<p style=\"text-align:$alignStr;min-width:0;max-width:100%;box-sizing:border-box;margin-bottom:6pt;word-break:normal;overflow-wrap:break-word;white-space:normal;\">")
+                    for (j in 0 until para.numCharacterRuns()) {
+                        try {
+                            val run = para.getCharacterRun(j)
+                            var text = run.text()
+                            if (text.isBlank() && text.isEmpty()) continue
+                            text = WordMathParser.decodeMathSymbols(text)
+                            var span = htmlEscape(text)
+                            if (run.isBold) span = "<strong>$span</strong>"
+                            if (run.isItalic) span = "<em>$span</em>"
+                            if (run.isStrikeThrough) span = "<s>$span</s>"
+                            paraSb.append(span)
+                        } catch (_: Exception) {}
+                    }
+                    paraSb.append("</p>\n")
+
+                    val citationFormatted = WordCitationParser.formatCitationTags(paraSb.toString())
+                    currentPage.append(citationFormatted)
+                    currentHeight += paraHeight
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Error parsing .doc paragraph at index $i: ${t.message}", t)
                 }
-
-                totalWords += rawText.split(Regex("\\s+")).count { it.isNotBlank() }
-                totalChars += rawText.length
-
-                val alignStr = when(para.justification) {
-                    1 -> "center"
-                    2 -> "right"
-                    3 -> "justify"
-                    else -> "left"
-                }
-
-                val charsPerLine = (printableWidth / 6.2f).toInt().coerceIn(24, 110)
-                val lines = Math.max(1, Math.ceil(rawText.length.toDouble() / charsPerLine).toInt())
-                val paraHeight = (lines * 19f) + 8f
-
-                if (currentHeight + paraHeight > printableHeight && currentPage.isNotEmpty()) {
-                    sealPage()
-                }
-
-                val paraSb = StringBuilder()
-                paraSb.append("<p style=\"text-align:$alignStr;min-width:0;width:100%;max-width:100%;word-break:normal;overflow-wrap:break-word;white-space:normal;\">")
-                for (j in 0 until para.numCharacterRuns()) {
-                    val run = para.getCharacterRun(j)
-                    var text = run.text()
-                    if (text.isBlank() && text.isEmpty()) continue
-                    text = WordMathParser.decodeMathSymbols(text)
-                    var span = htmlEscape(text)
-                    if (run.isBold) span = "<strong>$span</strong>"
-                    if (run.isItalic) span = "<em>$span</em>"
-                    if (run.isStrikeThrough) span = "<s>$span</s>"
-                    paraSb.append(span)
-                }
-                paraSb.append("</p>\n")
-
-                val citationFormatted = WordCitationParser.formatCitationTags(paraSb.toString())
-                currentPage.append(citationFormatted)
-                currentHeight += paraHeight
             }
             flushDiagramLines()
             sealPage()
@@ -199,30 +220,54 @@ class PoiWordEngine @Inject constructor(
                 readingTimeMinutes = Math.max(1, Math.ceil(totalWords / 200.0).toInt()),
                 author = null,
                 creationDate = null,
-                paperSizeName = "A4",
-                paperDimensions = "210 × 297 mm",
-                orientation = "Portrait",
-                marginsDescription = "Normal"
+                paperSizeName = pageSetup.paperSize.name,
+                paperDimensions = "${pageSetup.paperSize.widthMm.toInt()} × ${pageSetup.paperSize.heightMm.toInt()} mm",
+                orientation = if (pageSetup.orientation == PageOrientation.LANDSCAPE) "Landscape" else "Portrait",
+                marginsDescription = pageSetup.margins.summary()
             )
-        } catch (e: Exception) {
-            WordEngineResult.Error("Failed to parse binary .DOC: ${e.message}", e)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Error in parseDoc: ${t.message}", t)
+            WordEngineResult.Error("Failed to parse Word (.doc) document: ${t.localizedMessage ?: "Corrupt or encrypted file"}", t)
         }
     }
 
     private fun parseDocx(stream: InputStream, password: String?): WordEngineResult {
-        var finalStream = stream
         var poifsToClose: POIFSFileSystem? = null
+        var finalStream: InputStream = stream
 
-        if (password != null) {
-            val poifs = POIFSFileSystem(stream)
+        val pushback = java.io.PushbackInputStream(stream, 8)
+        val header = ByteArray(8)
+        val n = pushback.read(header)
+        if (n > 0) pushback.unread(header, 0, n)
+
+        val isOleo = n >= 8 &&
+            header[0] == 0xD0.toByte() && header[1] == 0xCF.toByte() &&
+            header[2] == 0x11.toByte() && header[3] == 0xE0.toByte() &&
+            header[4] == 0xA1.toByte() && header[5] == 0xB1.toByte() &&
+            header[6] == 0x1A.toByte() && header[7] == 0xE1.toByte()
+
+        if (isOleo) {
+            val poifs = POIFSFileSystem(pushback)
             poifsToClose = poifs
             val info = EncryptionInfo(poifs)
             val decryptor = Decryptor.getInstance(info)
-            if (!decryptor.verifyPassword(password)) {
-                poifs.close()
+
+            val pwd = password ?: "VelvetSweatshop"
+            val verified = try {
+                decryptor.verifyPassword(pwd)
+            } catch (_: Exception) {
+                false
+            }
+
+            if (!verified) {
+                if (password == null) {
+                    return WordEngineResult.PasswordRequired(isError = false)
+                }
                 return WordEngineResult.PasswordRequired(isError = true)
             }
             finalStream = decryptor.getDataStream(poifs)
+        } else {
+            finalStream = pushback
         }
 
         return try {
@@ -256,84 +301,125 @@ class PoiWordEngine @Inject constructor(
                 val consecutiveDiagrams = mutableListOf<XWPFParagraph>()
                 fun flushDiagramParagraphs() {
                     if (consecutiveDiagrams.isNotEmpty()) {
-                        val blockHtml = WordDiagramParser.renderDiagramBlock(consecutiveDiagrams)
-                        currentPage.append(blockHtml)
-                        currentHeight += (consecutiveDiagrams.size * 18f) + 36f
-                        consecutiveDiagrams.clear()
+                        try {
+                            val blockHtml = WordDiagramParser.renderDiagramBlock(consecutiveDiagrams)
+                            currentPage.append(blockHtml)
+                            currentHeight += (consecutiveDiagrams.size * 18f) + 36f
+                        } catch (t: Throwable) {
+                            Log.w(TAG, "Error rendering diagram block: ${t.message}", t)
+                        } finally {
+                            consecutiveDiagrams.clear()
+                        }
                     }
                 }
 
-                for (element in bodyElements) {
-                    when (element.elementType) {
-                        BodyElementType.PARAGRAPH -> {
-                            val para = element as XWPFParagraph
-                            if (WordDiagramParser.isDiagramParagraph(para)) {
-                                consecutiveDiagrams.add(para)
-                                continue
-                            } else {
-                                flushDiagramParagraphs()
-                            }
-
-                            val txt = para.text ?: ""
-                            totalWords += txt.split(Regex("\\s+")).count { it.isNotBlank() }
-                            totalChars += txt.length
-
-                            val isBreak = WordLayoutEngine.hasExplicitPageBreak(para)
-                            val estimatedHeight = WordLayoutEngine.estimateParagraphHeight(para, printableWidth)
-
-                            if (isBreak && currentPage.isNotEmpty()) {
-                                sealPage()
-                            } else if (currentHeight + estimatedHeight > printableHeight && currentPage.isNotEmpty()) {
-                                sealPage()
-                            }
-
-                            appendParagraphHtml(para, doc, currentPage, headings)
-                            currentHeight += estimatedHeight
+                // Granular per-XML-node iteration with safe fallback
+                for ((elemIdx, element) in bodyElements.withIndex()) {
+                    val elemTag = try {
+                        when (element.elementType) {
+                            BodyElementType.PARAGRAPH -> (element as? XWPFParagraph)?.ctp?.domNode?.nodeName ?: "w:p"
+                            BodyElementType.TABLE -> (element as? XWPFTable)?.ctTbl?.domNode?.nodeName ?: "w:tbl"
+                            else -> element.elementType?.name ?: "w:bodyElement"
                         }
-                        BodyElementType.TABLE -> {
-                            flushDiagramParagraphs()
-                            val table = element as XWPFTable
-                            for (row in table.rows) {
-                                for (cell in row.tableCells) {
-                                    val txt = cell.text ?: ""
+                    } catch (_: Exception) { "w:node" }
+
+                    try {
+                        when (element.elementType) {
+                            BodyElementType.PARAGRAPH -> {
+                                val para = element as XWPFParagraph
+                                try {
+                                    if (WordDiagramParser.isDiagramParagraph(para)) {
+                                        consecutiveDiagrams.add(para)
+                                        continue
+                                    } else {
+                                        flushDiagramParagraphs()
+                                    }
+
+                                    val txt = para.text ?: ""
                                     totalWords += txt.split(Regex("\\s+")).count { it.isNotBlank() }
                                     totalChars += txt.length
-                                }
-                            }
 
-                            val rowSpans = computeRowSpans(table)
-                            val tableHeaderHeight = if (table.rows.isNotEmpty()) WordLayoutEngine.estimateTableRowHeight(table.rows[0], printableWidth) else 24f
+                                    val isBreak = WordLayoutEngine.hasExplicitPageBreak(para)
+                                    val estimatedHeight = WordLayoutEngine.estimateParagraphHeight(para, printableWidth)
 
-                            var inTablePage = false
-                            fun startTableChunk() {
-                                currentPage.append("<div class=\"table-container\"><table class=\"docx-table\">\n")
-                                inTablePage = true
-                            }
-                            fun endTableChunk() {
-                                if (inTablePage) {
-                                    currentPage.append("</table></div>\n")
-                                    inTablePage = false
-                                }
-                            }
-
-                            startTableChunk()
-                            table.rows.forEachIndexed { rowIdx, row ->
-                                val rowHeight = WordLayoutEngine.estimateTableRowHeight(row, printableWidth)
-                                if (currentHeight + rowHeight > printableHeight && currentHeight > 0f) {
-                                    endTableChunk()
-                                    sealPage()
-                                    startTableChunk()
-                                    if (rowIdx > 0 && table.rows.isNotEmpty()) {
-                                        appendTableRowHtml(table.rows[0], 0, rowSpans, currentPage)
-                                        currentHeight += tableHeaderHeight
+                                    if (isBreak && currentPage.isNotEmpty()) {
+                                        sealPage()
+                                    } else if (currentHeight + estimatedHeight > printableHeight && currentPage.isNotEmpty()) {
+                                        sealPage()
                                     }
+
+                                    appendParagraphHtml(para, doc, currentPage, headings)
+                                    currentHeight += estimatedHeight
+                                } catch (t: Throwable) {
+                                    Log.w(TAG, "Error parsing paragraph node <$elemTag> at index $elemIdx: ${t.message}", t)
+                                    // Safe fallback: extract raw text in bounded paragraph
+                                    try {
+                                        val raw = para.text ?: ""
+                                        if (raw.isNotBlank()) {
+                                            currentPage.append("<p style=\"margin-bottom:6pt;max-width:100%;box-sizing:border-box;word-break:normal;overflow-wrap:break-word;\">${htmlEscape(raw)}</p>\n")
+                                            currentHeight += 18f
+                                        }
+                                    } catch (_: Exception) {}
                                 }
-                                appendTableRowHtml(row, rowIdx, rowSpans, currentPage)
-                                currentHeight += rowHeight
                             }
-                            endTableChunk()
+                            BodyElementType.TABLE -> {
+                                flushDiagramParagraphs()
+                                val table = element as XWPFTable
+                                try {
+                                    for (row in table.rows) {
+                                        for (cell in row.tableCells) {
+                                            val txt = cell.text ?: ""
+                                            totalWords += txt.split(Regex("\\s+")).count { it.isNotBlank() }
+                                            totalChars += txt.length
+                                        }
+                                    }
+
+                                    val rowSpans = computeRowSpans(table)
+                                    val tableHeaderHeight = if (table.rows.isNotEmpty()) WordLayoutEngine.estimateTableRowHeight(table.rows[0], printableWidth) else 24f
+
+                                    var inTablePage = false
+                                    fun startTableChunk() {
+                                        currentPage.append("<div class=\"table-container\" style=\"max-width:100%;box-sizing:border-box;overflow-x:auto;\"><table class=\"docx-table\" style=\"max-width:100%;box-sizing:border-box;\">\n")
+                                        inTablePage = true
+                                    }
+                                    fun endTableChunk() {
+                                        if (inTablePage) {
+                                            currentPage.append("</table></div>\n")
+                                            inTablePage = false
+                                        }
+                                    }
+
+                                    startTableChunk()
+                                    table.rows.forEachIndexed { rowIdx, row ->
+                                        val rowHeight = WordLayoutEngine.estimateTableRowHeight(row, printableWidth)
+                                        if (currentHeight + rowHeight > printableHeight && currentHeight > 0f) {
+                                            endTableChunk()
+                                            sealPage()
+                                            startTableChunk()
+                                            if (rowIdx > 0 && table.rows.isNotEmpty()) {
+                                                appendTableRowHtml(table.rows[0], 0, rowSpans, currentPage)
+                                                currentHeight += tableHeaderHeight
+                                            }
+                                        }
+                                        appendTableRowHtml(row, rowIdx, rowSpans, currentPage)
+                                        currentHeight += rowHeight
+                                    }
+                                    endTableChunk()
+                                } catch (t: Throwable) {
+                                    Log.w(TAG, "Error parsing table node <$elemTag> at index $elemIdx: ${t.message}", t)
+                                    // Safe fallback: render simple table structure
+                                    try {
+                                        renderFallbackTable(table, currentPage)
+                                        currentHeight += 40f
+                                    } catch (_: Exception) {}
+                                }
+                            }
+                            else -> {
+                                Log.d(TAG, "Skipping unrecognized XML body node <$elemTag> at index $elemIdx")
+                            }
                         }
-                        else -> {}
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "Unhandled error in body node <$elemTag> at index $elemIdx: ${t.message}", t)
                     }
                 }
                 flushDiagramParagraphs()
@@ -341,6 +427,20 @@ class PoiWordEngine @Inject constructor(
 
                 if (pages.isEmpty()) {
                     pages.add("<p style=\"color: #64748b; font-style: italic;\">Document is empty</p>")
+                }
+
+                // Extract custom headers/footers safely
+                val headerTitle = try {
+                    doc.headerList?.firstOrNull { it.text.isNotBlank() }?.text?.trim()?.take(50) ?: "Document"
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Error extracting custom header: ${t.message}", t)
+                    "Document"
+                }
+                val footerTitle = try {
+                    doc.footerList?.firstOrNull { it.text.isNotBlank() }?.text?.trim()?.take(50) ?: ""
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Error extracting custom footer: ${t.message}", t)
+                    ""
                 }
 
                 val totalPages = pages.size
@@ -352,9 +452,9 @@ class PoiWordEngine @Inject constructor(
                 for ((i, pageContent) in pages.withIndex()) {
                     val pageNum = i + 1
                     sb.append("<section class=\"docx-page\" data-page-number=\"$pageNum\">\n")
-                    sb.append("  <div class=\"docx-page-header\"><span class=\"docx-header-title\">Document</span><span class=\"docx-header-num\">$pageNum</span></div>\n")
+                    sb.append("  <div class=\"docx-page-header\"><span class=\"docx-header-title\">${htmlEscape(headerTitle)}</span><span class=\"docx-header-num\">$pageNum</span></div>\n")
                     sb.append("  <div class=\"docx-page-content\">\n$pageContent\n  </div>\n")
-                    sb.append("  <div class=\"docx-page-footer\"><span class=\"docx-footer-title\"></span><span class=\"docx-footer-num\">Page $pageNum of $totalPages</span></div>\n")
+                    sb.append("  <div class=\"docx-page-footer\"><span class=\"docx-footer-title\">${htmlEscape(footerTitle)}</span><span class=\"docx-footer-num\">Page $pageNum of $totalPages</span></div>\n")
                     sb.append("</section>\n")
                 }
 
@@ -377,8 +477,97 @@ class PoiWordEngine @Inject constructor(
                     marginsDescription = pageSetup.margins.summary()
                 )
             }
+        } catch (t: Throwable) {
+            Log.e(TAG, "DOCX OOXML stream parser error: ${t.message}", t)
+            // Attempt emergency text extractor recovery so the file never fails to open
+            attemptEmergencyRecovery(finalStream, t)
         } finally {
-            poifsToClose?.close()
+            try { poifsToClose?.close() } catch (_: Exception) {}
+        }
+    }
+
+    private fun attemptEmergencyRecovery(stream: InputStream, originalError: Throwable): WordEngineResult {
+        return try {
+            val text = stream.use { s ->
+                val pushback = java.io.PushbackInputStream(s, 4)
+                val h = ByteArray(4)
+                pushback.read(h)
+                pushback.unread(h)
+                try {
+                    val doc = XWPFDocument(pushback)
+                    val sb = StringBuilder()
+                    for (p in doc.paragraphs) {
+                        val t = p.text
+                        if (!t.isNullOrBlank()) sb.append(t).append("\n")
+                    }
+                    for (tbl in doc.tables) {
+                        for (row in tbl.rows) {
+                            for (cell in row.tableCells) {
+                                val t = cell.text
+                                if (!t.isNullOrBlank()) sb.append(t).append("\t")
+                            }
+                            sb.append("\n")
+                        }
+                    }
+                    doc.close()
+                    sb.toString()
+                } catch (_: Exception) {
+                    null
+                }
+            }
+
+            if (!text.isNullOrBlank()) {
+                val lines = text.lines()
+                val paragraphsHtml = lines.filter { it.isNotBlank() }
+                    .joinToString("\n") { "<p style=\"margin-bottom:6pt;max-width:100%;box-sizing:border-box;\">${htmlEscape(it)}</p>" }
+
+                val pageSetup = PageSetup(
+                    paperSize = PaperSize.A4,
+                    widthPt = PaperSize.A4.widthPt,
+                    heightPt = PaperSize.A4.heightPt,
+                    orientation = PageOrientation.PORTRAIT,
+                    margins = DocumentMargins()
+                )
+                val stylesheet = WordLayoutEngine.generateStylesheet(pageSetup)
+                val clientScript = WordLayoutEngine.generateClientScript()
+
+                val html = """
+                    <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+                    $stylesheet
+                    </head><body class="mode-paged"><div class="docx-paged-container">
+                    <section class="docx-page" data-page-number="1">
+                      <div class="docx-page-header"><span class="docx-header-title">Recovered Document</span><span class="docx-header-num">1</span></div>
+                      <div class="docx-page-content">
+                        <div style="padding:8px 12px;margin-bottom:14px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;font-size:12px;color:#92400e;">
+                          Notice: Document layout recovered in safe mode due to complex or non-standard formatting.
+                        </div>
+                        $paragraphsHtml
+                      </div>
+                      <div class="docx-page-footer"><span class="docx-footer-title"></span><span class="docx-footer-num">Page 1 of 1</span></div>
+                    </section>
+                    </div>$clientScript</body></html>
+                """.trimIndent()
+
+                WordEngineResult.Html(
+                    htmlContent = html,
+                    headings = emptyList(),
+                    pageCount = 1,
+                    wordCount = text.split(Regex("\\s+")).count { it.isNotBlank() },
+                    characterCount = text.length,
+                    readingTimeMinutes = 1,
+                    author = null,
+                    creationDate = null,
+                    paperSizeName = "A4",
+                    paperDimensions = "210 × 297 mm",
+                    orientation = "Portrait",
+                    marginsDescription = "Standard Margins"
+                )
+            } else {
+                WordEngineResult.Error("Failed to parse Word document: ${originalError.localizedMessage ?: "Unknown format"}", originalError)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Emergency recovery failed: ${e.message}", e)
+            WordEngineResult.Error("Failed to parse Word document: ${originalError.localizedMessage ?: "Unrecognized or corrupted document"}", originalError)
         }
     }
 
@@ -411,27 +600,62 @@ class PoiWordEngine @Inject constructor(
         val spacingAfter = if (rawSpacingAfter > 0) (rawSpacingAfter / 20.0).coerceIn(0.0, 36.0) else null
         val spacingBetween = if (rawSpacingBetween > 0) (rawSpacingBetween / 240.0).coerceIn(1.15, 2.2) else null
 
+        // Enforce proper paragraph spacing (spacing after) on list items
+        val effectiveSpacingAfter = if (isList) {
+            if (spacingAfter != null) spacingAfter.coerceAtLeast(4.0) else 4.0
+        } else {
+            spacingAfter
+        }
+
         val rawIndentLeft = try { para.indentationLeft } catch (_: Exception) { -1 }
         val rawIndentRight = try { para.indentationRight } catch (_: Exception) { -1 }
         val rawIndentFirstLine = try { para.indentationFirstLine } catch (_: Exception) { -1 }
+        val rawIndentHanging = try { para.indentationHanging } catch (_: Exception) { -1 }
 
-        val indentLeft = if (rawIndentLeft > 0) (rawIndentLeft / 20.0).coerceIn(0.0, 32.0) else null
-        val indentRight = if (rawIndentRight > 0) (rawIndentRight / 20.0).coerceIn(0.0, 24.0) else null
-        val indentFirstLine = if (rawIndentFirstLine > 0) (rawIndentFirstLine / 20.0).coerceIn(0.0, 24.0) else null
+        val indentLeftPt = if (rawIndentLeft > 0) (rawIndentLeft / 20.0).coerceIn(0.0, 180.0) else null
+        val indentRightPt = if (rawIndentRight > 0) (rawIndentRight / 20.0).coerceIn(0.0, 120.0) else null
+        val indentFirstLinePt = if (rawIndentFirstLine > 0) (rawIndentFirstLine / 20.0).coerceIn(0.0, 100.0) else null
+        val indentHangingPt = if (rawIndentHanging > 0) (rawIndentHanging / 20.0).coerceIn(0.0, 100.0) else null
+
+        // Paragraph shading & border constraints within page boundaries
+        val pPr = try { para.ctp.pPr } catch (_: Exception) { null }
+        val shdFill = try {
+            val fill = pPr?.shd?.fill?.toString()
+            if (!fill.isNullOrBlank() && fill != "auto" && fill != "none" && fill != "clear") {
+                if (fill.length == 6) "#$fill" else null
+            } else null
+        } catch (_: Exception) { null }
+
+        val hasBdr = try {
+            val bdr = pPr?.pBdr
+            bdr != null && (bdr.isSetLeft || bdr.isSetBottom || bdr.isSetTop || bdr.isSetRight)
+        } catch (_: Exception) { false }
 
         val bookmarks = try { para.ctp.bookmarkStartList.map { it.name } } catch (_: Exception) { emptyList() }
 
         val pStyles = buildString {
             append("text-align:$alignStr;")
-            val safeLineHeight = spacingBetween ?: 1.3
+            val safeLineHeight = spacingBetween ?: 1.35
             append("line-height:$safeLineHeight;")
-            append("min-height:1.2em;min-width:0;width:100%;max-width:100%;word-break:normal;overflow-wrap:break-word;white-space:normal;")
+            // Crucial: Use max-width: 100% and box-sizing: border-box WITHOUT width: 100% to prevent horizontal overflow
+            append("min-height:1.2em;min-width:0;max-width:100%;box-sizing:border-box;word-break:normal;overflow-wrap:break-word;white-space:normal;")
 
             if (spacingBefore != null) append("margin-top:${spacingBefore}pt;")
-            if (spacingAfter != null) append("margin-bottom:${spacingAfter}pt;")
-            if (indentLeft != null && !isList) append("margin-left:${indentLeft}pt;")
-            if (indentRight != null) append("margin-right:${indentRight}pt;")
-            if (indentFirstLine != null && !isList) append("text-indent:${indentFirstLine}pt;")
+            if (effectiveSpacingAfter != null) append("margin-bottom:${effectiveSpacingAfter}pt;")
+
+            if (!isList) {
+                if (indentLeftPt != null) append("margin-left:${indentLeftPt}pt;")
+                if (indentFirstLinePt != null) append("text-indent:${indentFirstLinePt}pt;")
+                else if (indentHangingPt != null) append("text-indent:-${indentHangingPt}pt;padding-left:${indentHangingPt}pt;")
+            }
+            if (indentRightPt != null) append("margin-right:${indentRightPt}pt;")
+
+            if (shdFill != null) {
+                append("background-color:$shdFill;padding:6px 10px;border-radius:4px;")
+            }
+            if (hasBdr) {
+                append("border-left:3px solid var(--border-color);padding-left:8px;")
+            }
         }
 
         val rawText = try { para.text ?: "" } catch (_: Exception) { "" }
@@ -444,21 +668,31 @@ class PoiWordEngine @Inject constructor(
             if (headingText.isNotEmpty()) {
                 headings.add(DocxHeading(text = headingText, level = headingLevel, anchorId = "h_${headings.size}"))
             }
-            tempSb.append("""<h$headingLevel $finalIdAttr style="$pStyles;min-width:0;width:100%;max-width:100%;word-break:normal;overflow-wrap:break-word;white-space:normal;">$anchorsHtml""")
+            tempSb.append("""<h$headingLevel $finalIdAttr style="$pStyles;min-width:0;max-width:100%;box-sizing:border-box;word-break:normal;overflow-wrap:break-word;white-space:normal;">$anchorsHtml""")
             appendParagraphBodyContent(para, doc, tempSb)
             tempSb.append("</h$headingLevel>\n")
         } else if (isList) {
-            val indent = (listLevel + 1) * 18
+            val baseIndentPt = ((listLevel + 1) * 16.0).coerceIn(16.0, 140.0)
+            val totalLeftIndentPt = (indentLeftPt ?: baseIndentPt).coerceAtLeast(baseIndentPt)
             val bullet = if (listLevel % 2 == 0) "&#8226;" else "&#9702;"
-            val listStyles = "$pStyles;margin-left:${indent}px;min-width:0;width:100%;max-width:100%;word-break:normal;overflow-wrap:break-word;"
-            tempSb.append("""<p $finalIdAttr style="$listStyles">$anchorsHtml$bullet&nbsp;""")
+            val bulletWidthPt = 14.0
+
+            // Subtract left indent and hanging indent from available width using padding-left with negative text-indent
+            val listStyles = buildString {
+                append(pStyles)
+                append("padding-left:${totalLeftIndentPt}pt;")
+                append("text-indent:-${bulletWidthPt}pt;")
+                append("margin-left:0;")
+                append("max-width:100%;box-sizing:border-box;")
+            }
+            tempSb.append("""<p class="docx-list-item" $finalIdAttr style="$listStyles">$anchorsHtml<span style="display:inline-block;width:${bulletWidthPt}pt;text-indent:0;">$bullet</span>""")
             appendParagraphBodyContent(para, doc, tempSb)
             tempSb.append("</p>\n")
         } else {
             if (rawText.isBlank() && !hasMathNodes(para) && para.runs.none { it.embeddedPictures.isNotEmpty() }) {
-                tempSb.append("<p $finalIdAttr style=\"margin:4px 0;min-height:1em;\">$anchorsHtml&nbsp;</p>\n")
+                tempSb.append("<p $finalIdAttr style=\"margin:4px 0;min-height:1em;max-width:100%;box-sizing:border-box;\">$anchorsHtml&nbsp;</p>\n")
             } else {
-                tempSb.append("""<p $finalIdAttr style="$pStyles">$anchorsHtml""")
+                tempSb.append("""<p class="docx-paragraph" $finalIdAttr style="$pStyles">$anchorsHtml""")
                 appendParagraphBodyContent(para, doc, tempSb)
                 tempSb.append("</p>\n")
             }
@@ -490,8 +724,13 @@ class PoiWordEngine @Inject constructor(
             for (i in 0 until childNodes.length) {
                 val node = childNodes.item(i) ?: continue
                 if (WordMathParser.isMathNode(node)) {
-                    WordMathParser.parseOMML(node, sb)
-                    hasHandledMath = true
+                    try {
+                        WordMathParser.parseOMML(node, sb)
+                        hasHandledMath = true
+                    } catch (t: Throwable) {
+                        val nodeName = node.nodeName ?: "m:oMath"
+                        Log.w(TAG, "Error parsing OMML math node <$nodeName>: ${t.message}", t)
+                    }
                 }
             }
             if (hasHandledMath) return
@@ -505,7 +744,9 @@ class PoiWordEngine @Inject constructor(
         sb: StringBuilder
     ) {
         for (run in para.runs) {
+            val runNodeName = try { run.ctr?.domNode?.nodeName ?: "w:r" } catch (_: Exception) { "w:r" }
             try {
+                // Embedded pictures
                 for (pic in run.embeddedPictures) {
                     try {
                         val data = pic.pictureData.data
@@ -519,37 +760,80 @@ class PoiWordEngine @Inject constructor(
                             else          -> "image/png"
                         }
                         val b64 = android.util.Base64.encodeToString(data, android.util.Base64.NO_WRAP)
-                        sb.append("""<img src="data:$mime;base64,$b64" style="max-width:100%; display:inline-block; overflow:hidden;">""")
-                    } catch (_: Exception) {}
+                        sb.append("""<img src="data:$mime;base64,$b64" style="max-width:100%;height:auto;display:inline-block;overflow:hidden;border-radius:4px;">""")
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "Error decoding embedded picture: ${t.message}", t)
+                    }
                 }
 
                 val text = run.text() ?: ""
                 if (text.isEmpty()) continue
 
-                val isBold      = try { run.isBold } catch (_: Exception) { false }
-                val isItalic    = try { run.isItalic } catch (_: Exception) { false }
+                val isHyperlink = run is XWPFHyperlinkRun ||
+                    try { run.ctr?.domNode?.parentNode?.nodeName?.contains("hyperlink", ignoreCase = true) == true } catch (_: Exception) { false }
+
+                val isBold = try { run.isBold } catch (_: Exception) { false }
+                val isItalic = try { run.isItalic } catch (_: Exception) { false }
                 val underlinePattern = try { run.underline } catch (_: Exception) { null }
-                val isUnderline = underlinePattern != null && underlinePattern != org.apache.poi.xwpf.usermodel.UnderlinePatterns.NONE
-                val isStrike    = try { run.isStrikeThrough } catch (_: Exception) { false }
+                val isUnderline = isHyperlink || (underlinePattern != null && underlinePattern != org.apache.poi.xwpf.usermodel.UnderlinePatterns.NONE)
+                val isStrike = try { run.isStrikeThrough } catch (_: Exception) { false }
                 val isDoubleStrike = try { run.isDoubleStrikeThrough } catch (_: Exception) { false }
-                val colorHex    = try { run.color?.let { if (it.length == 6) "#$it" else null } } catch (_: Exception) { null }
-                val fontSize    = try { run.fontSizeAsDouble?.toInt()?.takeIf { it > 0 } } catch (_: Exception) { null }
-                val fontFamily  = try { run.fontFamily } catch (_: Exception) { null }
-                val vAlign      = try { run.verticalAlignment?.toString()?.lowercase() } catch (_: Exception) { null }
+                val colorHex = try { run.color?.let { if (it.length == 6 && it != "auto") "#$it" else null } } catch (_: Exception) { null }
+
+                // Style inheritance: Hyperlinks and nested runs inherit base paragraph font size and spacing
+                val fontSize = if (!isHyperlink) {
+                    try { run.fontSizeAsDouble?.toInt()?.takeIf { it > 0 } } catch (_: Exception) { null }
+                } else {
+                    // Hyperlinks inherit base paragraph font size and line spacing to avoid scaling up
+                    null
+                }
+
+                val fontFamily = try { run.fontFamily } catch (_: Exception) { null }
+                val vAlign = try { run.verticalAlignment?.toString()?.lowercase() } catch (_: Exception) { null }
                 val isSubscript = vAlign == "subscript"
                 val isSuperscript = vAlign == "superscript"
-                val isCapitalized = try { run.isCapitalized } catch (_: Exception) { false }
-                val isSmallCaps   = try { run.isSmallCaps } catch (_: Exception) { false }
+
+                // Unintended casing transforms: ONLY apply if explicitly specified on run's own rPr DOM and never on hyperlinks
+                val isExplicitCaps = if (!isHyperlink) {
+                    try {
+                        val dom = run.ctr?.rPr?.domNode
+                        if (dom != null) {
+                            val nl = dom.childNodes
+                            (0 until nl.length).any { i ->
+                                val item = nl.item(i)
+                                (item.localName ?: item.nodeName).equals("caps", ignoreCase = true)
+                            }
+                        } else false
+                    } catch (_: Exception) { false }
+                } else false
+
+                val isExplicitSmallCaps = if (!isHyperlink) {
+                    try {
+                        val dom = run.ctr?.rPr?.domNode
+                        if (dom != null) {
+                            val nl = dom.childNodes
+                            (0 until nl.length).any { i ->
+                                val item = nl.item(i)
+                                (item.localName ?: item.nodeName).equals("smallcaps", ignoreCase = true)
+                            }
+                        } else false
+                    } catch (_: Exception) { false }
+                } else false
+
                 val highlightColor = try { run.textHighlightColor?.toString()?.takeIf { it != "none" && it.isNotBlank() } } catch (_: Exception) { null }
 
-                val isHyperlink = run is XWPFHyperlinkRun
                 val url = if (isHyperlink) {
                     try {
-                        val hr = run as XWPFHyperlinkRun
-                        if (!hr.anchor.isNullOrEmpty()) {
+                        val hr = run as? XWPFHyperlinkRun
+                        if (hr != null && !hr.anchor.isNullOrEmpty()) {
                             "#" + hr.anchor
-                        } else {
+                        } else if (hr != null) {
                             doc.getHyperlinkByID(hr.hyperlinkId)?.url
+                        } else {
+                            val parent = run.ctr?.domNode?.parentNode
+                            val rId = parent?.attributes?.getNamedItem("r:id")?.nodeValue
+                                ?: parent?.attributes?.getNamedItem("id")?.nodeValue
+                            if (rId != null) doc.getHyperlinkByID(rId)?.url else null
                         }
                     } catch (_: Exception) { null }
                 } else null
@@ -561,57 +845,68 @@ class PoiWordEngine @Inject constructor(
                 val escaped = htmlEscape(decodedText).replace("\t", "&nbsp;&nbsp;&nbsp;&nbsp;")
 
                 val styles = buildString {
-                    if (colorHex != null) append("color:$colorHex;")
+                    if (colorHex != null && !isHyperlink) append("color:$colorHex;")
                     if (fontSize != null) append("font-size:${fontSize}pt;")
                     if (fontFamily != null) append("font-family:'$fontFamily';")
                     if (highlightColor != null) append("background-color:$highlightColor;")
-                    if (isCapitalized) append("text-transform:uppercase;")
-                    if (isSmallCaps) append("font-variant:small-caps;")
+                    if (isExplicitCaps) append("text-transform:uppercase;")
+                    if (isExplicitSmallCaps) append("font-variant:small-caps;")
                 }
 
                 var span = escaped
-                if (isBold)      span = "<strong>$span</strong>"
-                if (isItalic)    span = "<em>$span</em>"
+                if (isBold) span = "<strong>$span</strong>"
+                if (isItalic) span = "<em>$span</em>"
                 if (isUnderline) span = "<u>$span</u>"
                 if (isStrike || isDoubleStrike) span = "<s>$span</s>"
                 if (isSubscript) span = "<sub>$span</sub>"
                 if (isSuperscript) span = "<sup>$span</sup>"
                 if (styles.isNotEmpty()) span = """<span style="$styles">$span</span>"""
-                if (url != null) {
-                    span = if (url.startsWith("#")) """<a href="$url">$span</a>""" else """<a href="${htmlEscape(url)}">$span</a>"""
+                if (isHyperlink || url != null) {
+                    val href = url ?: "#"
+                    span = """<a class="docx-hyperlink" href="${htmlEscape(href)}">$span</a>"""
                 }
 
                 for (fnId in footnoteIds) span += "<sup><a href=\"#footnote_$fnId\">[$fnId]</a></sup>"
                 for (enId in endnoteIds) span += "<sup><a href=\"#endnote_$enId\">[$enId]</a></sup>"
 
                 sb.append(span)
-            } catch (_: Exception) {}
+            } catch (t: Throwable) {
+                Log.w(TAG, "Error parsing run node <$runNodeName>: ${t.message}", t)
+                try {
+                    val txt = run.text() ?: ""
+                    if (txt.isNotEmpty()) sb.append(htmlEscape(txt))
+                } catch (_: Exception) {}
+            }
         }
     }
 
     private fun computeRowSpans(table: XWPFTable): Map<Pair<Int, Int>, Int> {
         val rowSpans = mutableMapOf<Pair<Int, Int>, Int>()
-        for (rIdx in table.rows.indices) {
-            val row = table.rows[rIdx]
-            for (cIdx in row.tableCells.indices) {
-                val cell = row.tableCells[cIdx]
-                val tcPr = try { cell.ctTc?.tcPr } catch (_: Exception) { null }
-                val vMergeNode = try { tcPr?.vMerge } catch (_: Exception) { null }
-                val vMergeVal = try { vMergeNode?.`val` } catch (_: Exception) { null }
-                if (vMergeVal == org.openxmlformats.schemas.wordprocessingml.x2006.main.STMerge.RESTART) {
-                    var span = 1
-                    for (nextR in rIdx + 1 until table.rows.size) {
-                        val nextRow = table.rows[nextR]
-                        val nextCell = if (cIdx < nextRow.tableCells.size) nextRow.tableCells[cIdx] else break
-                        val nextTcPr = try { nextCell.ctTc?.tcPr } catch (_: Exception) { null }
-                        val nextVMergeNode = try { nextTcPr?.vMerge } catch (_: Exception) { null }
-                        val nextVMergeVal = try { nextVMergeNode?.`val` } catch (_: Exception) { null }
-                        val isContinue = nextVMergeNode != null && nextVMergeVal != org.openxmlformats.schemas.wordprocessingml.x2006.main.STMerge.RESTART
-                        if (isContinue) span++ else break
+        try {
+            for (rIdx in table.rows.indices) {
+                val row = table.rows[rIdx]
+                for (cIdx in row.tableCells.indices) {
+                    val cell = row.tableCells[cIdx]
+                    val tcPr = try { cell.ctTc?.tcPr } catch (_: Exception) { null }
+                    val vMergeNode = try { tcPr?.vMerge } catch (_: Exception) { null }
+                    val vMergeVal = try { vMergeNode?.`val` } catch (_: Exception) { null }
+                    if (vMergeVal == org.openxmlformats.schemas.wordprocessingml.x2006.main.STMerge.RESTART) {
+                        var span = 1
+                        for (nextR in rIdx + 1 until table.rows.size) {
+                            val nextRow = table.rows[nextR]
+                            val nextCell = if (cIdx < nextRow.tableCells.size) nextRow.tableCells[cIdx] else break
+                            val nextTcPr = try { nextCell.ctTc?.tcPr } catch (_: Exception) { null }
+                            val nextVMergeNode = try { nextTcPr?.vMerge } catch (_: Exception) { null }
+                            val nextVMergeVal = try { nextVMergeNode?.`val` } catch (_: Exception) { null }
+                            val isContinue = nextVMergeNode != null && nextVMergeVal != org.openxmlformats.schemas.wordprocessingml.x2006.main.STMerge.RESTART
+                            if (isContinue) span++ else break
+                        }
+                        if (span > 1) rowSpans[Pair(rIdx, cIdx)] = span
                     }
-                    if (span > 1) rowSpans[Pair(rIdx, cIdx)] = span
                 }
             }
+        } catch (t: Throwable) {
+            Log.w(TAG, "Error computing table row spans: ${t.message}", t)
         }
         return rowSpans
     }
@@ -622,48 +917,73 @@ class PoiWordEngine @Inject constructor(
         rowSpans: Map<Pair<Int, Int>, Int>,
         sb: StringBuilder
     ) {
-        sb.append("<tr>")
-        row.tableCells.forEachIndexed { cIdx, cell ->
-            val tag = if (rowIdx == 0) "th" else "td"
-            val tcPr = try { cell.ctTc?.tcPr } catch (_: Exception) { null }
-            val colSpan = try { tcPr?.gridSpan?.`val`?.toInt()?.coerceAtLeast(1) ?: 1 } catch (_: Exception) { 1 }
-
-            val vMergeNode = try { tcPr?.vMerge } catch (_: Exception) { null }
-            val vMergeVal = try { vMergeNode?.`val` } catch (_: Exception) { null }
-            val isVMergeContinue = vMergeNode != null && vMergeVal != org.openxmlformats.schemas.wordprocessingml.x2006.main.STMerge.RESTART
-            if (isVMergeContinue) return@forEachIndexed
-
-            val rSpan = rowSpans[Pair(rowIdx, cIdx)] ?: 1
-            val bgColor = try { cell.color?.takeIf { it.length == 6 && it != "auto" } } catch (_: Exception) { null }
-            val vAlign = try { cell.verticalAlignment } catch (_: Exception) { null }
-            val vAlignStr = when (vAlign) {
-                XWPFTableCell.XWPFVertAlign.CENTER -> "middle"
-                XWPFTableCell.XWPFVertAlign.BOTTOM -> "bottom"
-                else -> "top"
-            }
-
-            val colSpanAttr = if (colSpan > 1) """ colspan="$colSpan"""" else ""
-            val rowSpanAttr = if (rSpan > 1) """ rowspan="$rSpan"""" else ""
-            val bgAttr = if (bgColor != null) "background-color:#$bgColor;" else ""
-            val alignAttr = "vertical-align:$vAlignStr;"
-
-            sb.append("<$tag$colSpanAttr$rowSpanAttr style=\"$bgAttr$alignAttr;min-width:40px;word-break:normal;overflow-wrap:break-word;\">")
-
-            var firstPara = true
-            for (para in cell.paragraphs) {
-                val cellText = try { para.text ?: "" } catch (_: Exception) { "" }
-                if (cellText.isBlank() && firstPara) { firstPara = false; continue }
-                if (!firstPara) sb.append("<br>")
+        val rowNodeName = try { row.ctRow?.domNode?.nodeName ?: "w:tr" } catch (_: Exception) { "w:tr" }
+        try {
+            sb.append("<tr>")
+            row.tableCells.forEachIndexed { cIdx, cell ->
+                val cellNodeName = try { cell.ctTc?.domNode?.nodeName ?: "w:tc" } catch (_: Exception) { "w:tc" }
                 try {
-                    appendRunsHtmlSimple(para, sb)
-                } catch (_: Exception) {
-                    sb.append(htmlEscape(cellText))
+                    val tag = if (rowIdx == 0) "th" else "td"
+                    val tcPr = try { cell.ctTc?.tcPr } catch (_: Exception) { null }
+                    val colSpan = try { tcPr?.gridSpan?.`val`?.toInt()?.coerceAtLeast(1) ?: 1 } catch (_: Exception) { 1 }
+
+                    val vMergeNode = try { tcPr?.vMerge } catch (_: Exception) { null }
+                    val vMergeVal = try { vMergeNode?.`val` } catch (_: Exception) { null }
+                    val isVMergeContinue = vMergeNode != null && vMergeVal != org.openxmlformats.schemas.wordprocessingml.x2006.main.STMerge.RESTART
+                    if (isVMergeContinue) return@forEachIndexed
+
+                    val rSpan = rowSpans[Pair(rowIdx, cIdx)] ?: 1
+                    val bgColor = try { cell.color?.takeIf { it.length == 6 && it != "auto" } } catch (_: Exception) { null }
+                    val vAlign = try { cell.verticalAlignment } catch (_: Exception) { null }
+                    val vAlignStr = when (vAlign) {
+                        XWPFTableCell.XWPFVertAlign.CENTER -> "middle"
+                        XWPFTableCell.XWPFVertAlign.BOTTOM -> "bottom"
+                        else -> "top"
+                    }
+
+                    val colSpanAttr = if (colSpan > 1) """ colspan="$colSpan"""" else ""
+                    val rowSpanAttr = if (rSpan > 1) """ rowspan="$rSpan"""" else ""
+                    val bgAttr = if (bgColor != null) "background-color:#$bgColor;" else ""
+                    val alignAttr = "vertical-align:$vAlignStr;"
+
+                    sb.append("<$tag$colSpanAttr$rowSpanAttr style=\"$bgAttr$alignAttr;min-width:36px;box-sizing:border-box;word-break:normal;overflow-wrap:break-word;\">")
+
+                    var firstPara = true
+                    for (para in cell.paragraphs) {
+                        val cellText = try { para.text ?: "" } catch (_: Exception) { "" }
+                        if (cellText.isBlank() && firstPara) { firstPara = false; continue }
+                        if (!firstPara) sb.append("<br>")
+                        try {
+                            appendRunsHtmlSimple(para, sb)
+                        } catch (_: Exception) {
+                            sb.append(htmlEscape(cellText))
+                        }
+                        firstPara = false
+                    }
+                    sb.append("</$tag>")
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Error parsing table cell <$cellNodeName> at ($rowIdx, $cIdx): ${t.message}", t)
+                    sb.append("<td style=\"padding:6px;border:1px solid var(--border-color);\">${htmlEscape(try { cell.text ?: "" } catch (_: Exception) { "" })}</td>")
                 }
-                firstPara = false
             }
-            sb.append("</$tag>")
+            sb.append("</tr>\n")
+        } catch (t: Throwable) {
+            Log.w(TAG, "Error parsing table row <$rowNodeName> at index $rowIdx: ${t.message}", t)
         }
-        sb.append("</tr>\n")
+    }
+
+    private fun renderFallbackTable(table: XWPFTable, sb: StringBuilder) {
+        sb.append("<div class=\"table-container\" style=\"max-width:100%;box-sizing:border-box;overflow-x:auto;\"><table class=\"docx-table\" style=\"max-width:100%;box-sizing:border-box;\">\n")
+        for ((rIdx, row) in table.rows.withIndex()) {
+            sb.append("<tr>")
+            val tag = if (rIdx == 0) "th" else "td"
+            for (cell in row.tableCells) {
+                val txt = try { cell.text ?: "" } catch (_: Exception) { "" }
+                sb.append("<$tag style=\"padding:6px;border:1px solid var(--border-color);box-sizing:border-box;\">${htmlEscape(txt)}</$tag>")
+            }
+            sb.append("</tr>\n")
+        }
+        sb.append("</table></div>\n")
     }
 
     private fun appendRunsHtmlSimple(
@@ -674,10 +994,10 @@ class PoiWordEngine @Inject constructor(
             val text = try { run.text() ?: "" } catch (_: Exception) { "" }
             if (text.isEmpty()) continue
             val decoded = WordMathParser.decodeMathSymbols(text)
-            val isBold   = try { run.isBold } catch (_: Exception) { false }
+            val isBold = try { run.isBold } catch (_: Exception) { false }
             val isItalic = try { run.isItalic } catch (_: Exception) { false }
             var span = htmlEscape(decoded)
-            if (isBold)   span = "<strong>$span</strong>"
+            if (isBold) span = "<strong>$span</strong>"
             if (isItalic) span = "<em>$span</em>"
             sb.append(span)
         }

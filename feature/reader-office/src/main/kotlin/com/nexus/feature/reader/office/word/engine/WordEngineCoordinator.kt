@@ -39,7 +39,7 @@ class WordEngineCoordinator @Inject constructor(
             try {
                 userPreferencesRepository.useLibreOfficeEngine.first()
             } catch (_: Exception) {
-                true
+                false
             }
         }
 

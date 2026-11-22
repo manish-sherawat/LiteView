@@ -199,7 +199,8 @@ object WordLayoutEngine {
 
     /**
      * Accurately estimates the typographic height (in points) of a paragraph when rendered,
-     * accounting for font size, embedded pictures, explicit line breaks, line height, and margins.
+     * accounting for font size, embedded pictures, explicit line breaks, line height, margins,
+     * and subtracting left indent and hanging indent from available width for accurate wrapping.
      */
     fun estimateParagraphHeight(para: XWPFParagraph, printableWidthPt: Float): Float {
         val styleId = try { para.style ?: "" } catch (_: Exception) { "" }
@@ -229,6 +230,26 @@ object WordLayoutEngine {
         }
         if (text.isBlank()) return 18f
 
+        // Extract paragraph indents: left, right, hanging, and first line
+        val rawIndentLeft = try { para.indentationLeft } catch (_: Exception) { -1 }
+        val rawIndentRight = try { para.indentationRight } catch (_: Exception) { -1 }
+        val rawIndentHanging = try { para.indentationHanging } catch (_: Exception) { -1 }
+        val rawIndentFirstLine = try { para.indentationFirstLine } catch (_: Exception) { -1 }
+
+        val leftIndentPt = if (rawIndentLeft > 0) (rawIndentLeft / 20f).coerceIn(0f, 180f) else 0f
+        val rightIndentPt = if (rawIndentRight > 0) (rawIndentRight / 20f).coerceIn(0f, 120f) else 0f
+        val hangingIndentPt = if (rawIndentHanging > 0) (rawIndentHanging / 20f).coerceIn(0f, 100f) else 0f
+        val firstLineIndentPt = if (rawIndentFirstLine > 0) (rawIndentFirstLine / 20f).coerceIn(0f, 100f) else 0f
+
+        // Check if list item
+        val isList = try { para.numID != null } catch (_: Exception) { false }
+        val listLevel = try { para.numIlvl?.toInt() ?: 0 } catch (_: Exception) { 0 }
+        val listIndentPt = if (isList) ((listLevel + 1) * 16f).coerceIn(16f, 140f) else 0f
+
+        // Available width for line wrapping: subtract left indent and hanging indent so justified text never clips
+        val totalDeductionPt = leftIndentPt + rightIndentPt + hangingIndentPt + listIndentPt
+        val availableWrappingWidthPt = (printableWidthPt - totalDeductionPt).coerceIn(100f, printableWidthPt)
+
         // Determine effective font size from runs
         var maxFontSize = 12f
         for (run in para.runs) {
@@ -236,9 +257,9 @@ object WordLayoutEngine {
             if (fs != null && fs > maxFontSize) maxFontSize = fs
         }
 
-        // Estimate characters per line based on font size and printable width
+        // Estimate characters per line based on font size and actual available wrapping width
         val avgCharWidth = maxFontSize * 0.52f
-        val charsPerLine = (printableWidthPt / avgCharWidth).toInt().coerceIn(24, 110)
+        val charsPerLine = (availableWrappingWidthPt / avgCharWidth).toInt().coerceIn(12, 110)
 
         // Count explicit line breaks (<w:br/>) within paragraph runs
         var explicitLineBreaks = 0
@@ -256,7 +277,12 @@ object WordLayoutEngine {
         val rawSpacingAfter = try { para.spacingAfter.toDouble() } catch (_: Exception) { -1.0 }
 
         val spacingBeforePt = if (rawSpacingBefore > 0) (rawSpacingBefore / 20.0).coerceIn(0.0, 36.0).toFloat() else 0f
-        val spacingAfterPt = if (rawSpacingAfter > 0) (rawSpacingAfter / 20.0).coerceIn(0.0, 36.0).toFloat() else 6f
+        // Enforce proper paragraph spacing (spacing after) on list items
+        val spacingAfterPt = if (isList) {
+            if (rawSpacingAfter > 0) (rawSpacingAfter / 20.0).coerceIn(3.0, 36.0).toFloat() else 4f
+        } else {
+            if (rawSpacingAfter > 0) (rawSpacingAfter / 20.0).coerceIn(0.0, 36.0).toFloat() else 6f
+        }
 
         val rawSpacingBetween = try { para.spacingBetween.toDouble() } catch (_: Exception) { -1.0 }
         val lineMultiplier = if (rawSpacingBetween > 0) {
@@ -334,7 +360,7 @@ object WordLayoutEngine {
 
   /* Universal Box-Sizing & Min-Width Constraint */
   *, *::before, *::after {
-    box-sizing: border-box;
+    box-sizing: border-box !important;
     min-width: 0;
   }
 
@@ -355,10 +381,11 @@ object WordLayoutEngine {
     -webkit-text-size-adjust: 100%;
   }
 
-  /* Prevent 1-letter vertical stacking: Strict bounds & word break rules */
-  h1, h2, h3, h4, h5, h6, p, li, blockquote, div, span {
+  /* Prevent 1-letter vertical stacking & horizontal overflow */
+  h1, h2, h3, h4, h5, h6, p, li, blockquote, div, span, .docx-paragraph, .docx-list-item {
     min-width: 0;
-    max-width: 100%;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
     word-break: normal !important;
     overflow-wrap: break-word !important;
     white-space: normal;
@@ -407,6 +434,7 @@ object WordLayoutEngine {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    overflow: hidden; /* Constrains shading, borders, and nested containers strictly within page boundaries */
     break-after: page;
     page-break-after: always;
   }
@@ -418,6 +446,8 @@ object WordLayoutEngine {
     min-width: 0;
     max-width: 100%;
     box-sizing: border-box;
+    overflow-wrap: break-word;
+    word-break: normal;
   }
 
   body.mode-paged .docx-page-header {
@@ -757,9 +787,21 @@ object WordLayoutEngine {
     break-inside: avoid;
     page-break-inside: avoid;
   }
-  a {
-    color: var(--primary-color);
+  a, .docx-hyperlink, a span, a strong, a em, a u, a s {
+    color: var(--primary-color) !important;
     text-decoration: underline;
+    font-size: inherit !important;
+    line-height: inherit !important;
+    letter-spacing: inherit !important;
+    font-family: inherit;
+    word-break: normal;
+    overflow-wrap: break-word;
+  }
+  .docx-list-item {
+    margin-top: 0;
+    margin-bottom: 4.5pt !important;
+    box-sizing: border-box !important;
+    max-width: 100% !important;
   }
   hr {
     border: none;

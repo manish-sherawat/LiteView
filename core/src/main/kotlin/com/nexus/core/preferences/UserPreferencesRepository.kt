@@ -258,7 +258,7 @@ class UserPreferencesRepository @Inject constructor(
     val trashRetentionDays: Flow<Int> = context.dataStore.data.map { prefs -> prefs[Keys.TRASH_RETENTION_DAYS] ?: 30 }
     suspend fun setTrashRetentionDays(days: Int) { context.dataStore.edit { prefs -> prefs[Keys.TRASH_RETENTION_DAYS] = days } }
 
-    val useLibreOfficeEngine: Flow<Boolean> = context.dataStore.data.map { prefs -> prefs[Keys.USE_LIBREOFFICE_ENGINE] ?: true }
+    val useLibreOfficeEngine: Flow<Boolean> = context.dataStore.data.map { prefs -> prefs[Keys.USE_LIBREOFFICE_ENGINE] ?: false }
     suspend fun setUseLibreOfficeEngine(value: Boolean) { context.dataStore.edit { prefs -> prefs[Keys.USE_LIBREOFFICE_ENGINE] = value } }
 
     suspend fun resetToDefaults() {
