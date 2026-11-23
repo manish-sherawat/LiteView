@@ -2,8 +2,16 @@ package com.nexus.core.ui.animations
 
 import android.util.Log
 import android.view.accessibility.AccessibilityManager
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -302,6 +310,45 @@ object TweenConfigs {
     fun scaleIn(delay: Int = 0, duration: Int = DurationScaleIn) = 
         AnimationDebug.tween<Float>(durationMillis = duration, delayMillis = delay, easing = EmphasizedDecelerateEasing)
 }
+
+/**
+ * Smooth, physical enter transition for viewer top bars, search bars, and bottom navigation pills.
+ *
+ * Slides vertically into view with Material 3 EmphasizedDecelerateEasing paired with a soft fade-in,
+ * avoiding abrupt bounces or jarring jumps.
+ */
+fun viewerBarEnterTransition(fromTop: Boolean = true): EnterTransition =
+    slideInVertically(
+        initialOffsetY = { if (fromTop) -it else it },
+        animationSpec = tween(
+            durationMillis = 260,
+            easing = EmphasizedDecelerateEasing
+        )
+    ) + fadeIn(
+        animationSpec = tween(
+            durationMillis = 200,
+            easing = LinearOutSlowInEasing
+        )
+    )
+
+/**
+ * Smooth, physical exit transition for viewer top bars, search bars, and bottom navigation pills.
+ *
+ * Slides vertically out of view with Material 3 EmphasizedAccelerateEasing paired with a soft fade-out.
+ */
+fun viewerBarExitTransition(toTop: Boolean = true): ExitTransition =
+    slideOutVertically(
+        targetOffsetY = { if (toTop) -it else it },
+        animationSpec = tween(
+            durationMillis = 220,
+            easing = EmphasizedAccelerateEasing
+        )
+    ) + fadeOut(
+        animationSpec = tween(
+            durationMillis = 180,
+            easing = FastOutLinearInEasing
+        )
+    )
 
 // ════════════════════════════════════════════════════════════════════
 // SECTION 6: UTILITY MODIFIERS & EXTENSIONS

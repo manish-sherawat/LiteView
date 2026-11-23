@@ -18,6 +18,8 @@ import androidx.navigation.compose.composable
 import androidx.compose.animation.*
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 
 // ─── Nexus Core Imports ─────────────────────────────────────────────
@@ -57,29 +59,29 @@ object NavConstants {
     const val DURATION_SPLASH_ENTER = 380
     const val DURATION_SPLASH_EXIT = 280
     
-    const val DURATION_DASHBOARD_ENTER = 320
-    const val DURATION_DASHBOARD_EXIT = 300
-    const val DURATION_DASHBOARD_BACK = 300
+    const val DURATION_DASHBOARD_ENTER = 280
+    const val DURATION_DASHBOARD_EXIT = 260
+    const val DURATION_DASHBOARD_BACK = 260
     
-    const val DURATION_SETTINGS_ENTER = 320
-    const val DURATION_SETTINGS_EXIT = 300
-    const val DURATION_SETTINGS_BACK = 300
+    const val DURATION_SETTINGS_ENTER = 280
+    const val DURATION_SETTINGS_EXIT = 240
+    const val DURATION_SETTINGS_BACK = 260
     
-    const val DURATION_SCANNER_ENTER = 320
-    const val DURATION_SCANNER_EXIT = 280
-    const val DURATION_SCANNER_BACK = 280
+    const val DURATION_SCANNER_ENTER = 300
+    const val DURATION_SCANNER_EXIT = 240
+    const val DURATION_SCANNER_BACK = 260
     
-    const val DURATION_READER_ENTER = 340
-    const val DURATION_READER_EXIT = 300
-    const val DURATION_READER_BACK = 300
+    const val DURATION_READER_ENTER = 320
+    const val DURATION_READER_EXIT = 240
+    const val DURATION_READER_BACK = 260
     
-    const val DURATION_UNSUPPORTED_ENTER = 320
-    const val DURATION_UNSUPPORTED_EXIT = 280
-    const val DURATION_UNSUPPORTED_BACK = 280
+    const val DURATION_UNSUPPORTED_ENTER = 300
+    const val DURATION_UNSUPPORTED_EXIT = 240
+    const val DURATION_UNSUPPORTED_BACK = 260
 
     // ─── Bottom Navigation Tab Switch Animation ─────────────────────
-    const val DURATION_TAB_SLIDE = 340
-    val TabSlideEasing: Easing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
+    const val DURATION_TAB_SLIDE = 280
+    val TabSlideEasing: Easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f)
     
     // ─── Default Values ─────────────────────────────────────────────
     const val DEFAULT_FILE_NAME = "Document"
@@ -182,150 +184,194 @@ fun splashExitTransition(): ExitTransition = fadeOut(
     animationSpec = tween(NavConstants.DURATION_SPLASH_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
+// ─── ROUTE TYPE INSPECTION HELPERS ──────────────────────────────────
+fun isReaderRoute(route: String?): Boolean {
+    val clean = route?.substringBefore('?') ?: return false
+    return clean.startsWith("reader/") ||
+           clean.startsWith("unsupported") ||
+           clean == NexusRoute.PdfReader.ROUTE ||
+           clean == NexusRoute.WordReader.ROUTE ||
+           clean == NexusRoute.ExcelReader.ROUTE ||
+           clean == NexusRoute.OfficeReader.ROUTE ||
+           clean == NexusRoute.PresentationReader.ROUTE ||
+           clean == NexusRoute.TextReader.ROUTE ||
+           clean == NexusRoute.Unsupported.ROUTE
+}
+
+// ─── HOST <-> READER COORDINATED TRANSITIONS ─────────────────────────
+/**
+ * Smooth, elevated card-exit animation for host screens (Dashboard, Tools, RecycleBin)
+ * when opening a document reader or scanner.
+ * Subtly recedes and dims with an organic cubic bezier curve, creating an elevated canvas experience.
+ */
+fun hostToReaderExitTransition(): ExitTransition = fadeOut(
+    animationSpec = tween(durationMillis = 200, easing = FastOutLinearInEasing)
+) + scaleOut(
+    targetScale = 0.95f,
+    animationSpec = tween(durationMillis = 280, easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f))
+)
+
+/**
+ * Smooth, elevated return animation for host screens (Dashboard, Tools, RecycleBin)
+ * when closing a document reader or scanner.
+ * Restores scale from 0.95f to 1.0f and fades back in cleanly.
+ */
+fun readerToHostPopEnterTransition(): EnterTransition = fadeIn(
+    animationSpec = tween(durationMillis = 220, easing = LinearOutSlowInEasing)
+) + scaleIn(
+    initialScale = 0.95f,
+    animationSpec = tween(durationMillis = 260, easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f))
+)
+
 // ─── DASHBOARD SCREEN ANIMATIONS ─────────────────────────────────────
 fun dashboardEnterTransition(): EnterTransition = fadeIn(
-    animationSpec = tween(NavConstants.DURATION_DASHBOARD_ENTER, easing = EmphasizedDecelerateEasing)
+    animationSpec = tween(NavConstants.DURATION_DASHBOARD_ENTER, easing = LinearOutSlowInEasing)
 ) + slideInHorizontally(
-    initialOffsetX = { fullWidth -> -fullWidth / 5 },
+    initialOffsetX = { fullWidth -> (-fullWidth * 0.20f).toInt() },
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_ENTER, easing = EmphasizedDecelerateEasing)
 )
 
 fun dashboardExitTransition(): ExitTransition = fadeOut(
-    animationSpec = tween(NavConstants.DURATION_DASHBOARD_EXIT, easing = EmphasizedAccelerateEasing)
+    animationSpec = tween(NavConstants.DURATION_DASHBOARD_EXIT, easing = FastOutLinearInEasing)
 ) + slideOutHorizontally(
-    targetOffsetX = { fullWidth -> -fullWidth / 5 },
+    targetOffsetX = { fullWidth -> (-fullWidth * 0.20f).toInt() },
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
 fun dashboardBackEnterTransition(): EnterTransition = fadeIn(
-    animationSpec = tween(NavConstants.DURATION_DASHBOARD_BACK, easing = EmphasizedDecelerateEasing)
+    animationSpec = tween(NavConstants.DURATION_DASHBOARD_BACK, easing = LinearOutSlowInEasing)
 ) + slideInHorizontally(
-    initialOffsetX = { fullWidth -> -fullWidth / 5 },
+    initialOffsetX = { fullWidth -> (-fullWidth * 0.20f).toInt() },
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_BACK, easing = EmphasizedDecelerateEasing)
 )
 
 fun dashboardBackExitTransition(): ExitTransition = fadeOut(
-    animationSpec = tween(NavConstants.DURATION_DASHBOARD_BACK, easing = EmphasizedAccelerateEasing)
+    animationSpec = tween(NavConstants.DURATION_DASHBOARD_BACK, easing = FastOutLinearInEasing)
 ) + slideOutHorizontally(
-    targetOffsetX = { fullWidth -> fullWidth },
+    targetOffsetX = { fullWidth -> (fullWidth * 0.35f).toInt() },
     animationSpec = tween(NavConstants.DURATION_DASHBOARD_BACK, easing = EmphasizedAccelerateEasing)
 )
 
 // ─── SETTINGS SCREEN ANIMATIONS ──────────────────────────────────────
 fun settingsEnterTransition(): EnterTransition = fadeIn(
-    animationSpec = tween(NavConstants.DURATION_SETTINGS_ENTER, easing = EmphasizedDecelerateEasing)
+    animationSpec = tween(NavConstants.DURATION_SETTINGS_ENTER, easing = LinearOutSlowInEasing)
 ) + slideInHorizontally(
-    initialOffsetX = { fullWidth -> fullWidth },
+    initialOffsetX = { fullWidth -> (fullWidth * 0.35f).toInt() },
     animationSpec = tween(NavConstants.DURATION_SETTINGS_ENTER, easing = EmphasizedDecelerateEasing)
 )
 
 fun settingsExitTransition(): ExitTransition = fadeOut(
-    animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedAccelerateEasing)
+    animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = FastOutLinearInEasing)
 ) + slideOutHorizontally(
-    targetOffsetX = { fullWidth -> -fullWidth / 5 },
+    targetOffsetX = { fullWidth -> (-fullWidth * 0.20f).toInt() },
     animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
 fun settingsBackEnterTransition(): EnterTransition = fadeIn(
-    animationSpec = tween(NavConstants.DURATION_SETTINGS_BACK, easing = EmphasizedDecelerateEasing)
+    animationSpec = tween(NavConstants.DURATION_SETTINGS_BACK, easing = LinearOutSlowInEasing)
 ) + slideInHorizontally(
-    initialOffsetX = { fullWidth -> -fullWidth / 5 },
+    initialOffsetX = { fullWidth -> (-fullWidth * 0.20f).toInt() },
     animationSpec = tween(NavConstants.DURATION_SETTINGS_BACK, easing = EmphasizedDecelerateEasing)
 )
 
 fun settingsBackExitTransition(): ExitTransition = fadeOut(
-    animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedAccelerateEasing)
+    animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = FastOutLinearInEasing)
 ) + slideOutHorizontally(
-    targetOffsetX = { fullWidth -> fullWidth },
+    targetOffsetX = { fullWidth -> (fullWidth * 0.35f).toInt() },
     animationSpec = tween(NavConstants.DURATION_SETTINGS_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
 // ─── SCANNER SCREEN ANIMATIONS ───────────────────────────────────────
 fun scannerEnterTransition(): EnterTransition = fadeIn(
-    animationSpec = tween(NavConstants.DURATION_SCANNER_ENTER, easing = EmphasizedDecelerateEasing)
+    animationSpec = tween(NavConstants.DURATION_SCANNER_ENTER, easing = LinearOutSlowInEasing)
 ) + scaleIn(
     initialScale = NavConstants.SCALE_SCANNER_ENTER,
-    animationSpec = tween(NavConstants.DURATION_SCANNER_ENTER, easing = EmphasizedDecelerateEasing)
+    animationSpec = tween(NavConstants.DURATION_SCANNER_ENTER, easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f))
+) + slideInVertically(
+    initialOffsetY = { (it * 0.05f).toInt() },
+    animationSpec = tween(NavConstants.DURATION_SCANNER_ENTER, easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f))
 )
 
 fun scannerExitTransition(): ExitTransition = fadeOut(
-    animationSpec = tween(NavConstants.DURATION_SCANNER_EXIT, easing = EmphasizedAccelerateEasing)
+    animationSpec = tween(NavConstants.DURATION_SCANNER_EXIT, easing = FastOutLinearInEasing)
 ) + scaleOut(
     targetScale = NavConstants.SCALE_SCANNER_EXIT,
     animationSpec = tween(NavConstants.DURATION_SCANNER_EXIT, easing = EmphasizedAccelerateEasing)
 )
 
 fun scannerBackEnterTransition(): EnterTransition = fadeIn(
-    animationSpec = tween(NavConstants.DURATION_SCANNER_BACK, easing = EmphasizedDecelerateEasing)
+    animationSpec = tween(NavConstants.DURATION_SCANNER_BACK, easing = LinearOutSlowInEasing)
 ) + scaleIn(
     initialScale = 0.96f,
     animationSpec = tween(NavConstants.DURATION_SCANNER_BACK, easing = EmphasizedDecelerateEasing)
 )
 
 fun scannerBackExitTransition(): ExitTransition = fadeOut(
-    animationSpec = tween(NavConstants.DURATION_SCANNER_EXIT, easing = EmphasizedAccelerateEasing)
+    animationSpec = tween(NavConstants.DURATION_SCANNER_EXIT, easing = FastOutLinearInEasing)
 ) + scaleOut(
     targetScale = NavConstants.SCALE_SCANNER_EXIT,
-    animationSpec = tween(NavConstants.DURATION_SCANNER_EXIT, easing = EmphasizedAccelerateEasing)
+    animationSpec = tween(NavConstants.DURATION_SCANNER_EXIT, easing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f))
+) + slideOutVertically(
+    targetOffsetY = { (it * 0.05f).toInt() },
+    animationSpec = tween(NavConstants.DURATION_SCANNER_EXIT, easing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f))
 )
 
 // ─── READER SCREEN ANIMATIONS ────────────────────────────────────────
+/**
+ * Physical elevation entrance for Document Readers:
+ * Rises smoothly with a subtle vertical emergence (6% viewport height)
+ * and scales up from 0.94f to 1.0f with fluid momentum and fade-in.
+ */
 fun readerEnterTransition(): EnterTransition = fadeIn(
-    animationSpec = tween(NavConstants.DURATION_READER_ENTER, easing = EmphasizedDecelerateEasing)
-) + slideInHorizontally(
-    initialOffsetX = { fullWidth -> fullWidth },
-    animationSpec = tween(NavConstants.DURATION_READER_ENTER, easing = EmphasizedDecelerateEasing)
+    animationSpec = tween(durationMillis = 220, easing = LinearOutSlowInEasing)
+) + scaleIn(
+    initialScale = 0.94f,
+    animationSpec = tween(durationMillis = 320, easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f))
+) + slideInVertically(
+    initialOffsetY = { fullHeight -> (fullHeight * 0.06f).toInt() },
+    animationSpec = tween(durationMillis = 320, easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f))
 )
 
+/**
+ * Standard forward exit (if navigating from a reader to a child screen).
+ */
 fun readerExitTransition(): ExitTransition = fadeOut(
-    animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedAccelerateEasing)
-) + slideOutHorizontally(
-    targetOffsetX = { fullWidth -> -fullWidth / 5 },
-    animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedAccelerateEasing)
+    animationSpec = tween(durationMillis = 180, easing = FastOutLinearInEasing)
+) + scaleOut(
+    targetScale = 0.96f,
+    animationSpec = tween(durationMillis = 220, easing = EmphasizedAccelerateEasing)
 )
 
+/**
+ * Pop enter transition (if returning back to a reader from a child screen).
+ */
 fun readerBackEnterTransition(): EnterTransition = fadeIn(
-    animationSpec = tween(NavConstants.DURATION_READER_BACK, easing = EmphasizedDecelerateEasing)
-) + slideInHorizontally(
-    initialOffsetX = { fullWidth -> -fullWidth / 5 },
-    animationSpec = tween(NavConstants.DURATION_READER_BACK, easing = EmphasizedDecelerateEasing)
+    animationSpec = tween(durationMillis = 220, easing = LinearOutSlowInEasing)
+) + scaleIn(
+    initialScale = 0.96f,
+    animationSpec = tween(durationMillis = 260, easing = EmphasizedDecelerateEasing)
 )
 
+/**
+ * Physical elevation exit for Document Readers (closing the file):
+ * The reader recedes gracefully downwards (6% viewport height)
+ * and scales down to 0.94f while fading out, returning the user to the host screen.
+ */
 fun readerBackExitTransition(): ExitTransition = fadeOut(
-    animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedAccelerateEasing)
-) + slideOutHorizontally(
-    targetOffsetX = { fullWidth -> fullWidth },
-    animationSpec = tween(NavConstants.DURATION_READER_EXIT, easing = EmphasizedAccelerateEasing)
+    animationSpec = tween(durationMillis = 180, easing = FastOutLinearInEasing)
+) + scaleOut(
+    targetScale = 0.94f,
+    animationSpec = tween(durationMillis = 240, easing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f))
+) + slideOutVertically(
+    targetOffsetY = { fullHeight -> (fullHeight * 0.06f).toInt() },
+    animationSpec = tween(durationMillis = 240, easing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f))
 )
 
 // ─── UNSUPPORTED FILE SCREEN ANIMATIONS ──────────────────────────────
-fun unsupportedEnterTransition(): EnterTransition = fadeIn(
-    animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_ENTER, easing = EmphasizedDecelerateEasing)
-) + slideInVertically(
-    initialOffsetY = { 60 },
-    animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_ENTER, easing = EmphasizedDecelerateEasing)
-)
-
-fun unsupportedExitTransition(): ExitTransition = fadeOut(
-    animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_EXIT, easing = EmphasizedAccelerateEasing)
-) + slideOutVertically(
-    targetOffsetY = { 60 },
-    animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_EXIT, easing = EmphasizedAccelerateEasing)
-)
-
-fun unsupportedBackEnterTransition(): EnterTransition = fadeIn(
-    animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_BACK, easing = EmphasizedDecelerateEasing)
-) + slideInVertically(
-    initialOffsetY = { 60 },
-    animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_BACK, easing = EmphasizedDecelerateEasing)
-)
-
-fun unsupportedBackExitTransition(): ExitTransition = fadeOut(
-    animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_EXIT, easing = EmphasizedAccelerateEasing)
-) + slideOutVertically(
-    targetOffsetY = { 60 },
-    animationSpec = tween(NavConstants.DURATION_UNSUPPORTED_EXIT, easing = EmphasizedAccelerateEasing)
-)
+fun unsupportedEnterTransition(): EnterTransition = readerEnterTransition()
+fun unsupportedExitTransition(): ExitTransition = readerExitTransition()
+fun unsupportedBackEnterTransition(): EnterTransition = readerBackEnterTransition()
+fun unsupportedBackExitTransition(): ExitTransition = readerBackExitTransition()
 
 // ─── BOTTOM NAVIGATION TAB SWITCH ANIMATIONS ─────────────────────────
 
@@ -345,43 +391,55 @@ fun getBottomNavTabIndex(route: String?): Int? {
 }
 
 /**
- * Smooth directional entrance animation for bottom bar tab switching.
- * If moving right (e.g. Home -> Tools, Tools -> Settings), enters smoothly from the right edge.
- * If moving left (e.g. Settings -> Tools, Tools -> Home), enters smoothly from the left edge.
+ * Smooth directional entrance animation for bottom bar tab switching with 35% parallax and soft fade.
  */
 fun bottomTabEnterTransition(movingRight: Boolean): EnterTransition {
     return slideInHorizontally(
-        initialOffsetX = { fullWidth -> if (movingRight) fullWidth else -fullWidth },
+        initialOffsetX = { fullWidth -> if (movingRight) (fullWidth * 0.35f).toInt() else (-fullWidth * 0.35f).toInt() },
         animationSpec = tween(
             durationMillis = NavConstants.DURATION_TAB_SLIDE,
             easing = NavConstants.TabSlideEasing
+        )
+    ) + fadeIn(
+        animationSpec = tween(
+            durationMillis = 220,
+            easing = LinearOutSlowInEasing
         )
     )
 }
 
 /**
- * Smooth directional exit animation for bottom bar tab switching.
- * If moving right (e.g. Home -> Tools), exits smoothly to the left edge.
- * If moving left (e.g. Tools -> Home), exits smoothly to the right edge.
+ * Smooth directional exit animation for bottom bar tab switching with 35% parallax and soft fade.
  */
 fun bottomTabExitTransition(movingRight: Boolean): ExitTransition {
     return slideOutHorizontally(
-        targetOffsetX = { fullWidth -> if (movingRight) -fullWidth else fullWidth },
+        targetOffsetX = { fullWidth -> if (movingRight) (-fullWidth * 0.35f).toInt() else (fullWidth * 0.35f).toInt() },
         animationSpec = tween(
             durationMillis = NavConstants.DURATION_TAB_SLIDE,
-            easing = NavConstants.TabSlideEasing
+            easing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
+        )
+    ) + fadeOut(
+        animationSpec = tween(
+            durationMillis = 180,
+            easing = FastOutLinearInEasing
         )
     )
 }
 
 /**
- * Scope extension to intercept transitions between bottom nav tabs (Home, Tools, Settings)
- * and apply smooth, directional spatial motion. Falls back to default transition for non-tab navigation.
+ * Comprehensive screen-aware enter transition interceptor:
+ * 1. Bottom nav tab switching (Home <-> Tools <-> Settings) uses directional 35% parallax sliding.
+ * 2. Returning from a Document Reader or Scanner uses smooth scale-up & fade-in (elevation descent of reader).
+ * 3. Fallback to route-specific transition.
  */
-fun AnimatedContentTransitionScope<NavBackStackEntry>.tabAwareEnter(
+fun AnimatedContentTransitionScope<NavBackStackEntry>.screenAwareEnter(
     fallback: () -> EnterTransition
 ): EnterTransition {
-    val initialIdx = getBottomNavTabIndex(initialState.destination.route)
+    val initialRoute = initialState.destination.route
+    if (isReaderRoute(initialRoute) || initialRoute?.startsWith("scanner") == true) {
+        return readerToHostPopEnterTransition()
+    }
+    val initialIdx = getBottomNavTabIndex(initialRoute)
     val targetIdx = getBottomNavTabIndex(targetState.destination.route)
     return if (initialIdx != null && targetIdx != null && initialIdx != targetIdx) {
         bottomTabEnterTransition(movingRight = targetIdx > initialIdx)
@@ -391,20 +449,34 @@ fun AnimatedContentTransitionScope<NavBackStackEntry>.tabAwareEnter(
 }
 
 /**
- * Scope extension to intercept transitions between bottom nav tabs (Home, Tools, Settings)
- * and apply smooth, directional spatial motion. Falls back to default transition for non-tab navigation.
+ * Comprehensive screen-aware exit transition interceptor:
+ * 1. Bottom nav tab switching (Home <-> Tools <-> Settings) uses directional 35% parallax sliding.
+ * 2. Opening a Document Reader or Scanner uses smooth scale-down & fade-out (card elevation emergence).
+ * 3. Fallback to route-specific transition.
  */
-fun AnimatedContentTransitionScope<NavBackStackEntry>.tabAwareExit(
+fun AnimatedContentTransitionScope<NavBackStackEntry>.screenAwareExit(
     fallback: () -> ExitTransition
 ): ExitTransition {
+    val targetRoute = targetState.destination.route
+    if (isReaderRoute(targetRoute) || targetRoute?.startsWith("scanner") == true) {
+        return hostToReaderExitTransition()
+    }
     val initialIdx = getBottomNavTabIndex(initialState.destination.route)
-    val targetIdx = getBottomNavTabIndex(targetState.destination.route)
+    val targetIdx = getBottomNavTabIndex(targetRoute)
     return if (initialIdx != null && targetIdx != null && initialIdx != targetIdx) {
         bottomTabExitTransition(movingRight = targetIdx > initialIdx)
     } else {
         fallback()
     }
 }
+
+fun AnimatedContentTransitionScope<NavBackStackEntry>.tabAwareEnter(
+    fallback: () -> EnterTransition
+): EnterTransition = screenAwareEnter(fallback)
+
+fun AnimatedContentTransitionScope<NavBackStackEntry>.tabAwareExit(
+    fallback: () -> ExitTransition
+): ExitTransition = screenAwareExit(fallback)
 
 // ════════════════════════════════════════════════════════════════════
 // SECTION 4: ARGUMENT EXTENSION HELPERS
@@ -831,8 +903,8 @@ fun NexusNavHost(
                 composable(
                     route = NexusRoute.ToolAction.ROUTE,
                     enterTransition = { settingsEnterTransition() },
-                    exitTransition = { settingsExitTransition() },
-                    popEnterTransition = { settingsBackEnterTransition() },
+                    exitTransition = { screenAwareExit { settingsExitTransition() } },
+                    popEnterTransition = { screenAwareEnter { settingsBackEnterTransition() } },
                     popExitTransition = { settingsBackExitTransition() }
                 ) { backStackEntry ->
                     ToolActionRoute(backStackEntry, router)
@@ -842,8 +914,8 @@ fun NexusNavHost(
                 composable(
                     route = NexusRoute.RecycleBin.route,
                     enterTransition = { settingsEnterTransition() },
-                    exitTransition = { settingsExitTransition() },
-                    popEnterTransition = { settingsBackEnterTransition() },
+                    exitTransition = { screenAwareExit { settingsExitTransition() } },
+                    popEnterTransition = { screenAwareEnter { settingsBackEnterTransition() } },
                     popExitTransition = { settingsBackExitTransition() }
                 ) {
                     RecycleBinRoute(router)

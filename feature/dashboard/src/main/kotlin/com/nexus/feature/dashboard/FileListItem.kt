@@ -197,9 +197,6 @@ fun FileListItem(
         label = "scale"
     )
 
-    val sharedScope = LocalSharedTransitionScope.current
-    val animatedScope = LocalAnimatedVisibilityScope.current
-
     // ─── Main Modern Paper Card ───────────────────────────────────────────
     Box(
         modifier = modifier
@@ -237,19 +234,9 @@ fun FileListItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // ─── 1. Left Thumbnail Paper Sheet (70 x 92 dp) ──────────────
-                var thumbnailModifier = Modifier
+                val thumbnailModifier = Modifier
                     .width(70.dp)
                     .height(92.dp)
-
-                if (sharedScope != null && animatedScope != null) {
-                    with(sharedScope) {
-                        thumbnailModifier = thumbnailModifier.sharedElement(
-                            sharedContentState = rememberSharedContentState(key = "thumb_${doc.uri}"),
-                            animatedVisibilityScope = animatedScope,
-                            boundsTransform = { _, _ -> tween(300) }
-                        )
-                    }
-                }
 
                 Box(
                     modifier = thumbnailModifier,
@@ -370,16 +357,7 @@ fun FileListItem(
                         verticalAlignment = Alignment.Top,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        var titleModifier: Modifier = Modifier.weight(1f).padding(end = NexusTheme.spacing.xxs)
-                        if (sharedScope != null && animatedScope != null) {
-                            with(sharedScope) {
-                                titleModifier = titleModifier.sharedElement(
-                                    sharedContentState = rememberSharedContentState(key = "title_${doc.uri}"),
-                                    animatedVisibilityScope = animatedScope,
-                                    boundsTransform = { _, _ -> tween(300) }
-                                )
-                            }
-                        }
+                        val titleModifier = Modifier.weight(1f).padding(end = NexusTheme.spacing.xxs)
 
                         NexusText(
                             text = highlightedFileName,

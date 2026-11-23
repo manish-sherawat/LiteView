@@ -194,9 +194,6 @@ fun FileGridItem(
         label = "gridScale"
     )
 
-    val sharedScope = LocalSharedTransitionScope.current
-    val animatedScope = LocalAnimatedVisibilityScope.current
-
     // Card Container
     Box(
         modifier = modifier
@@ -232,19 +229,9 @@ fun FileGridItem(
             modifier = Modifier.fillMaxWidth()
         ) {
             // ─── 1. Top Thumbnail Area (Taller aspect ratio ~ 0.82f for portrait sheet) ───
-            var thumbnailModifier = Modifier
+            val thumbnailModifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(0.82f)
-
-            if (sharedScope != null && animatedScope != null) {
-                with(sharedScope) {
-                    thumbnailModifier = thumbnailModifier.sharedElement(
-                        sharedContentState = rememberSharedContentState(key = "thumb_${doc.uri}"),
-                        animatedVisibilityScope = animatedScope,
-                        boundsTransform = { _, _ -> tween(300) }
-                    )
-                }
-            }
 
             Box(
                 modifier = thumbnailModifier
@@ -401,16 +388,7 @@ fun FileGridItem(
                     verticalAlignment = Alignment.Top,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    var titleModifier: Modifier = Modifier.weight(1f).padding(end = 2.dp)
-                    if (sharedScope != null && animatedScope != null) {
-                        with(sharedScope) {
-                            titleModifier = titleModifier.sharedElement(
-                                sharedContentState = rememberSharedContentState(key = "title_${doc.uri}"),
-                                animatedVisibilityScope = animatedScope,
-                                boundsTransform = { _, _ -> tween(300) }
-                            )
-                        }
-                    }
+                    val titleModifier = Modifier.weight(1f).padding(end = 2.dp)
 
                     NexusText(
                         text = highlightedFileName,

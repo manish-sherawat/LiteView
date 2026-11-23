@@ -53,6 +53,8 @@ import com.nexus.core.ui.animations.springBounceClick
 import com.nexus.core.ui.components.NexusButton
 import com.nexus.core.ui.components.NexusTopBar
 import com.nexus.core.ui.components.NexusViewerTopBar
+import com.nexus.core.ui.animations.viewerBarEnterTransition
+import com.nexus.core.ui.animations.viewerBarExitTransition
 import com.nexus.core.ui.components.NexusViewerActionButton
 import com.nexus.core.ui.components.NexusViewerActionDivider
 import com.nexus.core.ui.components.NexusFloatingIconButton
@@ -287,8 +289,8 @@ fun TextReaderScreen(
             AnimatedVisibility(
                 visible = !isImmersiveMode && uiState is TextReaderUiState.Success,
                 modifier = Modifier.align(Alignment.BottomCenter),
-                enter = expandVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) + fadeIn(),
-                exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMedium)) + fadeOut()
+                enter = viewerBarEnterTransition(fromTop = false),
+                exit = viewerBarExitTransition(toTop = false)
             ) {
                 val successState = uiState as TextReaderUiState.Success
                 Column(
@@ -476,8 +478,8 @@ fun TextReaderScreen(
                 AnimatedVisibility(
                     visible = !isImmersiveMode,
                     modifier = Modifier.align(Alignment.TopCenter),
-                    enter = androidx.compose.animation.slideInVertically(initialOffsetY = { -it }) + androidx.compose.animation.fadeIn(),
-                    exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { -it }) + androidx.compose.animation.fadeOut()
+                    enter = viewerBarEnterTransition(fromTop = true),
+                    exit = viewerBarExitTransition(toTop = true)
                 ) {
                     Column(
                         modifier = Modifier.fillMaxWidth()

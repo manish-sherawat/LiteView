@@ -16,6 +16,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import com.nexus.core.ui.animations.viewerBarEnterTransition
+import com.nexus.core.ui.animations.viewerBarExitTransition
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -427,8 +429,8 @@ fun PresentationReaderScreen(
                 // ─── Top Bar (Standard Nexus Luxury Top Bar) ─────────────────────
                 AnimatedVisibility(
                     visible = !isFullscreen,
-                    enter = slideInVertically { -it } + fadeIn(),
-                    exit = slideOutVertically { -it } + fadeOut(),
+                    enter = viewerBarEnterTransition(fromTop = true),
+                    exit = viewerBarExitTransition(toTop = true),
                     modifier = Modifier.align(Alignment.TopCenter)
                 ) {
                     NexusViewerTopBar(
@@ -457,8 +459,8 @@ fun PresentationReaderScreen(
                 // ─── 2.1 In-Slide Text Search Bar ─────────────────────────────────
                 AnimatedVisibility(
                     visible = state.isSearchActive && !isFullscreen,
-                    enter = slideInVertically { -it } + fadeIn(),
-                    exit = slideOutVertically { -it } + fadeOut(),
+                    enter = viewerBarEnterTransition(fromTop = true),
+                    exit = viewerBarExitTransition(toTop = true),
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .statusBarsPadding()
@@ -485,8 +487,8 @@ fun PresentationReaderScreen(
                 }
                 AnimatedVisibility(
                     visible = state.isSlideshowActive,
-                    enter = slideInVertically { -it } + fadeIn(),
-                    exit = slideOutVertically { -it } + fadeOut(),
+                    enter = viewerBarEnterTransition(fromTop = true),
+                    exit = viewerBarExitTransition(toTop = true),
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .statusBarsPadding()
@@ -540,8 +542,8 @@ fun PresentationReaderScreen(
                 // ─── Floating Bottom Controls & Slide Navigation ─────────────────────────
                 AnimatedVisibility(
                     visible = !isFullscreen && !state.showThumbnails,
-                    enter = slideInVertically { it } + fadeIn(),
-                    exit = slideOutVertically { it } + fadeOut(),
+                    enter = viewerBarEnterTransition(fromTop = false),
+                    exit = viewerBarExitTransition(toTop = false),
                     modifier = Modifier.align(Alignment.BottomCenter)
                 ) {
                     Column(
@@ -810,8 +812,8 @@ fun PresentationReaderScreen(
                 AnimatedVisibility(
                     visible = state.showThumbnails && !isFullscreen,
                     modifier = Modifier.align(Alignment.BottomCenter),
-                    enter = slideInVertically { it } + fadeIn(),
-                    exit = slideOutVertically { it } + fadeOut()
+                    enter = viewerBarEnterTransition(fromTop = false),
+                    exit = viewerBarExitTransition(toTop = false)
                 ) {
                     NexusSurface(
                         elevation = 16.dp,

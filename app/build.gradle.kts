@@ -17,7 +17,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.nexus.nexusdocs"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.nexus.nexusdocs"

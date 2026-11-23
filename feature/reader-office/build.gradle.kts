@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.nexus.feature.reader.office"
-    compileSdk = 37
+    compileSdk = 36
     ndkVersion = "30.0.15729638"
     defaultConfig { minSdk = 26; consumerProguardFiles("consumer-rules.pro") }
     compileOptions {

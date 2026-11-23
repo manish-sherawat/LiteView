@@ -98,6 +98,8 @@ import com.nexus.core.ui.components.NexusTopBar
 import com.nexus.core.ui.components.NexusViewerTopBar
 import com.nexus.core.ui.components.NexusViewerActionButton
 import com.nexus.core.ui.components.NexusViewerActionDivider
+import com.nexus.core.ui.animations.viewerBarEnterTransition
+import com.nexus.core.ui.animations.viewerBarExitTransition
 import com.nexus.core.ui.components.NexusFloatingIconButton
 import com.nexus.core.ui.utils.hazeGlassBackground
 import dev.chrisbanes.haze.HazeState
@@ -214,8 +216,6 @@ fun PdfReaderScreen(
     var isSavingAnnotations by remember { mutableStateOf(false) }
 
     val decodedUri = try { URLDecoder.decode(encodedUri, "UTF-8") } catch (_: Exception) { encodedUri }
-    val sharedScope = com.nexus.core.navigation.LocalSharedTransitionScope.current
-    val animatedScope = com.nexus.core.navigation.LocalAnimatedVisibilityScope.current
     val outline by viewModel.outline.collectAsStateWithLifecycle()
     val bookmarks by viewModel.bookmarks.collectAsStateWithLifecycle()
 
@@ -231,18 +231,6 @@ fun PdfReaderScreen(
     var mainModifier = modifier
         .fillMaxSize()
         .background(NexusTheme.colors.background)
-        
-    var sharedElementModifier: Modifier = Modifier
-    if (sharedScope != null && animatedScope != null) {
-        with(sharedScope) {
-            @OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
-            sharedElementModifier = Modifier.sharedElement(
-                sharedContentState = rememberSharedContentState(key = "thumb_$decodedUri"),
-                animatedVisibilityScope = animatedScope,
-                boundsTransform = { _, _ -> tween(300) }
-            )
-        }
-    }
 
     Box(
         modifier = mainModifier
@@ -262,7 +250,7 @@ fun PdfReaderScreen(
                         val placeholderHeight = screenWidthDp * 1.414f
                         
                         LazyColumn(
-                            modifier = Modifier.fillMaxSize().then(sharedElementModifier).padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.xxl),
+                            modifier = Modifier.fillMaxSize().padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.xxl),
                             verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.md)
                         ) {
                             items(3) {
@@ -321,7 +309,6 @@ fun PdfReaderScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .then(sharedElementModifier)
                                     .pointerInput(Unit) {
                                         detectTapGestures(
                                             onDoubleTap = { tapOffset ->
@@ -1318,8 +1305,8 @@ fun PdfReaderScreen(
                             AnimatedVisibility(
                                 visible = !isImmersiveMode,
                                 modifier = Modifier.align(Alignment.BottomCenter),
-                                enter = expandVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) + fadeIn(),
-                                exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMedium)) + fadeOut()
+                                enter = viewerBarEnterTransition(fromTop = false),
+                                exit = viewerBarExitTransition(toTop = false)
                             ) {
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -1591,8 +1578,8 @@ fun PdfReaderScreen(
             ) {
                 AnimatedVisibility(
                     visible = !isImmersiveMode,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
+                    enter = viewerBarEnterTransition(fromTop = true),
+                    exit = viewerBarExitTransition(toTop = true)
                 ) {
                     NexusViewerTopBar(
                         title = displayName,

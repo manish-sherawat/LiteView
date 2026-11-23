@@ -91,6 +91,8 @@ import com.nexus.core.theme.lightNexusColors
 import com.nexus.core.ui.NexusText
 import com.nexus.core.ui.animations.shimmerEffect
 import com.nexus.core.ui.animations.springBounceClick
+import com.nexus.core.ui.animations.viewerBarEnterTransition
+import com.nexus.core.ui.animations.viewerBarExitTransition
 import com.nexus.core.ui.components.FileDetailItem
 import com.nexus.core.ui.components.NexusButton
 import com.nexus.core.ui.components.NexusFileDetailsSheet
@@ -244,25 +246,6 @@ fun WordReaderScreen(
             encodedUri
         }
     }
-    val sharedScope = LocalSharedTransitionScope.current
-    val animatedScope = LocalAnimatedVisibilityScope.current
-
-    var sharedElementModifier: Modifier = Modifier
-    var titleSharedModifier: Modifier = Modifier
-    if (sharedScope != null && animatedScope != null) {
-        with(sharedScope) {
-            sharedElementModifier = Modifier.sharedElement(
-                sharedContentState = rememberSharedContentState(key = "thumb_$decodedUri"),
-                animatedVisibilityScope = animatedScope,
-                boundsTransform = { _, _ -> tween(300) }
-            )
-            titleSharedModifier = Modifier.sharedElement(
-                sharedContentState = rememberSharedContentState(key = "title_$decodedUri"),
-                animatedVisibilityScope = animatedScope,
-                boundsTransform = { _, _ -> tween(300) }
-            )
-        }
-    }
 
     val hazeState = remember { HazeState() }
 
@@ -285,7 +268,6 @@ fun WordReaderScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .then(sharedElementModifier)
                             .padding(top = 90.dp, bottom = 24.dp, start = 16.dp, end = 16.dp)
                     ) {
                         Column(
@@ -339,7 +321,7 @@ fun WordReaderScreen(
                             onToggleImmersive = { isImmersiveMode = !isImmersiveMode },
                             listState = pdfListState,
                             isDark = isDark,
-                            modifier = Modifier.fillMaxSize().then(sharedElementModifier)
+                            modifier = Modifier.fillMaxSize()
                         )
                     } else {
                         val typographyCss = """
@@ -431,7 +413,7 @@ fun WordReaderScreen(
                                     view.tag = htmlWithScript
                                 }
                             },
-                            modifier = Modifier.fillMaxSize().then(sharedElementModifier)
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
                 }
@@ -461,8 +443,8 @@ fun WordReaderScreen(
         AnimatedVisibility(
             visible = !isImmersiveMode && (uiState is WordReaderUiState.Ready),
             modifier = Modifier.align(Alignment.BottomCenter),
-            enter = expandVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) + fadeIn(),
-            exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessMedium)) + fadeOut()
+            enter = viewerBarEnterTransition(fromTop = false),
+            exit = viewerBarExitTransition(toTop = false)
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -970,13 +952,12 @@ fun WordReaderScreen(
         AnimatedVisibility(
             visible = !isImmersiveMode,
             modifier = Modifier.align(Alignment.TopCenter),
-            enter = androidx.compose.animation.slideInVertically(initialOffsetY = { -it }) + androidx.compose.animation.fadeIn(),
-            exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { -it }) + androidx.compose.animation.fadeOut()
+            enter = viewerBarEnterTransition(fromTop = true),
+            exit = viewerBarExitTransition(toTop = true)
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 NexusViewerTopBar(
                     title = displayName,
-                    titleModifier = titleSharedModifier,
                     hazeState = hazeState,
                     onBack = onBack,
                     actions = {
