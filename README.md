@@ -4,8 +4,9 @@
 <a href="https://play.google.com/store/apps/details?id=com.nexus.nexusdocs"><img src="https://img.shields.io/badge/Google%20Play-Available-34A853?style=for-the-badge&logo=googleplay&logoColor=white" /></a>
 <img src="https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" />
 <img src="https://img.shields.io/badge/Jetpack%20Compose-BOM%202025.06-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" />
-<img src="https://img.shields.io/badge/Version-4.2.0-orange?style=for-the-badge" />
-<img src="https://img.shields.io/badge/Min%20SDK-26%20(Android%208.0)-blue?style=for-the-badge" />
+<img src="https://img.shields.io/badge/Version-6.0.0-orange?style=for-the-badge" />
+<img src="https://img.shields.io/badge/Target%20SDK-36%20(Android%2016)-blue?style=for-the-badge" />
+<img src="https://img.shields.io/badge/16%20KB%20Aligned-arm64--v8a-success?style=for-the-badge" />
 <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" />
 
 </div>
@@ -45,14 +46,16 @@ Read PDFs, Microsoft Office files (`.docx`, `.xlsx`), PowerPoint presentations (
 
 ---
 
-## ⚡ What's New in v4.2.0
+## ⚡ What's New in v6.0.0
 
-* **🔍 Ultra-Sharp Multi-Scale PDF Zoom Engine**: Dynamic multi-resolution rasterization ensures crisp vector quality even at 4x, 8x, or 16x zoom without pixelation, accompanied by smooth, lag-free 60fps pan and scroll gestures.
+* **📄 In-Memory OOXML Word Engine (`.docx` & `.doc`)**: High-performance in-memory OOXML conversion stream rendered directly via hardware-accelerated PDFium. Zero disk clutter—intermediate byte streams never hit local storage and are completely excluded from the file scanner.
+* **🛡️ Hardened PowerPoint (`.pptx` & `.ppt`) Viewer**: Zero-crash presentation rendering with dual Aalto StAX XML parser factories, bounds protection on slide pagers, and robust top-level `Throwable` exception handlers.
+* **⚡ 16 KB Page-Size Architecture Compliance**: Fully compliant with Android 15 & 16 16 KB memory page architectures. Native libraries compiled using Android NDK r30 with explicit ELF alignment (`-Wl,-z,max-page-size=16384`) and verified `0x4000` boundaries.
+* **✨ Smooth Motion Transitions & Top Bar Refinements**: Fluid Shared-Z and Elevation Card scale transitions when opening and closing documents. Streamlined Docs viewer top bar with minimized gaps and clutter-free controls.
+* **🧹 Massive App Slimming (~274 MB Shredded)**: Eliminated unaligned 4KB legacy LibreOffice native binaries and assets; pruned unused dependencies (`coil-compose`, `log4j-api`, and UI test manifests).
+* **🔍 Multi-Scale PDF Zoom Engine**: Dynamic multi-resolution rasterization ensures crisp vector quality even at 4x, 8x, or 16x zoom without pixelation, accompanied by smooth, lag-free 60fps pan and scroll gestures.
 * **🌊 Nexus Liquid Glass Navigation Dock**: Real-time hardware-accelerated frosted glass bottom navigation bar with customizable corner radius, blur radius, refraction height, and refraction amount shaders.
-* **🛠️ 20+ Built-In Offline PDF Tools**: Complete offline workshop to convert (Images, Word, Excel, PPT, Text to PDF), manipulate (Merge, Split, Rotate, Reorder, Delete, Extract, Crop), secure (Encrypt, Sign, Watermark), and optimize (Compress, Repair, Number, Header/Footer) documents without internet or third-party servers.
-* **📽️ PowerPoint (`.pptx` & `.ppt`) Presentation Studio**: Dual-engine rendering (Zero-AWT POI + Native LibreOfficeKit C++ NDK bridge) with fullscreen presentation mode, slide thumbnail sorter grid, slide inking overlay, and speaker notes drawer.
-* **🎨 Solid Minimalist Top Bar Experience**: Restored distraction-free, high-contrast top bars across all readers with unified pill action badges for back, search, favorites, and contextual actions.
-* **🔎 Instant Search & High-Contrast Navigation**: Real-time multi-criteria file search with animated transitions, instant keyboard triggering, and one-tap query dismissal.
+* **🛠️ 20+ Built-In Offline PDF Tools**: Complete offline workshop to convert, manipulate, secure, and optimize documents without internet or third-party servers.
 
 ---
 
@@ -318,12 +321,12 @@ class node_preferences,node_theme,node_updater,node_github,node_mlkit toneIndigo
 | **Preferences** | DataStore Preferences | `1.1.1` | Asynchronous key-value user preferences storage |
 | **Concurrency & Async** | Coroutines & Flow | `1.9.0` | Reactive state management with `StateFlow` and structured concurrency |
 | **Lifecycle** | AndroidX Lifecycle | `2.8.7` | `collectAsStateWithLifecycle` & ViewModel lifecycle scopes |
-| **PDF Engine** | MuPDF (fitz) | `1.23.0` | Ultra-fast native C/C++ vector PDF rasterization engine |
+| **PDF Engine** | MuPDF (fitz) | `1.28.5` | Ultra-fast native C/C++ vector PDF rasterization engine (16 KB aligned) |
 | **PDF Tooling** | PDFBox-Android | `2.0.27.0` | Document scaling, blueprint ruler math & PDF utilities |
 | **Office Suite Parser** | Apache POI | `5.2.5` | Offline DOCX, XLSX, and PPTX document parsing (`aalto-xml 1.3.2`) |
-| **Presentation Engine** | LibreOfficeKit Bridge | Native NDK | C++ JNI bridge (`libnexus_presentation_engine.so`) for desktop slide fidelity |
+| **Presentation Engine** | Native Compose & POI | Hardened NDK | Zero-crash offline presentation engine with dual StAX XML factories |
 | **Vision & ML** | Google ML Kit | `16.0.0` / `19.0.0` | Document Scanner edge detection & on-device Text OCR |
-| **Image Loading** | Coil | `3.0.0` | High-performance image loading, thumbnail caching & SVG support |
+| **Thumbnail Engine** | Custom Bitmap Cache | In-Memory | Hardware-accelerated memory bitmap rendering and caching |
 | **Animations** | Jetpack Compose + Lottie | `6.6.2` | Spring-physics micro-interactions and vector animations |
 | **Permissions** | Accompanist Permissions | `0.36.0` | Seamless runtime storage and camera permission management |
 
@@ -422,6 +425,7 @@ See engineering documentation in `docs/`:
 - **[PPT_VIEWER_TASKS.md](docs/PPT_VIEWER_TASKS.md)** — Engineering task tracker
 
 ### ✅ Completed Milestones
+- [x] **v6.0.0** — **Next-Gen In-Memory OOXML Engine, 16 KB Page Alignment & PPT Hardening** (RAM-only OOXML to PDF pipeline; Android 15/16 16 KB page-size compliance; crash-free POI presentation engine with StAX XML factories; refined motion transitions & top bar; ~274 MB native bloat eliminated)
 - [x] **v4.2.0** — **Offline PDF Tools Suite & Multi-Scale PDF Zoom** (20+ conversion, page editing, encryption, signing, and repair tools; multi-resolution dynamic PDF zoom; liquid glass navigation dock; solid reader top bars; top-right search close controls)
 - [x] **v3.2.0** — **PowerPoint (`.pptx` / `.ppt`) Viewer** (Zero-AWT POI parser, native LOKit NDK bridge, floating dock, jump-to-slide, thumbnail drawer, fullscreen present mode)
 - [x] **v3.1.0** — **Recycle Bin & Safe Delete** (Soft-delete with 10-second undo countdown, trash restoration, permanent shredding)
