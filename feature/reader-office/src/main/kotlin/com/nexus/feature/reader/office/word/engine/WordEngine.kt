@@ -11,6 +11,30 @@ import java.io.File
 sealed interface WordEngineResult {
 
     /**
+     * Document was converted directly into an in-memory PDF byte stream.
+     * Guaranteed zero permanent storage footprint, excluded from database and scanners.
+     */
+    data class PdfStream(
+        val pdfBytes: ByteArray,
+        val pageCount: Int,
+        val headings: List<DocxHeading> = emptyList()
+    ) : WordEngineResult {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+            other as PdfStream
+            return pdfBytes.contentEquals(other.pdfBytes) && pageCount == other.pageCount && headings == other.headings
+        }
+
+        override fun hashCode(): Int {
+            var result = pdfBytes.contentHashCode()
+            result = 31 * result + pageCount
+            result = 31 * result + headings.hashCode()
+            return result
+        }
+    }
+
+    /**
      * Document was converted to a high-fidelity PDF by the native engine.
      */
     data class ConvertedPdf(

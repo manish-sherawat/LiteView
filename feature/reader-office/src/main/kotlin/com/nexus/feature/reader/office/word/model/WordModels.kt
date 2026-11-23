@@ -20,7 +20,7 @@ sealed class WordReaderUiState {
      * (produced by the ViewModel) so the UI layer only needs to hand it to a WebView.
      */
     data class Ready(
-        val htmlContent: String,
+        val htmlContent: String = "",
         val headings: List<DocxHeading> = emptyList(),
         val showOutline: Boolean = false,
         val author: String? = null,
@@ -34,6 +34,7 @@ sealed class WordReaderUiState {
         val orientation: String = "Portrait",
         val marginsDescription: String = "Normal",
         val convertedPdfPath: String? = null,
+        val isPdfStream: Boolean = false,
         val activeEngineName: String = "LibreOfficeKit Native Core"
     ) : WordReaderUiState()
 

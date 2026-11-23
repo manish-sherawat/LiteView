@@ -142,6 +142,38 @@ class LOKitDocumentBridge private constructor(
     }
 
     /**
+     * Exports/converts the document into an in-memory PDF byte stream.
+     * The intermediate scratch file is placed in a private cache directory,
+     * immediately read into memory, and deleted with zero storage footprint.
+     */
+    suspend fun exportToPdfBytes(transientDir: File): ByteArray? = withContext(LOKitRuntimeManager.lokitDispatcher) {
+        var scratchFile: File? = null
+        try {
+            if (!transientDir.exists()) transientDir.mkdirs()
+            val noMedia = File(transientDir, ".nomedia")
+            if (!noMedia.exists()) try { noMedia.createNewFile() } catch (_: Exception) {}
+
+            scratchFile = File(transientDir, "lok_scratch_${System.nanoTime()}.pdf")
+            nativeDoc.saveAs(scratchFile.absolutePath, "pdf", "SelectPdfVersion=1")
+            if (scratchFile.exists() && scratchFile.length() > 0) {
+                val bytes = scratchFile.readBytes()
+                Log.i(TAG, "Successfully generated in-memory PDF byte stream (${bytes.size} bytes)")
+                bytes
+            } else {
+                Log.e(TAG, "LOKit saveAs failed to produce PDF bytes")
+                null
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to convert document to in-memory PDF byte stream", t)
+            null
+        } finally {
+            try {
+                scratchFile?.delete()
+            } catch (_: Exception) {}
+        }
+    }
+
+    /**
      * Exports/converts the loaded document into a PDF file at [outputPdfFile].
      * Provides 100% desktop fidelity and seamless integration with PDF view engines.
      */

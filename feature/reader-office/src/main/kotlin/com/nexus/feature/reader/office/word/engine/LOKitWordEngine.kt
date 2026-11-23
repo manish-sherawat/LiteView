@@ -67,18 +67,16 @@ class LOKitWordEngine @Inject constructor(
 
             val pageCount = bridge.getPageCount().coerceAtLeast(1)
 
-            // 4. Convert to high-fidelity PDF
-            val pdfDir = File(context.cacheDir, "libreoffice/converted_docs").apply { mkdirs() }
-            val outputPdf = File(pdfDir, "doc_${localDocFile.nameWithoutExtension}_${System.currentTimeMillis()}.pdf")
-
-            val convertSuccess = bridge.exportToPdf(outputPdf)
-            if (!convertSuccess || !outputPdf.exists() || outputPdf.length() == 0L) {
-                return@withContext WordEngineResult.Error("LibreOfficeKit document conversion failed.")
+            // 4. Convert directly to in-memory PDF byte stream (scratch file immediately deleted)
+            val transientDir = File(context.cacheDir, "libreoffice/transient_streams")
+            val pdfBytes = bridge.exportToPdfBytes(transientDir)
+            if (pdfBytes == null || pdfBytes.isEmpty()) {
+                return@withContext WordEngineResult.Error("LibreOfficeKit document conversion failed to generate PDF stream.")
             }
 
-            Log.i(TAG, "LOKit successfully converted ${localDocFile.name} to PDF ($pageCount pages)")
-            WordEngineResult.ConvertedPdf(
-                pdfFile = outputPdf,
+            Log.i(TAG, "LOKit successfully converted ${localDocFile.name} to in-memory PDF (${pdfBytes.size} bytes, $pageCount pages)")
+            WordEngineResult.PdfStream(
+                pdfBytes = pdfBytes,
                 pageCount = pageCount
             )
         } catch (t: Throwable) {
@@ -86,6 +84,11 @@ class LOKitWordEngine @Inject constructor(
             WordEngineResult.Error("LOKit error: ${t.localizedMessage ?: "Native engine fault"}", t)
         } finally {
             bridge?.close()
+            try {
+                if (localDocFile != null && localDocFile.absolutePath.contains("libreoffice/incoming")) {
+                    localDocFile.delete()
+                }
+            } catch (_: Exception) {}
         }
     }
 

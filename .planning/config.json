@@ -1,0 +1,10 @@
+{
+  "mode": "interactive",
+  "granularity": "standard",
+  "workflow": {
+    "research": false,
+    "plan_check": false,
+    "verifier": true,
+    "auto_advance": true
+  }
+}

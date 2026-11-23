@@ -44,6 +44,7 @@ import org.apache.poi.xwpf.usermodel.XWPFTableCell
 import org.apache.poi.xwpf.usermodel.XWPFTableRow
 import com.nexus.feature.reader.office.word.engine.WordEngineCoordinator
 import com.nexus.feature.reader.office.word.engine.WordEngineResult
+import com.nexus.feature.reader.office.word.pdfium.WordPdfiumRenderer
 import org.w3c.dom.Node
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
@@ -78,6 +79,34 @@ class WordReaderViewModel @Inject constructor(
 
     private val _keepScreenAwake = MutableStateFlow(false)
     val keepScreenAwake: StateFlow<Boolean> = _keepScreenAwake.asStateFlow()
+
+    private var pdfiumRenderer: WordPdfiumRenderer? = null
+
+    private val _renderedPages = MutableStateFlow<Map<Int, android.graphics.Bitmap>>(emptyMap())
+    val renderedPages: StateFlow<Map<Int, android.graphics.Bitmap>> = _renderedPages.asStateFlow()
+
+    fun renderPage(pageIndex: Int, targetWidthPx: Int) {
+        val renderer = pdfiumRenderer ?: return
+        viewModelScope.launch(Dispatchers.Default) {
+            val bitmap = renderer.renderPageBitmap(pageIndex, targetWidthPx)
+            if (bitmap != null) {
+                _renderedPages.value = _renderedPages.value + (pageIndex to bitmap)
+            }
+        }
+    }
+
+    suspend fun getPageDimensions(pageIndex: Int): Pair<Int, Int> {
+        return pdfiumRenderer?.getPageDimensions(pageIndex) ?: Pair(595, 842)
+    }
+
+    fun getPdfBytes(): ByteArray? = pdfiumRenderer?.pdfBytes
+
+    override fun onCleared() {
+        super.onCleared()
+        pdfiumRenderer?.close()
+        pdfiumRenderer = null
+        _renderedPages.value = emptyMap()
+    }
 
     fun setKeepScreenAwake(value: Boolean) {
         viewModelScope.launch {
@@ -149,6 +178,10 @@ class WordReaderViewModel @Inject constructor(
             _uiState.value = WordReaderUiState.Loading()
             withContext(Dispatchers.IO) {
                 try {
+                    pdfiumRenderer?.close()
+                    pdfiumRenderer = null
+                    _renderedPages.value = emptyMap()
+
                     val decodedUri = safeDecode(encodedUri)
                     val uriStr = decodedUri
 
@@ -187,14 +220,44 @@ class WordReaderViewModel @Inject constructor(
                     val (engineResult, engineName) = coordinator.loadDocument(uri, docType, password)
 
                     val readyResult = when (engineResult) {
-                        is WordEngineResult.ConvertedPdf -> {
+                        is WordEngineResult.PdfStream -> {
+                            val renderer = WordPdfiumRenderer.fromBytes(context, engineResult.pdfBytes)
+                            pdfiumRenderer = renderer
                             WordReaderUiState.Ready(
                                 htmlContent = "",
                                 headings = engineResult.headings,
-                                pageCount = engineResult.pageCount,
-                                convertedPdfPath = engineResult.pdfFile.absolutePath,
+                                pageCount = renderer?.pageCount ?: engineResult.pageCount,
+                                isPdfStream = true,
                                 activeEngineName = engineName
                             )
+                        }
+                        is WordEngineResult.ConvertedPdf -> {
+                            val bytes = try {
+                                val b = engineResult.pdfFile.readBytes()
+                                engineResult.pdfFile.delete() // Clean up immediately from disk
+                                b
+                            } catch (_: Exception) { null }
+
+                            if (bytes != null && bytes.isNotEmpty()) {
+                                val renderer = WordPdfiumRenderer.fromBytes(context, bytes)
+                                pdfiumRenderer = renderer
+                                WordReaderUiState.Ready(
+                                    htmlContent = "",
+                                    headings = engineResult.headings,
+                                    pageCount = renderer?.pageCount ?: engineResult.pageCount,
+                                    isPdfStream = true,
+                                    activeEngineName = engineName
+                                )
+                            } else {
+                                WordReaderUiState.Ready(
+                                    htmlContent = "",
+                                    headings = engineResult.headings,
+                                    pageCount = engineResult.pageCount,
+                                    convertedPdfPath = engineResult.pdfFile.absolutePath,
+                                    isPdfStream = false,
+                                    activeEngineName = engineName
+                                )
+                            }
                         }
                         is WordEngineResult.Html -> {
                             WordReaderUiState.Ready(
@@ -211,6 +274,7 @@ class WordReaderViewModel @Inject constructor(
                                 orientation = engineResult.orientation,
                                 marginsDescription = engineResult.marginsDescription,
                                 convertedPdfPath = null,
+                                isPdfStream = false,
                                 activeEngineName = engineName
                             )
                         }
