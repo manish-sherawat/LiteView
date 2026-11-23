@@ -80,7 +80,7 @@ android {
         compose = true
     }
 
-    ndkVersion = "28.2.13676358"
+    ndkVersion = "30.0.15729638"
 
     packaging {
         resources {

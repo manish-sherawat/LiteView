@@ -10,7 +10,7 @@ android {
     namespace = "com.nexus.feature.reader.presentation"
     compileSdk = 37
 
-    ndkVersion = "28.2.13676358"
+    ndkVersion = "30.0.15729638"
 
     defaultConfig {
         minSdk = 26
@@ -24,7 +24,9 @@ android {
             cmake {
                 arguments += listOf(
                     "-DANDROID_STL=c++_shared",
-                    "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384"
+                    "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
+                    "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384",
+                    "-DCMAKE_EXE_LINKER_FLAGS=-Wl,-z,max-page-size=16384"
                 )
                 cppFlags += listOf("-std=c++17", "-fvisibility=hidden", "-Wall")
             }

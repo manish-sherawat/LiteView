@@ -82,30 +82,6 @@ fun WordOptionsBottomSheet(
                 onClick = onBookmarks
             )
         )
-        add(
-            DocumentOptionItem(
-                title = if (isSerif) "Font: Serif (Book style)" else "Font: Sans-Serif (Modern style)",
-                subtitle = "Tap to switch font style",
-                iconRes = com.nexus.core.R.drawable.ic_text_scan,
-                onClick = onToggleSerif
-            )
-        )
-        add(
-            DocumentOptionItem(
-                title = "Increase Text Size",
-                subtitle = "Make document text larger",
-                iconRes = com.nexus.core.R.drawable.ic_maximize,
-                onClick = onIncreaseFontSize
-            )
-        )
-        add(
-            DocumentOptionItem(
-                title = "Decrease Text Size",
-                subtitle = "Make document text smaller",
-                iconRes = com.nexus.core.R.drawable.ic_minimize,
-                onClick = onDecreaseFontSize
-            )
-        )
     }
 
     val group2 = listOf(

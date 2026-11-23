@@ -905,10 +905,6 @@ fun WordReaderScreen(
                     showBookmarksSheet = true
                 },
                 docxHeadingsCount = (uiState as? WordReaderUiState.Ready)?.headings?.size ?: 0,
-                onIncreaseFontSize = { viewModel.increaseDocxFontSize() },
-                onDecreaseFontSize = { viewModel.decreaseDocxFontSize() },
-                onToggleSerif = { viewModel.toggleDocxSerif() },
-                isSerif = docxIsSerif,
                 paperSizeName = (uiState as? WordReaderUiState.Ready)?.paperSizeName,
                 onGoToPage = {
                     showMenu = false
@@ -989,6 +985,7 @@ fun WordReaderScreen(
                                 painter = painterResource(id = com.nexus.core.R.drawable.ic_search),
                                 contentDescription = "Search",
                                 isActive = isSearchActive,
+                                size = 36.dp,
                                 onClick = { isSearchActive = !isSearchActive }
                             )
                             NexusViewerActionDivider()
@@ -996,6 +993,7 @@ fun WordReaderScreen(
                         NexusViewerActionButton(
                             painter = painterResource(id = com.nexus.core.R.drawable.ic_more_vert),
                             contentDescription = "More options",
+                            size = 36.dp,
                             onClick = { showMenu = true }
                         )
                     }

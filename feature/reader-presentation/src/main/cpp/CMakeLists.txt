@@ -22,6 +22,10 @@ target_link_libraries(
 )
 
 # Enforce 16 KB ELF segment alignment for Android 15+ compatibility
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
+add_link_options("-Wl,-z,max-page-size=16384")
+
 target_link_options(
     nexus_presentation_engine
     PRIVATE

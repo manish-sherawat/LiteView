@@ -487,15 +487,17 @@ fun NexusViewerTopBar(
     titleStyle: androidx.compose.ui.text.TextStyle? = null,
     onTitleClick: (() -> Unit)? = null,
     navigationIcon: (@Composable () -> Unit)? = null,
+    horizontalSpacing: Dp = 6.dp,
+    contentPadding: androidx.compose.foundation.layout.PaddingValues = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp),
     actions: @Composable RowScope.() -> Unit = {}
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
     ) {
         // 1. Back navigation button: circular floating solid button
         if (navigationIcon != null) {
@@ -530,7 +532,7 @@ fun NexusViewerTopBar(
                         Modifier
                     }
                 )
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 12.dp),
             contentAlignment = Alignment.CenterStart
         ) {
             NexusText(
@@ -558,8 +560,8 @@ fun NexusViewerTopBar(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier.padding(horizontal = 4.dp)
+                horizontalArrangement = Arrangement.spacedBy(1.dp),
+                modifier = Modifier.padding(horizontal = 3.dp)
             ) {
                 actions()
             }
