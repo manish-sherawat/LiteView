@@ -154,7 +154,7 @@ class LOKitDocumentBridge private constructor(
             if (!noMedia.exists()) try { noMedia.createNewFile() } catch (_: Exception) {}
 
             scratchFile = File(transientDir, "lok_scratch_${System.nanoTime()}.pdf")
-            nativeDoc.saveAs(scratchFile.absolutePath, "pdf", "SelectPdfVersion=1")
+            nativeDoc.saveAs(scratchFile.absolutePath, "pdf", "SelectPdfVersion=1,IsSkipEmptyPages=true")
             if (scratchFile.exists() && scratchFile.length() > 0) {
                 val bytes = scratchFile.readBytes()
                 Log.i(TAG, "Successfully generated in-memory PDF byte stream (${bytes.size} bytes)")
@@ -184,7 +184,7 @@ class LOKitDocumentBridge private constructor(
             }
             outputPdfFile.parentFile?.mkdirs()
 
-            nativeDoc.saveAs(outputPdfFile.absolutePath, "pdf", "SelectPdfVersion=1")
+            nativeDoc.saveAs(outputPdfFile.absolutePath, "pdf", "SelectPdfVersion=1,IsSkipEmptyPages=true")
             val success = outputPdfFile.exists() && outputPdfFile.length() > 0
             if (success) {
                 Log.i(TAG, "Successfully converted document to PDF: ${outputPdfFile.absolutePath} (${outputPdfFile.length()} bytes)")

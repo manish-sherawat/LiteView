@@ -153,43 +153,33 @@ object WordLayoutEngine {
     }
 
     /**
-     * Checks if a paragraph explicitly triggers a page break (manual page break, section break, or form feed).
+     * Checks if a paragraph explicitly triggers a hard page break (manual page break or form feed).
+     * Note: Soft breaks such as lastRenderedPageBreak are intentionally ignored because our engine
+     * performs dynamic height pagination; treating soft breaks as hard breaks causes duplicate blank pages.
      */
     fun hasExplicitPageBreak(para: XWPFParagraph): Boolean {
         try {
             if (para.isPageBreak) return true
 
-            // Check if paragraph ends a section (sectPr on pPr)
-            val pPr = try { para.ctp.pPr } catch (_: Exception) { null }
-            if (pPr?.sectPr != null) {
-                return true
-            }
-
-            // Check runs for page break elements or form feed
+            // Check runs for explicit hard page break elements or form feed
             for (run in para.runs) {
                 val ctr = run.ctr
                 if (ctr != null) {
                     for (br in ctr.brList) {
                         if (br.type == STBrType.PAGE) return true
                     }
-                    if (ctr.lastRenderedPageBreakList.isNotEmpty()) {
-                        return true
-                    }
                 }
                 val text = run.text() ?: ""
                 if (text.contains('\u000C')) return true
             }
 
-            // Check raw XML node for page breaks
+            // Check raw XML node for explicit hard page breaks (<w:br w:type="page"/>)
             val domNode = para.ctp.domNode
             val childNodes = domNode.childNodes
             for (i in 0 until childNodes.length) {
                 val node = childNodes.item(i)
                 val localName = (node.localName ?: node.nodeName.substringAfterLast(':')).lowercase()
                 if (localName == "br" && node.attributes?.getNamedItem("w:type")?.nodeValue == "page") {
-                    return true
-                }
-                if (localName == "lastrenderedpagebreak") {
                     return true
                 }
             }
