@@ -47,7 +47,11 @@ fun WordOutlineBottomSheet(
                 style = NexusTheme.typography.title,
                 modifier = Modifier.padding(horizontal = NexusTheme.spacing.lg, vertical = NexusTheme.spacing.xs)
             )
-            if (headings.isEmpty()) {
+            val validHeadings = androidx.compose.runtime.remember(headings) {
+                headings.filter { it.text.trim().isNotBlank() && it.text.trim().length >= 2 }
+            }
+
+            if (validHeadings.isEmpty()) {
                 NexusText(
                     text = "No outline available for this document.",
                     style = NexusTheme.typography.body,
@@ -56,7 +60,7 @@ fun WordOutlineBottomSheet(
                 )
             } else {
                 LazyColumn(modifier = Modifier.fillMaxWidth().padding(horizontal = NexusTheme.spacing.md)) {
-                    items(headings) { heading ->
+                    items(validHeadings) { heading ->
                         val indentPadding = ((heading.level - 1) * 16).dp
                         Row(
                             modifier = Modifier

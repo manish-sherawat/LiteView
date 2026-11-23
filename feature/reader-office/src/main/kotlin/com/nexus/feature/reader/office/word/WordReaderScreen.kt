@@ -349,8 +349,8 @@ fun WordReaderScreen(
                                 settings.setSupportZoom(true)
                                 settings.builtInZoomControls = true
                                 settings.displayZoomControls = false
-                                settings.useWideViewPort = true
-                                settings.loadWithOverviewMode = true
+                                settings.useWideViewPort = false
+                                settings.loadWithOverviewMode = false
                                 settings.domStorageEnabled = true
                                 settings.layoutAlgorithm = WebSettings.LayoutAlgorithm.NORMAL
                                 setFindListener { activeMatchOrdinal, numberOfMatches, isDoneCounting ->

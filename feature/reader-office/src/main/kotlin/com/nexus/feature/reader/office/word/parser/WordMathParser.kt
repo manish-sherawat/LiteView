@@ -4,6 +4,8 @@ import org.w3c.dom.Node
 
 object WordMathParser {
 
+    private const val TAG = "WordMathParser"
+
     /**
      * Translates Symbol font ASCII characters into proper Greek and mathematical Unicode symbols.
      */
@@ -337,7 +339,131 @@ object WordMathParser {
                         for (j in 0 until child.childNodes.length) parseOMML(child.childNodes.item(j), bSb)
                     }
                 }
-                sb.append("<span class=\"math-bar\">$bSb</span>")
+                sb.append("<span class=\"math-bar\" style=\"text-decoration:overline;\">$bSb</span>")
+            }
+            "m" -> { // Mathematical Matrix
+                sb.append("<table class=\"math-matrix\" style=\"display:inline-table;vertical-align:middle;border-collapse:collapse;margin:0 4px;border-left:1.5px solid currentColor;border-right:1.5px solid currentColor;border-radius:3px;padding:0 3px;\">")
+                for (i in 0 until node.childNodes.length) {
+                    val child = node.childNodes.item(i)
+                    val cName = (child.localName ?: child.nodeName.substringAfterLast(':')).lowercase()
+                    if (cName == "mr") {
+                        sb.append("<tr>")
+                        for (j in 0 until child.childNodes.length) {
+                            val cell = child.childNodes.item(j)
+                            val cellName = (cell.localName ?: cell.nodeName.substringAfterLast(':')).lowercase()
+                            if (cellName == "e") {
+                                val cSb = StringBuilder()
+                                for (k in 0 until cell.childNodes.length) parseOMML(cell.childNodes.item(k), cSb)
+                                sb.append("<td style=\"padding:2px 6px;text-align:center;font-size:0.9em;\">$cSb</td>")
+                            }
+                        }
+                        sb.append("</tr>")
+                    }
+                }
+                sb.append("</table>")
+            }
+            "eqarr" -> { // Equation Array (System of Equations)
+                sb.append("<div class=\"math-eq-arr\" style=\"display:inline-flex;flex-direction:column;vertical-align:middle;text-align:left;margin:2px 0;\">")
+                for (i in 0 until node.childNodes.length) {
+                    val child = node.childNodes.item(i)
+                    val cName = (child.localName ?: child.nodeName.substringAfterLast(':')).lowercase()
+                    if (cName == "e") {
+                        val rowSb = StringBuilder()
+                        for (j in 0 until child.childNodes.length) parseOMML(child.childNodes.item(j), rowSb)
+                        sb.append("<div class=\"math-eq-row\" style=\"padding:1px 0;\">$rowSb</div>")
+                    }
+                }
+                sb.append("</div>")
+            }
+            "acc" -> { // Accent (Hat, Vector, Dot, Bar)
+                var accChar = "\u0302" // default combining circumflex (hat)
+                var baseHtml = ""
+                for (i in 0 until node.childNodes.length) {
+                    val child = node.childNodes.item(i)
+                    val cName = (child.localName ?: child.nodeName.substringAfterLast(':')).lowercase()
+                    if (cName == "accpr") {
+                        for (j in 0 until child.childNodes.length) {
+                            val prop = child.childNodes.item(j)
+                            val pName = (prop.localName ?: prop.nodeName.substringAfterLast(':')).lowercase()
+                            if (pName == "chr") {
+                                val v = prop.attributes?.getNamedItem("m:val")?.nodeValue
+                                    ?: prop.attributes?.getNamedItem("val")?.nodeValue
+                                if (v != null) {
+                                    accChar = when (v) {
+                                        "^" -> "\u0302"
+                                        "→" -> "\u20D7"
+                                        "." -> "\u0307"
+                                        ".." -> "\u0308"
+                                        "~" -> "\u0303"
+                                        "¯" -> "\u0304"
+                                        else -> v
+                                    }
+                                }
+                            }
+                        }
+                    } else if (cName == "e") {
+                        val bSb = StringBuilder()
+                        for (j in 0 until child.childNodes.length) parseOMML(child.childNodes.item(j), bSb)
+                        baseHtml = bSb.toString()
+                    }
+                }
+                sb.append("<span class=\"math-accent\">$baseHtml$accChar</span>")
+            }
+            "box", "borderbox" -> { // Boxed expression / Strikethrough
+                val bSb = StringBuilder()
+                for (i in 0 until node.childNodes.length) {
+                    val child = node.childNodes.item(i)
+                    if ((child.localName ?: child.nodeName.substringAfterLast(':')).lowercase() == "e") {
+                        for (j in 0 until child.childNodes.length) parseOMML(child.childNodes.item(j), bSb)
+                    }
+                }
+                sb.append("<span class=\"math-box\" style=\"display:inline-block;border:1px solid currentColor;padding:1px 3px;margin:0 1px;border-radius:2px;\">$bSb</span>")
+            }
+            "spre" -> { // Pre-sub-superscript (Isotope notation)
+                var baseHtml = ""
+                var subHtml = ""
+                var supHtml = ""
+                for (i in 0 until node.childNodes.length) {
+                    val child = node.childNodes.item(i)
+                    val cName = (child.localName ?: child.nodeName.substringAfterLast(':')).lowercase()
+                    if (cName == "e") {
+                        val bSb = StringBuilder()
+                        for (j in 0 until child.childNodes.length) parseOMML(child.childNodes.item(j), bSb)
+                        baseHtml = bSb.toString()
+                    } else if (cName == "sub") {
+                        val sSb = StringBuilder()
+                        for (j in 0 until child.childNodes.length) parseOMML(child.childNodes.item(j), sSb)
+                        subHtml = sSb.toString()
+                    } else if (cName == "sup") {
+                        val spSb = StringBuilder()
+                        for (j in 0 until child.childNodes.length) parseOMML(child.childNodes.item(j), spSb)
+                        supHtml = spSb.toString()
+                    }
+                }
+                sb.append("<span class=\"math-spre\"><span class=\"math-spre-scripts\" style=\"display:inline-flex;flex-direction:column;font-size:0.75em;vertical-align:middle;\"><sup>$supHtml</sup><sub>$subHtml</sub></span><span class=\"math-base\">$baseHtml</span></span>")
+            }
+            "groupchr" -> { // Group character (Overbrace, Underbrace)
+                var chr = "⏞"
+                var baseHtml = ""
+                for (i in 0 until node.childNodes.length) {
+                    val child = node.childNodes.item(i)
+                    val cName = (child.localName ?: child.nodeName.substringAfterLast(':')).lowercase()
+                    if (cName == "groupchrpr") {
+                        for (j in 0 until child.childNodes.length) {
+                            val prop = child.childNodes.item(j)
+                            if ((prop.localName ?: prop.nodeName.substringAfterLast(':')).lowercase() == "chr") {
+                                val v = prop.attributes?.getNamedItem("m:val")?.nodeValue
+                                    ?: prop.attributes?.getNamedItem("val")?.nodeValue
+                                if (v != null) chr = v
+                            }
+                        }
+                    } else if (cName == "e") {
+                        val bSb = StringBuilder()
+                        for (j in 0 until child.childNodes.length) parseOMML(child.childNodes.item(j), bSb)
+                        baseHtml = bSb.toString()
+                    }
+                }
+                sb.append("<span class=\"math-groupchr\" style=\"display:inline-flex;flex-direction:column;align-items:center;\"><span style=\"font-size:0.8em;\">$chr</span><span>$baseHtml</span></span>")
             }
             "r" -> { // Math run
                 val rSb = StringBuilder()
@@ -355,6 +481,9 @@ object WordMathParser {
                 sb.append("<span class=\"math-text\">${escapeHtml(decodeMathSymbols(node.textContent ?: ""))}</span>")
             }
             else -> {
+                if (localName.isNotBlank() && !localName.endsWith("pr")) {
+                    android.util.Log.d(TAG, "Parsing unhandled or container OMML math element <$localName> (${node.childNodes.length} children)")
+                }
                 for (i in 0 until node.childNodes.length) {
                     parseOMML(node.childNodes.item(i), sb)
                 }

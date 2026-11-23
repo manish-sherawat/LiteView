@@ -194,7 +194,7 @@ class PoiWordEngine @Inject constructor(
 
             val totalPages = pages.size
             val sb = StringBuilder(1024 * 64)
-            sb.append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=yes\">\n")
+            sb.append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes\">\n")
             sb.append(stylesheet)
             sb.append("\n</head><body class=\"mode-paged\"><div class=\"docx-paged-container\">\n")
 
@@ -284,6 +284,29 @@ class PoiWordEngine @Inject constructor(
                 val stylesheet = WordLayoutEngine.generateStylesheet(pageSetup)
                 val clientScript = WordLayoutEngine.generateClientScript()
 
+                // Extract all native document footnotes
+                val footnotesMap = mutableMapOf<String, String>()
+                try {
+                    for (fn in doc.footnotes) {
+                        val idStr = fn.id?.toString() ?: continue
+                        val fnType = (try { fn.ctFtnEdn?.type?.toString()?.lowercase() } catch (_: Exception) { null }) ?: ""
+                        if (fnType.contains("separator")) continue
+                        val fnTextSb = StringBuilder()
+                        for (p in fn.paragraphs) {
+                            val pTxt = p.text ?: ""
+                            if (pTxt.isNotBlank()) {
+                                if (fnTextSb.isNotEmpty()) fnTextSb.append(" ")
+                                appendRunsHtmlSimple(p, fnTextSb)
+                            }
+                        }
+                        if (fnTextSb.isNotBlank()) {
+                            footnotesMap[idStr] = fnTextSb.toString()
+                        }
+                    }
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Error extracting footnotes: ${t.message}", t)
+                }
+
                 val pages = mutableListOf<String>()
                 val currentPage = StringBuilder(4096)
                 var currentHeight = 0f
@@ -348,7 +371,7 @@ class PoiWordEngine @Inject constructor(
                                         sealPage()
                                     }
 
-                                    appendParagraphHtml(para, doc, currentPage, headings)
+                                    appendParagraphHtml(para, doc, currentPage, headings, footnotesMap)
                                     currentHeight += estimatedHeight
                                 } catch (t: Throwable) {
                                     Log.w(TAG, "Error parsing paragraph node <$elemTag> at index $elemIdx: ${t.message}", t)
@@ -407,11 +430,11 @@ class PoiWordEngine @Inject constructor(
                                             sealPage()
                                             startTableChunk()
                                             if (rowIdx > 0 && table.rows.isNotEmpty()) {
-                                                appendTableRowHtml(table.rows[0], 0, rowSpans, currentPage)
+                                                appendTableRowHtml(table.rows[0], 0, rowSpans, currentPage, doc, footnotesMap)
                                                 currentHeight += tableHeaderHeight
                                             }
                                         }
-                                        appendTableRowHtml(row, rowIdx, rowSpans, currentPage)
+                                        appendTableRowHtml(row, rowIdx, rowSpans, currentPage, doc, footnotesMap)
                                         currentHeight += rowHeight
                                     }
                                     endTableChunk()
@@ -435,6 +458,17 @@ class PoiWordEngine @Inject constructor(
                 flushDiagramParagraphs()
                 sealPage()
 
+                // Append footnotes section if footnotes or references exist
+                val footnotesHtml = WordCitationParser.renderFootnotesSection(footnotesMap)
+                if (footnotesHtml.isNotBlank()) {
+                    if (pages.isNotEmpty()) {
+                        val lastIdx = pages.size - 1
+                        pages[lastIdx] = pages[lastIdx] + "\n" + footnotesHtml
+                    } else {
+                        pages.add(footnotesHtml)
+                    }
+                }
+
                 if (pages.isEmpty()) {
                     pages.add("<p style=\"color: #64748b; font-style: italic;\">Document is empty</p>")
                 }
@@ -455,7 +489,7 @@ class PoiWordEngine @Inject constructor(
 
                 val totalPages = pages.size
                 val sb = StringBuilder(1024 * 64)
-                sb.append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=yes\">\n")
+                sb.append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes\">\n")
                 sb.append(stylesheet)
                 sb.append("\n</head><body class=\"mode-paged\"><div class=\"docx-paged-container\">\n")
 
@@ -542,7 +576,7 @@ class PoiWordEngine @Inject constructor(
                 val clientScript = WordLayoutEngine.generateClientScript()
 
                 val html = """
-                    <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+                    <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
                     $stylesheet
                     </head><body class="mode-paged"><div class="docx-paged-container">
                     <section class="docx-page" data-page-number="1">
@@ -585,10 +619,13 @@ class PoiWordEngine @Inject constructor(
         para: XWPFParagraph,
         doc: XWPFDocument,
         sb: StringBuilder,
-        headings: MutableList<DocxHeading>
+        headings: MutableList<DocxHeading>,
+        footnotesMap: Map<String, String> = emptyMap()
     ) {
         val styleId = try { para.style ?: "" } catch (_: Exception) { "" }
-        val isHeading = styleId.lowercase().startsWith("heading")
+        val cleanStyleId = styleId.lowercase()
+        val isTOC = cleanStyleId.contains("toc")
+        val isHeading = !isTOC && cleanStyleId.startsWith("heading")
         val headingLevel = if (isHeading) {
             styleId.filter { it.isDigit() }.firstOrNull()?.digitToInt()?.coerceIn(1, 6) ?: 1
         } else 0
@@ -643,6 +680,31 @@ class PoiWordEngine @Inject constructor(
 
         val dirStyle = if (isBidi) "direction:rtl;" else "direction:ltr;"
 
+        // Vertical text direction handling
+        val textDirection = try {
+            val dom = pPr?.domNode
+            var dir: String? = null
+            if (dom != null) {
+                val nl = dom.childNodes
+                for (i in 0 until nl.length) {
+                    val item = nl.item(i) ?: continue
+                    val name = item.localName ?: item.nodeName
+                    if (name.equals("textDirection", ignoreCase = true)) {
+                        dir = item.attributes?.getNamedItem("w:val")?.nodeValue
+                            ?: item.attributes?.getNamedItem("val")?.nodeValue
+                        break
+                    }
+                }
+            }
+            dir
+        } catch (_: Exception) { null }
+
+        val writingModeStyle = when (textDirection?.lowercase()) {
+            "tbrl", "tbrlv" -> "writing-mode:vertical-rl;"
+            "btlr" -> "writing-mode:vertical-lr;"
+            else -> "writing-mode:horizontal-tb;"
+        }
+
         val shdFill = try {
             val fill = pPr?.shd?.fill?.toString()
             if (!fill.isNullOrBlank() && fill != "auto" && fill != "none" && fill != "clear") {
@@ -659,7 +721,7 @@ class PoiWordEngine @Inject constructor(
 
         val pStyles = buildString {
             append("text-align:$alignStr;")
-            append("$dirStyle;writing-mode:horizontal-tb;")
+            append("$dirStyle;$writingModeStyle")
             val safeLineHeight = spacingBetween ?: 1.35
             append("line-height:$safeLineHeight;")
             // Crucial: Use max-width: 100% and box-sizing: border-box WITHOUT width: 100% to prevent horizontal overflow
@@ -684,23 +746,22 @@ class PoiWordEngine @Inject constructor(
         }
 
         val rawText = try { para.text ?: "" } catch (_: Exception) { "" }
+        val cleanHeadingText = rawText.replace(Regex("[\\u00A0\\u200B\\uFEFF]"), " ").replace(Regex("\\s+"), " ").trim()
+        val isValidHeading = isHeading && cleanHeadingText.isNotBlank() && cleanHeadingText.length >= 2 && !cleanHeadingText.all { it.isDigit() || it in ".-_•* \t" }
         val hasPictures = para.runs.any { it.embeddedPictures.isNotEmpty() }
         val isStandalonePicture = hasPictures && rawText.isBlank() && !hasMathNodes(para)
         val anchorsHtml = bookmarks.joinToString("") { "<a id=\"$it\"></a>" }
-        val finalIdAttr = if (isHeading) "id=\"h_${headings.size}\"" else ""
+        val finalIdAttr = if (isValidHeading) "id=\"h_${headings.size}\"" else ""
 
         val tempSb = StringBuilder()
         if (isStandalonePicture) {
             tempSb.append("""<div class="docx-figure-container" $finalIdAttr>$anchorsHtml""")
-            appendParagraphBodyContent(para, doc, tempSb)
+            appendParagraphBodyContent(para, doc, tempSb, footnotesMap)
             tempSb.append("</div>\n")
-        } else if (isHeading) {
-            val headingText = rawText.trim()
-            if (headingText.isNotEmpty()) {
-                headings.add(DocxHeading(text = headingText, level = headingLevel, anchorId = "h_${headings.size}"))
-            }
+        } else if (isValidHeading) {
+            headings.add(DocxHeading(text = cleanHeadingText, level = headingLevel, anchorId = "h_${headings.size}"))
             tempSb.append("""<h$headingLevel $finalIdAttr style="$pStyles;min-width:0;max-width:100%;box-sizing:border-box;word-break:normal;overflow-wrap:break-word;white-space:normal;">$anchorsHtml""")
-            appendParagraphBodyContent(para, doc, tempSb)
+            appendParagraphBodyContent(para, doc, tempSb, footnotesMap)
             tempSb.append("</h$headingLevel>\n")
         } else if (isList) {
             val baseIndentPt = ((listLevel + 1) * 16.0).coerceIn(16.0, 140.0)
@@ -717,19 +778,19 @@ class PoiWordEngine @Inject constructor(
                 append("max-width:100%;box-sizing:border-box;")
             }
             tempSb.append("""<p class="docx-list-item" $finalIdAttr style="$listStyles">$anchorsHtml<span style="display:inline-block;width:${bulletWidthPt}pt;text-indent:0;">$bullet</span>""")
-            appendParagraphBodyContent(para, doc, tempSb)
+            appendParagraphBodyContent(para, doc, tempSb, footnotesMap)
             tempSb.append("</p>\n")
         } else {
             if (rawText.isBlank() && !hasMathNodes(para) && !hasPictures) {
                 tempSb.append("<p $finalIdAttr style=\"margin:4px 0;min-height:1em;max-width:100%;box-sizing:border-box;\">$anchorsHtml&nbsp;</p>\n")
             } else {
                 tempSb.append("""<p class="docx-paragraph" $finalIdAttr style="$pStyles">$anchorsHtml""")
-                appendParagraphBodyContent(para, doc, tempSb)
+                appendParagraphBodyContent(para, doc, tempSb, footnotesMap)
                 tempSb.append("</p>\n")
             }
         }
 
-        val citationFormatted = WordCitationParser.formatCitationTags(tempSb.toString())
+        val citationFormatted = WordCitationParser.formatCitationTags(tempSb.toString(), footnotesMap.keys)
         sb.append(citationFormatted)
     }
 
@@ -746,7 +807,8 @@ class PoiWordEngine @Inject constructor(
     private fun appendParagraphBodyContent(
         para: XWPFParagraph,
         doc: XWPFDocument,
-        sb: StringBuilder
+        sb: StringBuilder,
+        footnotesMap: Map<String, String> = emptyMap()
     ) {
         val domNode = try { para.ctp.domNode } catch (_: Exception) { null }
         if (domNode != null) {
@@ -766,13 +828,14 @@ class PoiWordEngine @Inject constructor(
             }
             if (hasHandledMath) return
         }
-        appendRunsHtml(para, doc, sb)
+        appendRunsHtml(para, doc, sb, footnotesMap)
     }
 
     private fun appendRunsHtml(
         para: XWPFParagraph,
         doc: XWPFDocument,
-        sb: StringBuilder
+        sb: StringBuilder,
+        footnotesMap: Map<String, String> = emptyMap()
     ) {
         for (run in para.runs) {
             val runNodeName = try { run.ctr?.domNode?.nodeName ?: "w:r" } catch (_: Exception) { "w:r" }
@@ -869,8 +932,8 @@ class PoiWordEngine @Inject constructor(
                     } catch (_: Exception) { null }
                 } else null
 
-                val footnoteIds = try { run.ctr?.footnoteReferenceList?.map { it.id } ?: emptyList() } catch (_: Exception) { emptyList() }
-                val endnoteIds = try { run.ctr?.endnoteReferenceList?.map { it.id } ?: emptyList() } catch (_: Exception) { emptyList() }
+                val footnoteIds = try { run.ctr?.footnoteReferenceList?.map { it.id?.toString() ?: "" }?.filter { it.isNotBlank() } ?: emptyList() } catch (_: Exception) { emptyList() }
+                val endnoteIds = try { run.ctr?.endnoteReferenceList?.map { it.id?.toString() ?: "" }?.filter { it.isNotBlank() } ?: emptyList() } catch (_: Exception) { emptyList() }
 
                 val decodedText = WordMathParser.decodeMathSymbols(text)
                 val escaped = htmlEscape(decodedText).replace("\t", "&nbsp;&nbsp;&nbsp;&nbsp;")
@@ -898,8 +961,13 @@ class PoiWordEngine @Inject constructor(
                     span = """<a class="docx-hyperlink" href="${htmlEscape(href)}">$span</a>"""
                 }
 
-                for (fnId in footnoteIds) span += "<sup><a href=\"#footnote_$fnId\">[$fnId]</a></sup>"
-                for (enId in endnoteIds) span += "<sup><a href=\"#endnote_$enId\">[$enId]</a></sup>"
+                for (fnId in footnoteIds) {
+                    val preview = footnotesMap[fnId]?.let { " title=\"${htmlEscape(it)}\"" } ?: ""
+                    span += "<sup class=\"footnote-ref\"><a href=\"#footnote_$fnId\"$preview>[$fnId]</a></sup>"
+                }
+                for (enId in endnoteIds) {
+                    span += "<sup class=\"endnote-ref\"><a href=\"#endnote_$enId\">[$enId]</a></sup>"
+                }
 
                 sb.append(span)
             } catch (t: Throwable) {
@@ -943,11 +1011,71 @@ class PoiWordEngine @Inject constructor(
         return rowSpans
     }
 
+    private fun extractCellBordersCss(cell: XWPFTableCell): String {
+        val tcPr = try { cell.ctTc?.tcPr } catch (_: Exception) { null } ?: return "border:1px solid var(--border-color);"
+        val dom = try { tcPr.domNode } catch (_: Exception) { null } ?: return "border:1px solid var(--border-color);"
+        val childNodes = dom.childNodes ?: return "border:1px solid var(--border-color);"
+
+        var tcBordersNode: org.w3c.dom.Node? = null
+        for (i in 0 until childNodes.length) {
+            val node = childNodes.item(i) ?: continue
+            val name = node.localName ?: node.nodeName
+            if (name.equals("tcBorders", ignoreCase = true)) {
+                tcBordersNode = node
+                break
+            }
+        }
+
+        if (tcBordersNode == null) {
+            return "border:1px solid var(--border-color);"
+        }
+
+        val bordersList = tcBordersNode.childNodes ?: return "border:1px solid var(--border-color);"
+        val borderSides = mutableMapOf<String, String>()
+
+        for (i in 0 until bordersList.length) {
+            val bNode = bordersList.item(i) ?: continue
+            val side = (bNode.localName ?: bNode.nodeName).lowercase()
+            if (side !in listOf("top", "left", "bottom", "right")) continue
+
+            val attrs = bNode.attributes
+            val bVal = attrs?.getNamedItem("w:val")?.nodeValue ?: attrs?.getNamedItem("val")?.nodeValue ?: "single"
+            if (bVal == "none" || bVal == "nil") {
+                borderSides[side] = "border-$side:none !important;"
+                continue
+            }
+            val rawSz = attrs?.getNamedItem("w:sz")?.nodeValue ?: attrs?.getNamedItem("sz")?.nodeValue
+            val szPt = (rawSz?.toFloatOrNull() ?: 4f) / 8f
+            val borderPx = (szPt * 1.33f).coerceIn(1f, 8f)
+
+            val rawColor = attrs?.getNamedItem("w:color")?.nodeValue ?: attrs?.getNamedItem("color")?.nodeValue
+            val color = if (!rawColor.isNullOrBlank() && rawColor != "auto" && rawColor.length == 6) "#$rawColor" else "var(--border-color)"
+
+            val borderStyle = when (bVal.lowercase()) {
+                "double" -> "double"
+                "dashed", "dashdotstroked" -> "dashed"
+                "dotted" -> "dotted"
+                else -> "solid"
+            }
+            borderSides[side] = "border-$side:${String.format(java.util.Locale.US, "%.1f", borderPx)}px $borderStyle $color !important;"
+        }
+
+        return if (borderSides.isEmpty()) {
+            "border:1px solid var(--border-color);"
+        } else {
+            listOf("top", "right", "bottom", "left").joinToString(" ") { side ->
+                borderSides[side] ?: "border-$side:1px solid var(--border-color);"
+            }
+        }
+    }
+
     private fun appendTableRowHtml(
         row: XWPFTableRow,
         rowIdx: Int,
         rowSpans: Map<Pair<Int, Int>, Int>,
-        sb: StringBuilder
+        sb: StringBuilder,
+        doc: XWPFDocument? = null,
+        footnotesMap: Map<String, String> = emptyMap()
     ) {
         val rowNodeName = try { row.ctRow?.domNode?.nodeName ?: "w:tr" } catch (_: Exception) { "w:tr" }
         try {
@@ -998,20 +1126,50 @@ class PoiWordEngine @Inject constructor(
                         else                      -> "text-align:left;"
                     }
 
+                    val cellTextDirection = try {
+                        val dom = tcPr?.domNode
+                        var dir: String? = null
+                        if (dom != null) {
+                            val nl = dom.childNodes
+                            for (i in 0 until nl.length) {
+                                val item = nl.item(i) ?: continue
+                                val name = item.localName ?: item.nodeName
+                                if (name.equals("textDirection", ignoreCase = true)) {
+                                    dir = item.attributes?.getNamedItem("w:val")?.nodeValue
+                                        ?: item.attributes?.getNamedItem("val")?.nodeValue
+                                    break
+                                }
+                            }
+                        }
+                        dir
+                    } catch (_: Exception) { null }
+
+                    val cellWritingMode = when (cellTextDirection?.lowercase()) {
+                        "tbrl", "tbrlv" -> "writing-mode:vertical-rl;"
+                        "btlr" -> "writing-mode:vertical-lr;"
+                        else -> "writing-mode:horizontal-tb;"
+                    }
+
+                    val cellBordersCss = extractCellBordersCss(cell)
                     val colSpanAttr = if (colSpan > 1) """ colspan="$colSpan"""" else ""
                     val rowSpanAttr = if (rSpan > 1) """ rowspan="$rSpan"""" else ""
                     val bgAttr = if (bgColor != null) "background-color:#$bgColor;" else ""
                     val alignAttr = "vertical-align:$vAlignStr;"
 
-                    sb.append("<$tag$colSpanAttr$rowSpanAttr style=\"$bgAttr$alignAttr$cellHAlignStr$widthStyle;box-sizing:border-box;word-break:normal;overflow-wrap:normal;white-space:normal;writing-mode:horizontal-tb;\">")
+                    sb.append("<$tag$colSpanAttr$rowSpanAttr style=\"$bgAttr$alignAttr$cellHAlignStr$widthStyle$cellWritingMode$cellBordersCss;padding:8px 10px;box-sizing:border-box;word-break:normal;overflow-wrap:normal;white-space:normal;\">")
 
                     var firstPara = true
                     for (para in cell.paragraphs) {
                         val cellText = try { para.text ?: "" } catch (_: Exception) { "" }
-                        if (cellText.isBlank() && firstPara) { firstPara = false; continue }
+                        val hasPictures = para.runs.any { it.embeddedPictures.isNotEmpty() }
+                        if (cellText.isBlank() && firstPara && !hasPictures) { firstPara = false; continue }
                         if (!firstPara) sb.append("<br>")
                         try {
-                            appendRunsHtmlSimple(para, sb)
+                            if (doc != null) {
+                                appendParagraphBodyContent(para, doc, sb, footnotesMap)
+                            } else {
+                                appendRunsHtmlSimple(para, sb)
+                            }
                         } catch (_: Exception) {
                             sb.append(htmlEscape(cellText))
                         }

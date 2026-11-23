@@ -499,21 +499,40 @@ object WordLayoutEngine {
 
   /* ══════════════════════════════════════════
      RESPONSIVE BOUNDS FOR MOBILE CANVASES (< 768px)
-     Protects margins from crushing the text column
+     Full-Width Web Reading Experience
      ══════════════════════════════════════════ */
   @media screen and (max-width: 768px) {
     :root {
-      --doc-margin-left: min(${margins.leftPt}pt, 20px) !important;
-      --doc-margin-right: min(${margins.rightPt}pt, 20px) !important;
-      --doc-margin-top: min(${margins.topPt}pt, 24px) !important;
-      --doc-margin-bottom: min(${margins.bottomPt}pt, 24px) !important;
+      --doc-margin-left: 16px !important;
+      --doc-margin-right: 16px !important;
+      --doc-margin-top: 18px !important;
+      --doc-margin-bottom: 20px !important;
     }
     body.mode-paged {
-      padding: 12px 6px 100px 6px !important;
+      padding: 0 0 100px 0 !important;
+      background-color: var(--bg-page) !important;
+      width: 100% !important;
+    }
+    body.mode-paged .docx-paged-container {
+      width: 100% !important;
+      max-width: 100% !important;
+      padding: 0 !important;
+      margin: 0 !important;
     }
     body.mode-paged .docx-page {
-      margin: 12px auto 20px auto !important;
-      padding: var(--doc-margin-top) var(--doc-margin-right) var(--doc-margin-bottom) var(--doc-margin-left) !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      min-height: auto !important;
+      margin: 0 !important;
+      border-radius: 0 !important;
+      border: none !important;
+      border-bottom: 1px solid var(--border-color) !important;
+      box-shadow: none !important;
+      padding: 20px 16px 28px 16px !important;
+      box-sizing: border-box !important;
+    }
+    body.mode-paged .docx-page:last-child {
+      border-bottom: none !important;
     }
   }
 
@@ -644,6 +663,29 @@ object WordLayoutEngine {
     display: flex;
     align-items: center;
     gap: 6px;
+  }
+  .diagram-controls {
+    display: inline-flex;
+    gap: 4px;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px;
+    border-radius: 4px;
+  }
+  .diag-tab-btn {
+    border: none;
+    background: transparent;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .diag-tab-btn.active {
+    background: white;
+    color: var(--primary-color);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
   .diagram-code-content {
     margin: 0;
@@ -875,6 +917,81 @@ object WordLayoutEngine {
     margin: 20px 0;
   }
 
+  /* ── Footnotes & Citations Section ── */
+  .docx-footnotes-section {
+    margin-top: 36px;
+    padding-top: 14px;
+    border-top: 1.5px solid var(--border-color);
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .docx-footnotes-divider {
+    width: 60px;
+    height: 2px;
+    background: var(--primary-color);
+    margin-bottom: 12px;
+    border-radius: 1px;
+  }
+  .docx-footnotes-header {
+    margin-bottom: 10px;
+  }
+  .docx-footnotes-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+  }
+  .docx-footnotes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .docx-footnote-item {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-muted);
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .docx-footnote-num {
+    font-weight: 700;
+    color: var(--primary-color);
+    flex-shrink: 0;
+  }
+  .docx-footnote-body {
+    flex: 1;
+    word-break: normal;
+    overflow-wrap: break-word;
+  }
+  .docx-footnote-backlink {
+    text-decoration: none;
+    color: var(--primary-color);
+  }
+  .docx-citation-anchor {
+    text-decoration: none;
+    color: inherit;
+  }
+  .docx-footnote-ref a {
+    text-decoration: none;
+    color: var(--primary-color) !important;
+    font-weight: 600;
+  }
+
+  /* ── Vertical Text Directions ── */
+  .text-dir-tbrl {
+    writing-mode: vertical-rl !important;
+    text-orientation: mixed !important;
+    display: inline-block;
+  }
+  .text-dir-btlr {
+    writing-mode: vertical-lr !important;
+    text-orientation: mixed !important;
+    transform: rotate(180deg);
+    display: inline-block;
+  }
+
   /* ── Dark Mode ── */
   .dark-mode {
     --primary-color: #60a5fa;
@@ -887,6 +1004,22 @@ object WordLayoutEngine {
     --page-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
     --page-border: 1px solid rgba(51, 65, 85, 0.7);
     color: #e2e8f0;
+  }
+  .dark-mode .diag-tab-btn.active {
+    background: #334155;
+    color: #93c5fd;
+  }
+  .dark-mode .diagram-vector-svg {
+    background: rgba(15, 23, 42, 0.9) !important;
+    box-shadow: inset 0 0 0 1px rgba(51, 65, 85, 0.6) !important;
+  }
+  .dark-mode .diagram-vector-svg text {
+    fill: #f1f5f9 !important;
+  }
+  .dark-mode .tree-leaf-node, .dark-mode .tree-branch-node {
+    background: rgba(96, 165, 250, 0.12) !important;
+    border-color: rgba(96, 165, 250, 0.25) !important;
+    color: #e2e8f0 !important;
   }
   .dark-mode.mode-paged {
     background-color: var(--bg-canvas) !important;
