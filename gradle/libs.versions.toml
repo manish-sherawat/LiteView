@@ -36,7 +36,6 @@ datastore = "1.1.1"
 
 # Apache POI (Office document parsing)
 apachePoi = "5.2.5"
-log4j = "2.20.0"
 aaltoXml = "1.3.2"
 
 # MuPDF (16 KB page-size compatible)
@@ -44,9 +43,6 @@ mupdf = "1.28.5"
 
 # PDFBox Android
 pdfboxAndroid = "2.0.27.0"
-
-# Coil
-coil = "3.0.0"
 
 # Lottie
 lottie = "6.6.2"
@@ -109,7 +105,6 @@ androidx-datastore-preferences = { group = "androidx.datastore", name = "datasto
 apache-poi = { group = "org.apache.poi", name = "poi", version.ref = "apachePoi" }
 apache-poi-ooxml = { group = "org.apache.poi", name = "poi-ooxml", version.ref = "apachePoi" }
 apache-poi-scratchpad = { group = "org.apache.poi", name = "poi-scratchpad", version.ref = "apachePoi" }
-log4j-api = { group = "org.apache.logging.log4j", name = "log4j-api", version.ref = "log4j" }
 aalto-xml = { group = "com.fasterxml", name = "aalto-xml", version.ref = "aaltoXml" }
 
 # MuPDF
@@ -117,9 +112,6 @@ mupdf = { group = "com.artifex.mupdf", name = "fitz", version.ref = "mupdf" }
 
 # PDFBox Android
 pdfbox-android = { group = "com.tom-roush", name = "pdfbox-android", version.ref = "pdfboxAndroid" }
-
-# Coil
-coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 
 # Lottie
 lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottie" }

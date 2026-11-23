@@ -56,6 +56,9 @@ class PresentationReaderViewModel @Inject constructor(
 
     init {
         try {
+            System.setProperty("org.apache.poi.javax.xml.stream.XMLInputFactory", "com.fasterxml.aalto.stax.InputFactoryImpl")
+            System.setProperty("org.apache.poi.javax.xml.stream.XMLOutputFactory", "com.fasterxml.aalto.stax.OutputFactoryImpl")
+            System.setProperty("org.apache.poi.javax.xml.stream.XMLEventFactory", "com.fasterxml.aalto.stax.EventFactoryImpl")
             System.setProperty("javax.xml.stream.XMLInputFactory", "com.fasterxml.aalto.stax.InputFactoryImpl")
             System.setProperty("javax.xml.stream.XMLOutputFactory", "com.fasterxml.aalto.stax.OutputFactoryImpl")
             System.setProperty("javax.xml.stream.XMLEventFactory", "com.fasterxml.aalto.stax.EventFactoryImpl")
@@ -154,68 +157,91 @@ class PresentationReaderViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = PresentationUiState.Loading
 
-            val decodedFileName = safeUrlDecode(rawFileName)
-            val decodedUriString = safeUrlDecode(encodedUri)
+            try {
+                val decodedFileName = safeUrlDecode(rawFileName)
+                val decodedUriString = safeUrlDecode(encodedUri)
 
-            val targetFile = withContext(Dispatchers.IO) {
-                prepareLocalFile(Uri.parse(decodedUriString), decodedFileName)
-            }
+                val targetFile = withContext(Dispatchers.IO) {
+                    prepareLocalFile(Uri.parse(decodedUriString), decodedFileName)
+                }
 
-            if (targetFile == null || !targetFile.exists()) {
-                _uiState.value = PresentationUiState.Error("Unable to access presentation file.")
-                return@launch
-            }
+                if (targetFile == null || !targetFile.exists() || targetFile.length() <= 0L) {
+                    _uiState.value = PresentationUiState.Error("Unable to access presentation file.")
+                    return@launch
+                }
 
-            // Save to recent documents history
-            withContext(Dispatchers.IO) {
-                try {
-                    val isPpt = decodedFileName.endsWith(".ppt", ignoreCase = true)
-                    val mime = if (isPpt) "application/vnd.ms-powerpoint" else "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                    recentDocumentDao.upsert(
-                        RecentDocument(
-                            uri = decodedUriString,
-                            fileName = decodedFileName,
-                            mimeType = mime,
-                            fileSizeBytes = targetFile.length(),
-                            lastOpenedAt = System.currentTimeMillis(),
-                            documentType = com.nexus.core.navigation.DocumentType.PPTX.name,
-                            lastScrollIndex = 0,
-                            lastScrollOffset = 0
+                // Save to recent documents history
+                withContext(Dispatchers.IO) {
+                    try {
+                        val isPpt = decodedFileName.endsWith(".ppt", ignoreCase = true)
+                        val mime = if (isPpt) "application/vnd.ms-powerpoint" else "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                        recentDocumentDao.upsert(
+                            RecentDocument(
+                                uri = decodedUriString,
+                                fileName = decodedFileName,
+                                mimeType = mime,
+                                fileSizeBytes = targetFile.length(),
+                                lastOpenedAt = System.currentTimeMillis(),
+                                documentType = com.nexus.core.navigation.DocumentType.PPTX.name,
+                                lastScrollIndex = 0,
+                                lastScrollOffset = 0
+                            )
                         )
-                    )
-                } catch (_: Exception) {
-                    // Non-fatal if recent history upsert fails
+                    } catch (_: Throwable) {
+                        // Non-fatal if recent history upsert fails
+                    }
                 }
-            }
 
-            val doc: PresentationDocument? = withContext(Dispatchers.IO) {
-                var loadedDoc: PresentationDocument? = null
-                if (lokitManager.isAvailable()) {
-                    loadedDoc = lokitManager.openDocument(targetFile)
+                val doc: PresentationDocument? = withContext(Dispatchers.IO) {
+                    var loadedDoc: PresentationDocument? = null
+                    try {
+                        // 1. Primary engine: Apache POI with rich native Compose rendering & fast loading
+                        loadedDoc = com.nexus.feature.reader.presentation.engine.poi.PoiPresentationParser.parse(targetFile)
+                    } catch (t: Throwable) {
+                        android.util.Log.w("PresentationVM", "POI presentation parser failed for ${targetFile.name}", t)
+                    }
+                    if (loadedDoc == null && lokitManager.isAvailable()) {
+                        try {
+                            // 2. Fallback engine: LibreOfficeKit if bootstrap assets exist
+                            loadedDoc = lokitManager.openDocument(targetFile)
+                        } catch (t: Throwable) {
+                            android.util.Log.e("PresentationVM", "LOKit fallback failed for ${targetFile.name}", t)
+                        }
+                    }
+                    loadedDoc
                 }
-                if (loadedDoc == null) {
-                    // Seamlessly fallback to Apache POI parser (offline native Compose model)
-                    loadedDoc = com.nexus.feature.reader.presentation.engine.poi.PoiPresentationParser.parse(targetFile)
+
+                if (doc == null || doc.slideCount <= 0) {
+                    val msg = if (doc != null && doc.slideCount == 0) {
+                        "This presentation contains no slides."
+                    } else {
+                        "Unable to parse presentation file."
+                    }
+                    _uiState.value = PresentationUiState.Error(msg)
+                    return@launch
                 }
-                loadedDoc
+
+                activeDocument = doc
+                isBitmapRenderingSupported = try {
+                    doc.renderSlide(0, 10, 10) != null
+                } catch (t: Throwable) {
+                    false
+                }
+
+                _uiState.value = PresentationUiState.Success(
+                    fileName = decodedFileName,
+                    slideCount = doc.slideCount,
+                    currentSlideIndex = 0,
+                    slides = doc.slides
+                )
+                triggerPreRenderCache(0)
+                prefetchThumbnails((0 until minOf(12, doc.slideCount)).toList())
+            } catch (t: Throwable) {
+                android.util.Log.e("PresentationVM", "Fatal error opening presentation", t)
+                _uiState.value = PresentationUiState.Error(
+                    t.localizedMessage?.ifBlank { null } ?: "Failed to open presentation document."
+                )
             }
-
-            if (doc == null) {
-                _uiState.value = PresentationUiState.Error("Unable to parse presentation file.")
-                return@launch
-            }
-
-            activeDocument = doc
-            isBitmapRenderingSupported = (doc.renderSlide(0, 10, 10) != null)
-
-            _uiState.value = PresentationUiState.Success(
-                fileName = decodedFileName,
-                slideCount = doc.slideCount,
-                currentSlideIndex = 0,
-                slides = doc.slides
-            )
-            triggerPreRenderCache(0)
-            prefetchThumbnails((0 until minOf(12, doc.slideCount)).toList())
         }
     }
 
@@ -534,15 +560,17 @@ class PresentationReaderViewModel @Inject constructor(
             if (uri.scheme == "file") {
                 uri.path?.let { File(it) }
             } else {
-                val tempFile = File(context.cacheDir, "temp_presentation_${System.currentTimeMillis()}_$fileName")
-                context.contentResolver.openInputStream(uri)?.use { input ->
+                val sanitized = fileName.replace(Regex("[^a-zA-Z0-9._-]"), "_").ifBlank { "document.pptx" }
+                val tempFile = File(context.cacheDir, "temp_presentation_${System.currentTimeMillis()}_$sanitized")
+                val stream = context.contentResolver.openInputStream(uri) ?: return null
+                stream.use { input ->
                     FileOutputStream(tempFile).use { output ->
                         input.copyTo(output)
                     }
                 }
-                tempFile
+                if (tempFile.exists() && tempFile.length() > 0L) tempFile else null
             }
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             null
         }
     }

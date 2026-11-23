@@ -21,8 +21,17 @@ needed_icons.txt
 # External reference projects
 AndroidLiquidGlass-kmp/
 
+# Credentials & Secrets (Never commit or push)
 *.jks
 *.keystore
 keystore.properties
 key.properties
+signing.properties
+secrets.properties
+*.secret
+*.env
+.env*
+*.token
+google-services.json
+
 

@@ -57,10 +57,6 @@ dependencies {
     implementation(libs.apache.poi)
     implementation(libs.apache.poi.ooxml)
     implementation(libs.apache.poi.scratchpad)
-    implementation(libs.log4j.api)
     implementation(libs.aalto.xml)
-
-    // Coil
-    implementation(libs.coil.compose)
 }
 tasks.withType<JavaCompile>().configureEach { exclude("**/byRounds/**") }

@@ -24,6 +24,14 @@ class LOKitManager @Inject constructor(
      * Checks if LibreOffice native binaries are packaged and loadable on this device.
      */
     fun isAvailable(): Boolean {
+        // LibreOfficeKit presentation rendering requires full UNO bootstrap assets (services.rdb)
+        // Without these assets, nativeInit crashes with SIGABRT/SIGSEGV.
+        val installDir = File(context.filesDir, "libreoffice")
+        val servicesRdb = File(installDir, "program/services.rdb")
+        val altServicesRdb = File(installDir, "services.rdb")
+        if (!servicesRdb.exists() && !altServicesRdb.exists()) {
+            return false
+        }
         return LOKitBridge.isNativeLoaded() && try {
             LOKitBridge.nativeIsEngineAvailable()
         } catch (_: Throwable) {
@@ -51,6 +59,13 @@ class LOKitManager @Inject constructor(
             // Copy assets if packaged in apk
             unpackAssetsIfNeeded("libreoffice", installDir)
 
+            val servicesRdb = File(installDir, "program/services.rdb")
+            val altServicesRdb = File(installDir, "services.rdb")
+            if (!servicesRdb.exists() && !altServicesRdb.exists()) {
+                Log.w(tag, "LibreOffice bootstrap assets (services.rdb) not found; skipping native initialization")
+                return@withContext false
+            }
+
             val userProfileDir = File(context.cacheDir, "lo_profile")
             if (!userProfileDir.exists()) {
                 userProfileDir.mkdirs()
@@ -68,8 +83,8 @@ class LOKitManager @Inject constructor(
                 Log.w(tag, "nativeInit returned 0 (LibreOffice core binaries may not be present in jniLibs)")
                 false
             }
-        } catch (e: Exception) {
-            Log.e(tag, "Error during LOKit initialization", e)
+        } catch (t: Throwable) {
+            Log.e(tag, "Error during LOKit initialization", t)
             false
         }
     }

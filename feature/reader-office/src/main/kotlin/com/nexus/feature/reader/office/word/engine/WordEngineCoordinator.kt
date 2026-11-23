@@ -42,7 +42,7 @@ class WordEngineCoordinator @Inject constructor(
             try {
                 userPreferencesRepository.useLibreOfficeEngine.first()
             } catch (_: Exception) {
-                true // Default to primary LOKit engine
+                false // Default to high-performance, 16KB-compliant Native OOXML-to-PDF converter
             }
         }
 

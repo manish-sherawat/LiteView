@@ -23,8 +23,8 @@ android {
         applicationId = "com.nexus.nexusdocs"
         minSdk = 26
         targetSdk = 36
-        versionCode = 500
-        versionName = "5.5.0"
+        versionCode = 600
+        versionName = "6.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -92,6 +92,21 @@ android {
                 "**/libc++_shared.so",
                 "lib/arm64-v8a/libc++_shared.so"
             )
+            excludes += listOf(
+                "**/liblo-native-code.so",
+                "**/libsmime3.so",
+                "**/libsoftokn3.so",
+                "**/libplds4.so",
+                "**/libfreebl3.so",
+                "**/libnssckbi.so",
+                "**/libnss3.so",
+                "**/libnssdbm3.so",
+                "**/libssl3.so",
+                "**/libnspr4.so",
+                "**/libnssutil3.so",
+                "**/libsqlite3.so",
+                "**/libplc4.so"
+            )
         }
     }
 }
@@ -126,7 +141,6 @@ dependencies {
 
     implementation(libs.compose.animation)
     debugImplementation(libs.compose.ui.tooling)
-    debugImplementation(libs.compose.ui.test.manifest)
 
     // Navigation
     implementation(libs.navigation.compose)
@@ -142,10 +156,6 @@ dependencies {
 
     // Testing
     testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(composeBom)
-    androidTestImplementation(libs.compose.ui.test.junit4)
 }
 
 tasks.withType<JavaCompile>().configureEach { exclude("**/byRounds/**") }

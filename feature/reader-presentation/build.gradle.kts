@@ -92,14 +92,10 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
-    // Coil for thumbnail caching
-    implementation(libs.coil.compose)
-
     // Apache POI — PPTX / PPT Parsing Engine
     implementation(libs.apache.poi)
     implementation(libs.apache.poi.ooxml)
     implementation(libs.apache.poi.scratchpad)
-    implementation(libs.log4j.api)
     implementation(libs.aalto.xml)
 }
 

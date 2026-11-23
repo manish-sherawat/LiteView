@@ -366,8 +366,8 @@ fun PresentationReaderScreen(
             is PresentationUiState.Success -> {
                 val hazeState = remember { HazeState() }
                 val pagerState = rememberPagerState(
-                    initialPage = state.currentSlideIndex,
-                    pageCount = { state.slideCount }
+                    initialPage = state.currentSlideIndex.coerceIn(0, maxOf(0, state.slideCount - 1)),
+                    pageCount = { maxOf(1, state.slideCount) }
                 )
 
                 LaunchedEffect(pagerState) {

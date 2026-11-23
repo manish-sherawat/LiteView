@@ -75,7 +75,7 @@ object PoiPresentationParser {
                 lowerName.endsWith(".ppt") -> parsePpt(file) ?: parsePptx(file)
                 else -> parsePptx(file) ?: parsePpt(file)
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Failed to parse presentation ${file.absolutePath}", e)
             null
         }
@@ -459,7 +459,7 @@ object PoiPresentationParser {
                                     }
                                 }
                             }
-                        } catch (shapeError: Exception) {
+                        } catch (shapeError: Throwable) {
                             Log.w(TAG, "Error parsing shape on slide $index", shapeError)
                         }
                     }
@@ -549,7 +549,7 @@ object PoiPresentationParser {
                     }
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "parsePptx failed", e)
             null
         }
@@ -734,7 +734,7 @@ object PoiPresentationParser {
                                     }
                                 }
                             }
-                        } catch (shapeError: Exception) {
+                        } catch (shapeError: Throwable) {
                             Log.w(TAG, "Error parsing HSLF shape on slide $index", shapeError)
                         }
                     }
@@ -813,7 +813,7 @@ object PoiPresentationParser {
                     }
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "parsePpt failed", e)
             null
         }

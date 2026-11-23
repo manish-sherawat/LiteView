@@ -25,10 +25,10 @@ Java_com_nexus_feature_reader_presentation_engine_LOKitBridge_nativeIsEngineAvai
     if (sLokInitFunc != nullptr) {
         return JNI_TRUE;
     }
-    // Check if libreoffice library is already loaded or in system path
-    void* handle = dlopen("liblo-native-code.so", RTLD_NOW | RTLD_GLOBAL);
+    // Only check if already loaded using RTLD_NOLOAD to avoid greedy 200MB mappings
+    void* handle = dlopen("liblo-native-code.so", RTLD_NOLOAD);
     if (!handle) {
-        handle = dlopen("libsofficeapp.so", RTLD_NOW | RTLD_GLOBAL);
+        handle = dlopen("libsofficeapp.so", RTLD_NOLOAD);
     }
     if (handle) {
         auto initFunc = (LokInitFunc)dlsym(handle, "libreofficekit_hook_2");
@@ -53,8 +53,31 @@ Java_com_nexus_feature_reader_presentation_engine_LOKitBridge_nativeInit(
 
     LOGI("nativeInit: initializing LibreOfficeKit with installPath=%s", installPath);
 
+    if (installPath == nullptr || strlen(installPath) == 0) {
+        LOGE("nativeInit: invalid installPath");
+        if (jInstallPath) env->ReleaseStringUTFChars(jInstallPath, installPath);
+        if (jUserProfileUrl) env->ReleaseStringUTFChars(jUserProfileUrl, userProfileUrl);
+        return 0;
+    }
+
+    // CRITICAL: Verify that the required LibreOffice bootstrap files actually exist before calling sLokInitFunc.
+    // If services.rdb is missing, libreofficekit_hook_2 will call abort() or segfault, which terminates the entire app process.
+    std::string testPath = std::string(installPath) + "/program/services.rdb";
+    FILE* f = fopen(testPath.c_str(), "rb");
+    if (!f) {
+        // Also check if installPath itself has services.rdb directly
+        std::string testPath2 = std::string(installPath) + "/services.rdb";
+        f = fopen(testPath2.c_str(), "rb");
+    }
+    if (!f) {
+        LOGE("nativeInit: LibreOffice bootstrap services.rdb not found in %s; aborting init to prevent process crash", installPath);
+        if (jInstallPath) env->ReleaseStringUTFChars(jInstallPath, installPath);
+        if (jUserProfileUrl) env->ReleaseStringUTFChars(jUserProfileUrl, userProfileUrl);
+        return 0;
+    }
+    fclose(f);
+
     if (sLokInitFunc == nullptr) {
-        // Attempt dlopen
         void* handle = dlopen("liblo-native-code.so", RTLD_NOW | RTLD_GLOBAL);
         if (!handle) {
             handle = dlopen("libsofficeapp.so", RTLD_NOW | RTLD_GLOBAL);
