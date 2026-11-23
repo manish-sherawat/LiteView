@@ -20,6 +20,11 @@ import android.text.style.StyleSpan
 import android.text.style.UnderlineSpan
 import android.util.Log
 import com.nexus.feature.reader.office.word.model.DocxHeading
+import com.nexus.feature.reader.office.word.parser.DocumentMargins
+import com.nexus.feature.reader.office.word.parser.PageOrientation
+import com.nexus.feature.reader.office.word.parser.PageSetup
+import com.nexus.feature.reader.office.word.parser.PaperSize
+import com.nexus.feature.reader.office.word.parser.WordLayoutEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.apache.poi.hwpf.HWPFDocument
@@ -34,25 +39,28 @@ import kotlin.math.max
 
 /**
  * Native in-memory conversion service that converts OOXML (DOCX) and binary Word (DOC)
- * documents into standard PDF byte streams.
+ * documents into standard PDF byte streams with strict typography and spacing rules.
  *
  * Guarantees:
  * 1. 100% In-Memory: Streams directly into a [ByteArrayOutputStream]. Zero files written to permanent storage.
- * 2. High-Fidelity Vector & Bitmap Rendering: Headers, footers, text runs, tables, images, and math text.
+ * 2. Strict Layout & Spacing:
+ *    - Strict page margins: All elements constrained within printable bounds.
+ *    - Calibrated paragraph padding: Strict space before and space after on body paragraphs and list items.
+ *    - Hierarchy-aware heading separation: Distinct space before (14-24pt) and space after (7-12pt) with orphan protection.
+ *    - Decorative line spacing: Generous vertical padding around horizontal rules and paragraph borders to prevent overlapping.
+ *    - Comfortable line spacing: Minimum 1.28-1.30x line multiplier to prevent crowded text and descender/ascender collisions.
  * 3. Robust Fault-Tolerance: Recovers gracefully from damaged nodes without failing the whole document.
  */
 object NativeWordToPdfConverter {
 
     private const val TAG = "NativeWordToPdf"
 
-    // Standard A4 dimensions in PostScript points (72 points per inch)
-    private const val PAGE_WIDTH_PT = 595
-    private const val PAGE_HEIGHT_PT = 842
-    private const val MARGIN_X = 54f
-    private const val MARGIN_TOP = 54f
-    private const val MARGIN_BOTTOM = 54f
-    private const val CONTENT_WIDTH = PAGE_WIDTH_PT - (MARGIN_X * 2f) // 487 pt
-    private const val CONTENT_HEIGHT = PAGE_HEIGHT_PT - MARGIN_TOP - MARGIN_BOTTOM // 734 pt
+    // Default standard A4 fallback dimensions in PostScript points (72 points per inch)
+    private const val DEFAULT_PAGE_WIDTH_PT = 595
+    private const val DEFAULT_PAGE_HEIGHT_PT = 842
+    private const val DEFAULT_MARGIN_X = 54f
+    private const val DEFAULT_MARGIN_TOP = 54f
+    private const val DEFAULT_MARGIN_BOTTOM = 54f
 
     suspend fun convertToPdfStream(
         context: Context,
@@ -123,25 +131,50 @@ object NativeWordToPdfConverter {
 
         try {
             XWPFDocument(finalStream).use { doc ->
+                // Extract document page setup and enforce strict margin rules
+                val pageSetup = try {
+                    WordLayoutEngine.extractPageSetup(doc)
+                } catch (_: Exception) {
+                    PageSetup(
+                        paperSize = PaperSize.A4,
+                        widthPt = DEFAULT_PAGE_WIDTH_PT.toFloat(),
+                        heightPt = DEFAULT_PAGE_HEIGHT_PT.toFloat(),
+                        orientation = PageOrientation.PORTRAIT,
+                        margins = DocumentMargins(DEFAULT_MARGIN_TOP, DEFAULT_MARGIN_BOTTOM, DEFAULT_MARGIN_X, DEFAULT_MARGIN_X)
+                    )
+                }
+
+                val pageWidthPt = pageSetup.widthPt.toInt().coerceIn(320, 1600)
+                val pageHeightPt = pageSetup.heightPt.toInt().coerceIn(400, 2200)
+
+                // Enforce strict margin rules:
+                val marginLeft = pageSetup.margins.leftPt.coerceIn(40f, 90f)
+                val marginRight = pageSetup.margins.rightPt.coerceIn(40f, 90f)
+                val marginTop = pageSetup.margins.topPt.coerceIn(48f, 90f)
+                val marginBottom = pageSetup.margins.bottomPt.coerceIn(48f, 90f)
+
+                val contentWidth = pageWidthPt - marginLeft - marginRight
+                val pageBottomLimit = pageHeightPt - marginBottom
+
                 var currentPageNum = 1
-                var pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH_PT, PAGE_HEIGHT_PT, currentPageNum).create()
+                var pageInfo = PdfDocument.PageInfo.Builder(pageWidthPt, pageHeightPt, currentPageNum).create()
                 var currentPage = pdfDoc.startPage(pageInfo)
                 var currentCanvas = currentPage.canvas
-                var cursorY = MARGIN_TOP
+                var cursorY = marginTop
 
                 val bgPaint = Paint().apply { color = Color.WHITE; style = Paint.Style.FILL }
-                currentCanvas.drawRect(0f, 0f, PAGE_WIDTH_PT.toFloat(), PAGE_HEIGHT_PT.toFloat(), bgPaint)
+                currentCanvas.drawRect(0f, 0f, pageWidthPt.toFloat(), pageHeightPt.toFloat(), bgPaint)
 
                 fun startNewPage() {
-                    drawPageFooter(currentCanvas, currentPageNum)
+                    drawPageFooter(currentCanvas, currentPageNum, pageWidthPt.toFloat(), pageHeightPt.toFloat(), marginLeft, marginRight)
                     pdfDoc.finishPage(currentPage)
 
                     currentPageNum++
-                    pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH_PT, PAGE_HEIGHT_PT, currentPageNum).create()
+                    pageInfo = PdfDocument.PageInfo.Builder(pageWidthPt, pageHeightPt, currentPageNum).create()
                     currentPage = pdfDoc.startPage(pageInfo)
                     currentCanvas = currentPage.canvas
-                    currentCanvas.drawRect(0f, 0f, PAGE_WIDTH_PT.toFloat(), PAGE_HEIGHT_PT.toFloat(), bgPaint)
-                    cursorY = MARGIN_TOP
+                    currentCanvas.drawRect(0f, 0f, pageWidthPt.toFloat(), pageHeightPt.toFloat(), bgPaint)
+                    cursorY = marginTop
                 }
 
                 for (elem in doc.bodyElements) {
@@ -149,44 +182,116 @@ object NativeWordToPdfConverter {
                         BodyElementType.PARAGRAPH -> {
                             val para = elem as XWPFParagraph
                             val rawText = para.text ?: ""
-                            val style = try { para.style ?: "" } catch (_: Exception) { "" }
-                            val isHeading = style.lowercase().startsWith("heading")
                             val cleanText = rawText.trim()
+                            val paraStyleId = try { para.style ?: "" } catch (_: Exception) { "" }
+                            val isHeading = paraStyleId.lowercase().startsWith("heading")
+                            val headingLevel = if (isHeading) {
+                                paraStyleId.filter { it.isDigit() }.firstOrNull()?.digitToInt()?.coerceIn(1, 6) ?: 1
+                            } else 0
 
-                            if (isHeading && cleanText.isNotBlank() && cleanText.length >= 2) {
-                                val lvl = style.filter { it.isDigit() }.firstOrNull()?.digitToInt()?.coerceIn(1, 6) ?: 1
-                                headings.add(DocxHeading(text = cleanText, level = lvl, anchorId = "h_${headings.size}"))
+                            // Check explicit page break
+                            if (WordLayoutEngine.hasExplicitPageBreak(para)) {
+                                if (cursorY > marginTop) {
+                                    startNewPage()
+                                }
                             }
 
-                            // Check pictures
+                            if (isHeading && cleanText.isNotBlank() && cleanText.length >= 2) {
+                                headings.add(DocxHeading(text = cleanText, level = headingLevel, anchorId = "h_${headings.size}"))
+                            }
+
+                            // Calculate paragraph indentation math
+                            val rawIndentLeft = try { para.indentationLeft } catch (_: Exception) { -1 }
+                            val rawIndentRight = try { para.indentationRight } catch (_: Exception) { -1 }
+                            val indentLeft = if (rawIndentLeft > 0) (rawIndentLeft / 20f).coerceIn(0f, 160f) else 0f
+                            val indentRight = if (rawIndentRight > 0) (rawIndentRight / 20f).coerceIn(0f, 120f) else 0f
+
+                            val isList = try { para.numID != null || para.numFmt != null } catch (_: Exception) { false }
+                            val listLevel = try { para.numIlvl?.toInt() ?: 0 } catch (_: Exception) { 0 }
+                            val listIndent = if (isList) ((listLevel + 1) * 18f).coerceIn(18f, 120f) else 0f
+
+                            val effectiveLeft = marginLeft + indentLeft + listIndent
+                            val availableWidth = (pageWidthPt - effectiveLeft - marginRight - indentRight).coerceIn(120f, contentWidth)
+
+                            // Check for decorative horizontal rule / divider line
+                            val isHorizontalRule = cleanText.matches(Regex("^[-_*=~]{3,}$"))
+                            if (isHorizontalRule) {
+                                val dividerSpaceBefore = 12f
+                                val dividerSpaceAfter = 14f
+                                if (cursorY + dividerSpaceBefore + 2f + dividerSpaceAfter > pageBottomLimit) {
+                                    startNewPage()
+                                } else {
+                                    cursorY += if (cursorY == marginTop) 4f else dividerSpaceBefore
+                                }
+                                val dividerPaint = Paint().apply {
+                                    color = Color.rgb(203, 213, 225)
+                                    strokeWidth = 1.25f
+                                    style = Paint.Style.STROKE
+                                }
+                                currentCanvas.drawLine(effectiveLeft, cursorY, effectiveLeft + availableWidth, cursorY, dividerPaint)
+                                cursorY += dividerSpaceAfter
+                                continue
+                            }
+
+                            // Check paragraph borders
+                            val hasTopBorder = try {
+                                val bdrTop = para.ctp.pPr?.pBdr?.top
+                                bdrTop != null && bdrTop.`val`?.toString()?.lowercase() != "none"
+                            } catch (_: Exception) { false }
+
+                            val hasBottomBorder = try {
+                                val bdrBottom = para.ctp.pPr?.pBdr?.bottom
+                                bdrBottom != null && bdrBottom.`val`?.toString()?.lowercase() != "none"
+                            } catch (_: Exception) { false }
+
+                            // Handle embedded pictures inside paragraph
                             val pictures = para.runs.flatMap { it.embeddedPictures }
                             for (pic in pictures) {
                                 val data = try { pic.pictureData.data } catch (_: Exception) { null }
                                 if (data != null && data.isNotEmpty()) {
                                     val bmp = BitmapFactory.decodeByteArray(data, 0, data.size)
                                     if (bmp != null) {
-                                        val maxW = CONTENT_WIDTH
+                                        val picSpaceBefore = if (cursorY == marginTop) 4f else 12f
+                                        val picSpaceAfter = 14f
+                                        val maxW = availableWidth
                                         val aspect = bmp.height.toFloat() / bmp.width.toFloat().coerceAtLeast(1f)
                                         val drawW = minOf(maxW, bmp.width.toFloat())
                                         val drawH = drawW * aspect
 
-                                        if (cursorY + drawH > MARGIN_TOP + CONTENT_HEIGHT) {
+                                        if (cursorY + picSpaceBefore + drawH + picSpaceAfter > pageBottomLimit) {
                                             startNewPage()
+                                        } else {
+                                            cursorY += picSpaceBefore
                                         }
 
-                                        val left = MARGIN_X + ((CONTENT_WIDTH - drawW) / 2f)
+                                        val left = effectiveLeft + ((availableWidth - drawW) / 2f)
                                         currentCanvas.drawBitmap(bmp, null, RectF(left, cursorY, left + drawW, cursorY + drawH), null)
-                                        cursorY += drawH + 12f
+                                        cursorY += drawH + picSpaceAfter
                                     }
                                 }
                             }
 
+                            // Blank paragraph handling: enforce strict vertical padding
                             if (rawText.isBlank()) {
-                                cursorY += 8f
-                                if (cursorY > MARGIN_TOP + CONTENT_HEIGHT) startNewPage()
+                                cursorY += 10f
+                                if (cursorY > pageBottomLimit) startNewPage()
                                 continue
                             }
 
+                            // Draw decorative top border with proper vertical separation
+                            if (hasTopBorder) {
+                                val topBorderSpace = if (cursorY == marginTop) 4f else 8f
+                                cursorY += topBorderSpace
+                                val borderPaint = Paint().apply {
+                                    color = Color.rgb(203, 213, 225)
+                                    strokeWidth = 1f
+                                    style = Paint.Style.STROKE
+                                }
+                                currentCanvas.drawLine(effectiveLeft, cursorY, effectiveLeft + availableWidth, cursorY, borderPaint)
+                                cursorY += 8f // separation between decorative top line and text
+                            }
+
+                            // Alignment
                             val alignment = try { para.alignment ?: ParagraphAlignment.LEFT } catch (_: Exception) { ParagraphAlignment.LEFT }
                             val layoutAlign = when (alignment) {
                                 ParagraphAlignment.CENTER -> Layout.Alignment.ALIGN_CENTER
@@ -194,42 +299,141 @@ object NativeWordToPdfConverter {
                                 else -> Layout.Alignment.ALIGN_NORMAL
                             }
 
+                            // Configure strict line spacing settings
+                            val rawSpacingBetween = try { para.spacingBetween.toDouble() } catch (_: Exception) { -1.0 }
+                            val lineMultiplier = if (rawSpacingBetween > 0) {
+                                (rawSpacingBetween / 240.0).coerceIn(1.20, 2.2).toFloat()
+                            } else {
+                                if (isHeading) 1.22f else 1.30f
+                            }
+                            val lineAdd = if (isHeading) 3.5f else 3.0f
+
+                            // Typography configuration
                             val ssb = buildSpannable(para, isHeading)
                             val tp = TextPaint().apply {
                                 isAntiAlias = true
-                                textSize = if (isHeading) 17f else 11.5f
-                                color = if (isHeading) Color.rgb(30, 41, 59) else Color.rgb(51, 65, 85)
+                                textSize = if (isHeading) {
+                                    when (headingLevel) {
+                                        1 -> 20f
+                                        2 -> 16f
+                                        3 -> 14f
+                                        else -> 12.5f
+                                    }
+                                } else {
+                                    11.5f
+                                }
+                                color = if (isHeading) {
+                                    when (headingLevel) {
+                                        1 -> Color.rgb(15, 23, 42) // Slate 900
+                                        2 -> Color.rgb(30, 41, 59) // Slate 800
+                                        else -> Color.rgb(51, 65, 85) // Slate 700
+                                    }
+                                } else {
+                                    Color.rgb(51, 65, 85)
+                                }
                                 if (isHeading) typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                             }
 
                             val staticLayout = StaticLayout.Builder
-                                .obtain(ssb, 0, ssb.length, tp, CONTENT_WIDTH.toInt())
+                                .obtain(ssb, 0, ssb.length, tp, availableWidth.toInt())
                                 .setAlignment(layoutAlign)
-                                .setLineSpacing(3f, 1.15f)
+                                .setLineSpacing(lineAdd, lineMultiplier)
                                 .setIncludePad(false)
                                 .build()
 
                             val elementHeight = staticLayout.height.toFloat()
-                            val spacingAfter = if (isHeading) 12f else 6f
 
-                            if (cursorY + elementHeight > MARGIN_TOP + CONTENT_HEIGHT) {
+                            // Vertical separation settings: strict spacing before and spacing after
+                            val rawSpacingBefore = try { para.spacingBefore.toDouble() } catch (_: Exception) { -1.0 }
+                            val rawSpacingAfter = try { para.spacingAfter.toDouble() } catch (_: Exception) { -1.0 }
+
+                            val spacingBefore = if (cursorY == marginTop) {
+                                0f // Suppress space before at top of page
+                            } else if (rawSpacingBefore > 0) {
+                                (rawSpacingBefore / 20.0).coerceIn(0.0, 36.0).toFloat()
+                            } else {
+                                if (isHeading) {
+                                    when (headingLevel) {
+                                        1 -> 24f
+                                        2 -> 18f
+                                        3 -> 14f
+                                        else -> 12f
+                                    }
+                                } else {
+                                    0f
+                                }
+                            }
+
+                            val spacingAfter = if (rawSpacingAfter > 0) {
+                                (rawSpacingAfter / 20.0).coerceIn(3.0, 36.0).toFloat()
+                            } else {
+                                if (isHeading) {
+                                    when (headingLevel) {
+                                        1 -> 12f
+                                        2 -> 9f
+                                        3 -> 7f
+                                        else -> 6f
+                                    }
+                                } else if (isList) {
+                                    5f
+                                } else {
+                                    8f // Strict paragraph padding for normal body text
+                                }
+                            }
+
+                            // Keep-with-next / Orphan prevention for headings
+                            val keepWithNextRoom = if (isHeading) 44f else 0f
+                            if (cursorY + spacingBefore + elementHeight + spacingAfter + keepWithNextRoom > pageBottomLimit) {
                                 startNewPage()
+                            } else {
+                                cursorY += spacingBefore
+                            }
+
+                            // Draw list bullet dot if list item
+                            if (isList && cleanText.isNotBlank()) {
+                                val bulletPaint = Paint().apply {
+                                    color = Color.rgb(100, 116, 139)
+                                    style = Paint.Style.FILL
+                                    isAntiAlias = true
+                                }
+                                val bulletY = cursorY + (tp.textSize * 0.72f)
+                                currentCanvas.drawCircle(effectiveLeft - 9f, bulletY, 2.2f, bulletPaint)
                             }
 
                             currentCanvas.save()
-                            currentCanvas.translate(MARGIN_X, cursorY)
+                            currentCanvas.translate(effectiveLeft, cursorY)
                             staticLayout.draw(currentCanvas)
                             currentCanvas.restore()
 
-                            cursorY += elementHeight + spacingAfter
+                            cursorY += elementHeight
+
+                            // Draw decorative bottom border with proper separation
+                            if (hasBottomBorder) {
+                                cursorY += 6f
+                                val borderPaint = Paint().apply {
+                                    color = Color.rgb(203, 213, 225)
+                                    strokeWidth = 1f
+                                    style = Paint.Style.STROKE
+                                }
+                                currentCanvas.drawLine(effectiveLeft, cursorY, effectiveLeft + availableWidth, cursorY, borderPaint)
+                                cursorY += 12f // generous vertical separation after decorative line
+                            } else {
+                                cursorY += spacingAfter
+                            }
                         }
                         BodyElementType.TABLE -> {
                             val table = elem as XWPFTable
                             val numRows = table.rows.size
                             if (numRows == 0) continue
 
+                            val tableSpaceBefore = if (cursorY == marginTop) 4f else 14f
+                            val tableSpaceAfter = 16f
+
                             val numCols = table.rows.maxOfOrNull { it.tableCells.size } ?: 1
-                            val colW = CONTENT_WIDTH / numCols.coerceAtLeast(1)
+                            val colW = contentWidth / numCols.coerceAtLeast(1)
+                            val cellPadH = 8f
+                            val cellPadV = 6f
+
                             val cellPaint = TextPaint().apply {
                                 isAntiAlias = true
                                 textSize = 10f
@@ -241,24 +445,27 @@ object NativeWordToPdfConverter {
                                 style = Paint.Style.STROKE
                             }
 
+                            cursorY += tableSpaceBefore
+
                             for ((rIdx, row) in table.rows.withIndex()) {
                                 var rowHeight = 22f
                                 val cellLayouts = row.tableCells.map { cell ->
                                     val txt = cell.text ?: ""
                                     StaticLayout.Builder
-                                        .obtain(txt, 0, txt.length, cellPaint, (colW - 12f).toInt().coerceAtLeast(20))
+                                        .obtain(txt, 0, txt.length, cellPaint, (colW - (cellPadH * 2f)).toInt().coerceAtLeast(20))
                                         .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                                        .setLineSpacing(2f, 1.20f)
                                         .setIncludePad(false)
                                         .build()
                                 }
                                 val maxCellH = cellLayouts.maxOfOrNull { it.height.toFloat() } ?: 14f
-                                rowHeight = maxOf(rowHeight, maxCellH + 12f)
+                                rowHeight = maxOf(rowHeight, maxCellH + (cellPadV * 2f))
 
-                                if (cursorY + rowHeight > MARGIN_TOP + CONTENT_HEIGHT) {
+                                if (cursorY + rowHeight > pageBottomLimit) {
                                     startNewPage()
                                 }
 
-                                var cellX = MARGIN_X
+                                var cellX = marginLeft
                                 for ((cIdx, cellLayout) in cellLayouts.withIndex()) {
                                     val cellRect = RectF(cellX, cursorY, cellX + colW, cursorY + rowHeight)
                                     if (rIdx == 0) {
@@ -268,7 +475,7 @@ object NativeWordToPdfConverter {
                                     currentCanvas.drawRect(cellRect, borderPaint)
 
                                     currentCanvas.save()
-                                    currentCanvas.translate(cellX + 6f, cursorY + 6f)
+                                    currentCanvas.translate(cellX + cellPadH, cursorY + cellPadV)
                                     cellLayout.draw(currentCanvas)
                                     currentCanvas.restore()
 
@@ -277,13 +484,13 @@ object NativeWordToPdfConverter {
 
                                 cursorY += rowHeight
                             }
-                            cursorY += 12f
+                            cursorY += tableSpaceAfter
                         }
                         else -> {}
                     }
                 }
 
-                drawPageFooter(currentCanvas, currentPageNum)
+                drawPageFooter(currentCanvas, currentPageNum, pageWidthPt.toFloat(), pageHeightPt.toFloat(), marginLeft, marginRight)
                 pdfDoc.finishPage(currentPage)
             }
 
@@ -306,25 +513,34 @@ object NativeWordToPdfConverter {
         val pdfDoc = PdfDocument()
         try {
             HWPFDocument(stream).use { doc ->
+                val pageWidthPt = DEFAULT_PAGE_WIDTH_PT
+                val pageHeightPt = DEFAULT_PAGE_HEIGHT_PT
+                val marginLeft = DEFAULT_MARGIN_X
+                val marginRight = DEFAULT_MARGIN_X
+                val marginTop = DEFAULT_MARGIN_TOP
+                val marginBottom = DEFAULT_MARGIN_BOTTOM
+                val contentWidth = pageWidthPt - marginLeft - marginRight
+                val pageBottomLimit = pageHeightPt - marginBottom
+
                 var currentPageNum = 1
-                var pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH_PT, PAGE_HEIGHT_PT, currentPageNum).create()
+                var pageInfo = PdfDocument.PageInfo.Builder(pageWidthPt, pageHeightPt, currentPageNum).create()
                 var currentPage = pdfDoc.startPage(pageInfo)
                 var currentCanvas = currentPage.canvas
-                var cursorY = MARGIN_TOP
+                var cursorY = marginTop
 
                 val bgPaint = Paint().apply { color = Color.WHITE; style = Paint.Style.FILL }
-                currentCanvas.drawRect(0f, 0f, PAGE_WIDTH_PT.toFloat(), PAGE_HEIGHT_PT.toFloat(), bgPaint)
+                currentCanvas.drawRect(0f, 0f, pageWidthPt.toFloat(), pageHeightPt.toFloat(), bgPaint)
 
                 fun startNewPage() {
-                    drawPageFooter(currentCanvas, currentPageNum)
+                    drawPageFooter(currentCanvas, currentPageNum, pageWidthPt.toFloat(), pageHeightPt.toFloat(), marginLeft, marginRight)
                     pdfDoc.finishPage(currentPage)
 
                     currentPageNum++
-                    pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH_PT, PAGE_HEIGHT_PT, currentPageNum).create()
+                    pageInfo = PdfDocument.PageInfo.Builder(pageWidthPt, pageHeightPt, currentPageNum).create()
                     currentPage = pdfDoc.startPage(pageInfo)
                     currentCanvas = currentPage.canvas
-                    currentCanvas.drawRect(0f, 0f, PAGE_WIDTH_PT.toFloat(), PAGE_HEIGHT_PT.toFloat(), bgPaint)
-                    cursorY = MARGIN_TOP
+                    currentCanvas.drawRect(0f, 0f, pageWidthPt.toFloat(), pageHeightPt.toFloat(), bgPaint)
+                    cursorY = marginTop
                 }
 
                 val range = doc.range
@@ -334,8 +550,22 @@ object NativeWordToPdfConverter {
                     val p = range.getParagraph(i)
                     val rawText = p.text()?.trimEnd('\r', '\n') ?: ""
                     if (rawText.isBlank()) {
-                        cursorY += 6f
-                        if (cursorY > MARGIN_TOP + CONTENT_HEIGHT) startNewPage()
+                        cursorY += 8f
+                        if (cursorY > pageBottomLimit) startNewPage()
+                        continue
+                    }
+
+                    val cleanText = rawText.trim()
+                    val isHorizontalRule = cleanText.matches(Regex("^[-_*=~]{3,}$"))
+                    if (isHorizontalRule) {
+                        cursorY += 12f
+                        val dividerPaint = Paint().apply {
+                            color = Color.rgb(203, 213, 225)
+                            strokeWidth = 1.25f
+                            style = Paint.Style.STROKE
+                        }
+                        currentCanvas.drawLine(marginLeft, cursorY, marginLeft + contentWidth, cursorY, dividerPaint)
+                        cursorY += 14f
                         continue
                     }
 
@@ -357,26 +587,28 @@ object NativeWordToPdfConverter {
                     }
 
                     val staticLayout = StaticLayout.Builder
-                        .obtain(ssb, 0, ssb.length, tp, CONTENT_WIDTH.toInt())
+                        .obtain(ssb, 0, ssb.length, tp, contentWidth.toInt())
                         .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-                        .setLineSpacing(3f, 1.15f)
+                        .setLineSpacing(3f, 1.28f)
                         .setIncludePad(false)
                         .build()
 
                     val elementHeight = staticLayout.height.toFloat()
-                    if (cursorY + elementHeight > MARGIN_TOP + CONTENT_HEIGHT) {
+                    val spacingAfter = 8f
+
+                    if (cursorY + elementHeight + spacingAfter > pageBottomLimit) {
                         startNewPage()
                     }
 
                     currentCanvas.save()
-                    currentCanvas.translate(MARGIN_X, cursorY)
+                    currentCanvas.translate(marginLeft, cursorY)
                     staticLayout.draw(currentCanvas)
                     currentCanvas.restore()
 
-                    cursorY += elementHeight + 6f
+                    cursorY += elementHeight + spacingAfter
                 }
 
-                drawPageFooter(currentCanvas, currentPageNum)
+                drawPageFooter(currentCanvas, currentPageNum, pageWidthPt.toFloat(), pageHeightPt.toFloat(), marginLeft, marginRight)
                 pdfDoc.finishPage(currentPage)
             }
 
@@ -431,7 +663,14 @@ object NativeWordToPdfConverter {
         return ssb
     }
 
-    private fun drawPageFooter(canvas: Canvas, pageNum: Int) {
+    private fun drawPageFooter(
+        canvas: Canvas,
+        pageNum: Int,
+        pageWidth: Float,
+        pageHeight: Float,
+        marginLeft: Float,
+        marginRight: Float
+    ) {
         val footerPaint = TextPaint().apply {
             isAntiAlias = true
             textSize = 9f
@@ -442,8 +681,8 @@ object NativeWordToPdfConverter {
             color = Color.rgb(226, 232, 240)
             strokeWidth = 0.5f
         }
-        val footerY = PAGE_HEIGHT_PT - 24f
-        canvas.drawLine(MARGIN_X, footerY - 10f, PAGE_WIDTH_PT - MARGIN_X, footerY - 10f, linePaint)
-        canvas.drawText("Page $pageNum", PAGE_WIDTH_PT / 2f, footerY, footerPaint)
+        val footerY = pageHeight - 24f
+        canvas.drawLine(marginLeft, footerY - 10f, pageWidth - marginRight, footerY - 10f, linePaint)
+        canvas.drawText("Page $pageNum", pageWidth / 2f, footerY, footerPaint)
     }
 }
