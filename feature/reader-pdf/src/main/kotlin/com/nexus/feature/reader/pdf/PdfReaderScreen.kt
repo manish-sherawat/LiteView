@@ -194,6 +194,7 @@ fun PdfReaderScreen(
     val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme()
     val isDarkTheme = isSystemDark || backgroundMode == PdfBackgroundMode.Inverts
     val isHorizontalLayout by viewModel.isHorizontalLayout.collectAsStateWithLifecycle()
+    var isFitPage by remember { mutableStateOf(false) }
 
     var isAnnotationPillVisible by remember { mutableStateOf(false) }
     var activeAnnotationTool by remember { mutableStateOf<com.nexus.feature.reader.pdf.components.AnnotationTool?>(com.nexus.feature.reader.pdf.components.AnnotationTool.Pen) }
@@ -379,7 +380,7 @@ fun PdfReaderScreen(
                                                         val panChange = event.calculatePan()
                                                         
                                                         val newScale = if (isMultiTouch) {
-                                                            (oldScale * zoomChange).coerceIn(0.5f, maxZoom)
+                                                            (oldScale * zoomChange).coerceIn(1f, maxZoom)
                                                         } else {
                                                             oldScale
                                                         }
@@ -441,8 +442,8 @@ fun PdfReaderScreen(
                                     .graphicsLayer {
                                         scaleX = scale
                                         scaleY = scale
-                                        translationX = if (scale < 1f) (screenWidthPxInt * (1f - scale)) / 2f else offsetX
-                                        translationY = if (scale < 1f) 0f else offsetY
+                                        translationX = offsetX
+                                        translationY = offsetY
                                         transformOrigin = TransformOrigin(0f, 0f)
                                     }
                             ) {
@@ -497,12 +498,23 @@ fun PdfReaderScreen(
                                         else 
                                             Color.White
                                             
+                                        val isLandscape = pageRotation % 180 != 0
+                                        val pageRatio = if (bitmap != null && bitmap.width > 0 && bitmap.height > 0) {
+                                            if (isLandscape) bitmap.width.toFloat() / bitmap.height.toFloat()
+                                            else bitmap.height.toFloat() / bitmap.width.toFloat()
+                                        } else {
+                                            1.414f
+                                        }
+                                        val availableHeight = (configuration.screenHeightDp.dp - topPadding - bottomPadding - 24.dp).coerceAtLeast(200.dp)
+                                        val fitPageWidth = (availableHeight / pageRatio).coerceIn(180.dp, screenWidthDp - 20.dp)
+                                        val pageItemWidth = if (isFitPage) fitPageWidth else (screenWidthDp - 20.dp)
+
                                         NexusSurface(
                                             shape = RoundedCornerShape(6.dp),
                                             elevation = 4.dp,
                                             color = pageContainerColor,
                                             modifier = Modifier
-                                                .width(screenWidthDp - 20.dp)
+                                                .width(pageItemWidth)
                                                 .shadow(elevation = 4.dp, shape = RoundedCornerShape(6.dp), clip = true)
                                         ) {
                                             Box(
@@ -1333,10 +1345,10 @@ fun PdfReaderScreen(
                                         }
                                     },
                                     onZoomOut = {
-                                        val newScale = (scale / 1.25f).coerceAtLeast(0.5f)
+                                        val newScale = (scale / 1.25f).coerceAtLeast(1f)
                                         coroutineScope.launch {
                                             Animatable(scale).animateTo(newScale) { scale = value }
-                                            if (newScale <= 1f) {
+                                            if (newScale == 1f) {
                                                 launch { Animatable(offsetX).animateTo(0f) { offsetX = value } }
                                                 launch { Animatable(offsetY).animateTo(0f) { offsetY = value } }
                                             }
@@ -1601,32 +1613,22 @@ fun PdfReaderScreen(
                 },
                 onFitWidth = {
                     showMenu = false
-                    val screenWidthDpVal = configuration.screenWidthDp.toFloat()
-                    val targetScale = (screenWidthDpVal / (screenWidthDpVal - 20f)).coerceIn(1.0f, 1.15f)
+                    isFitPage = false
                     coroutineScope.launch {
                         val pageIdx = (currentPage - 1).coerceAtLeast(0)
                         launch { listState.animateScrollToItem(pageIdx) }
-                        launch { Animatable(scale).animateTo(targetScale) { scale = value } }
+                        launch { Animatable(scale).animateTo(1f) { scale = value } }
                         launch { Animatable(offsetX).animateTo(0f) { offsetX = value } }
                         launch { Animatable(offsetY).animateTo(0f) { offsetY = value } }
                     }
                 },
                 onFitPage = {
                     showMenu = false
-                    val pageIdx = (currentPage - 1).coerceAtLeast(0)
-                    val currentBmp = renderedPages[pageIdx]
-                    val pageRatio = if (currentBmp != null && currentBmp.width > 0) {
-                        currentBmp.height.toFloat() / currentBmp.width.toFloat()
-                    } else {
-                        1.414f
-                    }
-                    val screenWidthDpVal = configuration.screenWidthDp.toFloat()
-                    val pageHeightInViewport = (screenWidthDpVal - 20f) * pageRatio
-                    val availableHeight = configuration.screenHeightDp.toFloat() - 140f
-                    val targetScale = (availableHeight / pageHeightInViewport).coerceIn(0.5f, 0.95f)
+                    isFitPage = true
                     coroutineScope.launch {
+                        val pageIdx = (currentPage - 1).coerceAtLeast(0)
                         launch { listState.animateScrollToItem(pageIdx) }
-                        launch { Animatable(scale).animateTo(targetScale) { scale = value } }
+                        launch { Animatable(scale).animateTo(1f) { scale = value } }
                         launch { Animatable(offsetX).animateTo(0f) { offsetX = value } }
                         launch { Animatable(offsetY).animateTo(0f) { offsetY = value } }
                     }
