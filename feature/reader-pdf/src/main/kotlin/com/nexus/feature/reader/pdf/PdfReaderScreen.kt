@@ -1286,7 +1286,7 @@ fun PdfReaderScreen(
                                 canUndo = pageStrokes.isNotEmpty(),
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
-                                    .padding(bottom = bottomInset + 66.dp),
+                                    .padding(bottom = bottomInset + 72.dp),
                                 isDark = isDarkTheme
                             )
 
@@ -1295,7 +1295,7 @@ fun PdfReaderScreen(
                                 visible = !isImmersiveMode,
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
-                                    .padding(bottom = bottomInset + 10.dp),
+                                    .padding(bottom = bottomInset + 12.dp),
                                 enter = slideInVertically(animationSpec = tween(220)) { it } + fadeIn(animationSpec = tween(200)),
                                 exit = slideOutVertically(animationSpec = tween(180)) { it } + fadeOut(animationSpec = tween(150))
                             ) {

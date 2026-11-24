@@ -446,9 +446,6 @@ fun PdfModernBottomDock(
 
     Box(
         modifier = modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(bottom = 12.dp)
             .wrapContentWidth(Alignment.CenterHorizontally)
             .height(48.dp)
             .shadow(elevation = 12.dp, shape = CircleShape, ambientColor = Color.Black.copy(alpha = 0.10f), spotColor = Color.Black.copy(alpha = 0.16f))
