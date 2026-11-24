@@ -153,7 +153,7 @@ fun PdfModernTopBar(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Pill 2: Document Title & Page Count Pill
+        // Pill 2: Document Title Pill
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -165,46 +165,20 @@ fun PdfModernTopBar(
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.Center
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
+            Text(
+                text = title,
+                style = TextStyle(
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    letterSpacing = (-0.14).sp,
+                    color = ink,
+                    textAlign = TextAlign.Center
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = title,
-                    style = TextStyle(
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                        letterSpacing = (-0.14).sp,
-                        color = ink
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-
-                if (pageCount > 0) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .width(1.dp)
-                            .height(14.dp)
-                            .background(border)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "$pageCount pgs",
-                        style = TextStyle(
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 11.5.sp,
-                            color = muted
-                        ),
-                        maxLines = 1
-                    )
-                }
-            }
+            )
         }
 
         Spacer(modifier = Modifier.width(8.dp))
@@ -735,12 +709,26 @@ fun PdfModernAnnotationBar(
                         .springBounceClick(onClick = onSelectPen),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = rememberPenIcon(isFilled = penActive),
-                        contentDescription = "Pen",
-                        modifier = Modifier.size(17.dp),
-                        tint = if (penActive) activeToolInk else ink
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = rememberPenIcon(isFilled = false),
+                            contentDescription = "Pen",
+                            modifier = Modifier.size(16.dp),
+                            tint = if (penActive) activeToolInk else ink
+                        )
+                        if (penActive) {
+                            Spacer(modifier = Modifier.height(1.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(4.dp)
+                                    .clip(CircleShape)
+                                    .background(selectedColor)
+                            )
+                        }
+                    }
                 }
 
                 // Highlighter Tool
@@ -752,12 +740,26 @@ fun PdfModernAnnotationBar(
                         .springBounceClick(onClick = onSelectHighlighter),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = rememberHighlighterIcon(isFilled = isHighlighter),
-                        contentDescription = "Highlighter",
-                        modifier = Modifier.size(17.dp),
-                        tint = if (isHighlighter) activeToolInk else ink
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = rememberHighlighterIcon(isFilled = false),
+                            contentDescription = "Highlighter",
+                            modifier = Modifier.size(16.dp),
+                            tint = if (isHighlighter) activeToolInk else ink
+                        )
+                        if (isHighlighter) {
+                            Spacer(modifier = Modifier.height(1.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(4.dp)
+                                    .clip(CircleShape)
+                                    .background(selectedColor)
+                            )
+                        }
+                    }
                 }
 
                 // Separator
@@ -771,10 +773,15 @@ fun PdfModernAnnotationBar(
 
                 // Color Swatches
                 palette.forEach { c ->
-                    val isSelected = selectedColor == c
+                    val isC1Neutral = (c == Color(0xFF141416) || c == Color(0xFFF4F4F6) || c == Color.Black || c == Color.White)
+                    val isC2Neutral = (selectedColor == Color(0xFF141416) || selectedColor == Color(0xFFF4F4F6) || selectedColor == Color.Black || selectedColor == Color.White)
+                    val isSelected = if (isC1Neutral && isC2Neutral) true else (c.red == selectedColor.red && c.green == selectedColor.green && c.blue == selectedColor.blue)
+                    val isLightColor = (0.299f * c.red + 0.587f * c.green + 0.114f * c.blue) > 0.45f
+                    val checkmarkTint = if (isLightColor) Color(0xFF141416) else Color.White
+
                     Box(
                         modifier = Modifier
-                            .size(26.dp)
+                            .size(28.dp)
                             .clip(CircleShape)
                             .border(
                                 width = if (isSelected) 2.dp else 0.dp,
@@ -786,11 +793,21 @@ fun PdfModernAnnotationBar(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(16.dp)
+                                .size(18.dp)
                                 .clip(CircleShape)
                                 .background(c)
-                                .border(0.5.dp, Color.Black.copy(alpha = 0.15f), CircleShape)
-                        )
+                                .border(0.5.dp, if (isDark) Color.White.copy(alpha = 0.25f) else Color.Black.copy(alpha = 0.2f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = "Selected",
+                                    modifier = Modifier.size(11.dp),
+                                    tint = checkmarkTint
+                                )
+                            }
+                        }
                     }
                 }
 

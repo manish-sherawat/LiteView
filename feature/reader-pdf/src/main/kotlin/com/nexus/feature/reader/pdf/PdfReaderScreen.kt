@@ -1269,7 +1269,14 @@ fun PdfReaderScreen(
                                     isDrawMode = true
                                 },
                                 selectedColor = selectedAnnotationColor,
-                                onSelectColor = { color -> selectedAnnotationColor = color },
+                                onSelectColor = { color ->
+                                    selectedAnnotationColor = color
+                                    isDrawMode = true
+                                    if (activeAnnotationTool != com.nexus.feature.reader.pdf.components.AnnotationTool.Pen &&
+                                        activeAnnotationTool != com.nexus.feature.reader.pdf.components.AnnotationTool.Highlighter) {
+                                        activeAnnotationTool = com.nexus.feature.reader.pdf.components.AnnotationTool.Pen
+                                    }
+                                },
                                 onUndo = {
                                     val current = pageStrokes.toMutableList()
                                     if (current.isNotEmpty()) {
