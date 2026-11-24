@@ -294,7 +294,7 @@ fun ExcelReaderScreen(
                         buildString {
                             append("<!DOCTYPE html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes\">")
                             append("<style>")
-                            append("body { font-family: sans-serif; font-size: 14px; margin: 0; padding: 16px; background-color: transparent; color: $textColor !important; overscroll-behavior: contain; } ")
+                            append("html, body { font-family: sans-serif; font-size: 14px; margin: 0; padding: 16px; width: 100%; background-color: transparent; color: $textColor !important; overscroll-behavior: contain; overflow: auto; } ")
                             append("body * { color: $textColor !important; } ")
                             append("table { border-collapse: separate; border-spacing: 0; background-color: transparent; margin-bottom: 24px; } ")
                             append("td, th { border: ${if(state.showGridlines) "1px solid #888888" else "none"}; padding: 8px 12px; white-space: nowrap; background-color: ${if(isDark) "#1e1e1e" else "#ffffff"}; } ")

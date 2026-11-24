@@ -348,7 +348,7 @@ fun PdfReaderScreen(
                                                         val rawOffsetY = tapOffset.y - (tapOffset.y - offsetY) * zoomFactor
                                                         
                                                         val maxOffsetX = 0f
-                                                        val minOffsetX = -(screenWidthPxInt * targetScale - screenWidthPxInt)
+                                                        val minOffsetX = -(screenWidthPxInt.toFloat() * targetScale - screenWidthPxInt.toFloat())
                                                         val maxOffsetY = 0f
                                                         val minOffsetY = -(screenHeightPx * targetScale - screenHeightPx)
                                                         
@@ -366,7 +366,7 @@ fun PdfReaderScreen(
                                     }
                                     .pointerInput(Unit) {
                                         awaitEachGesture {
-                                            awaitFirstDown()
+                                            awaitFirstDown(requireUnconsumed = false)
                                             snapJob?.cancel()
                                             do {
                                                 val event = awaitPointerEvent()
@@ -391,7 +391,7 @@ fun PdfReaderScreen(
                                                         val rawOffsetY = centroid.y - (centroid.y - offsetY) * actualZoom + panChange.y
                                                         
                                                         val maxOffsetX = 0f
-                                                        val minOffsetX = -(screenWidthPxInt * scale - screenWidthPxInt)
+                                                        val minOffsetX = -(screenWidthPxInt.toFloat() * scale - screenWidthPxInt.toFloat())
                                                         val maxOffsetY = 0f
                                                         val minOffsetY = -(screenHeightPx * scale - screenHeightPx)
                                                         
@@ -416,8 +416,9 @@ fun PdfReaderScreen(
                                                 }
                                             } while (event.changes.any { it.pressed })
                                             
-                                            if (scale <= 1f) {
+                                            if (scale <= 1.02f) {
                                                 snapJob = coroutineScope.launch {
+                                                    launch { Animatable(scale).animateTo(1f) { scale = value } }
                                                     launch { Animatable(offsetX).animateTo(0f) { offsetX = value } }
                                                     launch { Animatable(offsetY).animateTo(0f) { offsetY = value } }
                                                 }
@@ -1072,7 +1073,7 @@ fun PdfReaderScreen(
                                     LazyRow(
                                         state = listState,
                                         modifier = Modifier.fillMaxSize(),
-                                        userScrollEnabled = !isDrawMode,
+                                        userScrollEnabled = !isDrawMode && scale <= 1.02f,
                                         contentPadding = PaddingValues(top = topPadding, start = 8.dp, end = 8.dp, bottom = bottomPadding),
                                         horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs),
                                         verticalAlignment = Alignment.CenterVertically
@@ -1083,7 +1084,7 @@ fun PdfReaderScreen(
                                     LazyColumn(
                                         state = listState,
                                         modifier = Modifier.fillMaxSize(),
-                                        userScrollEnabled = !isDrawMode,
+                                        userScrollEnabled = !isDrawMode && scale <= 1.02f,
                                         contentPadding = PaddingValues(top = topPadding, start = 8.dp, end = 8.dp, bottom = bottomPadding),
                                         verticalArrangement = Arrangement.spacedBy(10.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally

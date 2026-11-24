@@ -441,10 +441,10 @@ class PdfReaderViewModel @Inject constructor(
                                     if (quads != null) {
                                         for (qArray in quads) {
                                             for (q in qArray) {
-                                                val left = minOf(q.ul_x, q.ll_x) / width
-                                                val top = minOf(q.ul_y, q.ur_y) / height
-                                                val right = maxOf(q.ur_x, q.lr_x) / width
-                                                val bottom = maxOf(q.ll_y, q.lr_y) / height
+                                                val left = (minOf(q.ul_x, q.ll_x) - rect.x0) / width
+                                                val top = (minOf(q.ul_y, q.ur_y) - rect.y0) / height
+                                                val right = (maxOf(q.ur_x, q.lr_x) - rect.x0) / width
+                                                val bottom = (maxOf(q.ll_y, q.lr_y) - rect.y0) / height
                                                 rectList.add(android.graphics.RectF(left, top, right, bottom))
                                             }
                                         }

@@ -325,6 +325,10 @@ fun WordReaderScreen(
                         )
                     } else {
                         val typographyCss = """
+                            html, body {
+                                overscroll-behavior: contain !important;
+                                overflow: auto !important;
+                            }
                             body, .docx-page, h1, h2, h3, h4, h5, h6, p, li, td, th {
                                 font-family: ${if (docxIsSerif) "Georgia, 'Times New Roman', serif" else "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"} !important;
                                 writing-mode: horizontal-tb !important;
