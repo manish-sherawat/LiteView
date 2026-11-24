@@ -35,6 +35,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import com.nexus.core.ui.components.NexusVerticalScrollbar
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.vectorResource
+import com.nexus.feature.reader.pdf.components.*
 
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -146,6 +147,31 @@ fun PdfReaderScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     
+    val currentPage by remember(listState) {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val visibleItemsInfo = layoutInfo.visibleItemsInfo
+            if (visibleItemsInfo.isEmpty()) {
+                1
+            } else {
+                val viewportCenter = layoutInfo.viewportEndOffset / 2
+                val closestItem = visibleItemsInfo.minByOrNull { item ->
+                    val itemCenter = item.offset + item.size / 2
+                    kotlin.math.abs(itemCenter - viewportCenter)
+                }
+                (closestItem?.index ?: 0) + 1
+            }
+        }
+    }
+
+    var scale by remember { mutableFloatStateOf(1f) }
+    var settledScale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+    var snapJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    val maxZoom = 5f
+
+    
     val displayName = try { URLDecoder.decode(URLDecoder.decode(fileName, "UTF-8"), "UTF-8") } catch (_: Exception) { fileName }
 
     val configuration = LocalConfiguration.current
@@ -159,18 +185,20 @@ fun PdfReaderScreen(
     var showRenameDialog by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showGoToPageDialog by remember { mutableStateOf(false) }
+    var showThumbnailsSheet by remember { mutableStateOf(false) }
     var pageRotation by remember { mutableIntStateOf(0) }
     var renameText by remember { mutableStateOf("") }
     var goToPageText by remember { mutableStateOf("") }
     
-    var showViewModal by remember { mutableStateOf(false) }
     var backgroundMode by remember { mutableStateOf(PdfBackgroundMode.Original) }
+    val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val isDarkTheme = isSystemDark || backgroundMode == PdfBackgroundMode.Inverts
     val isHorizontalLayout by viewModel.isHorizontalLayout.collectAsStateWithLifecycle()
 
     var isAnnotationPillVisible by remember { mutableStateOf(false) }
     var activeAnnotationTool by remember { mutableStateOf<com.nexus.feature.reader.pdf.components.AnnotationTool?>(com.nexus.feature.reader.pdf.components.AnnotationTool.Pen) }
     var selectedShape by remember { mutableStateOf(com.nexus.feature.reader.pdf.components.ShapeType.Rectangle) }
-    val initialAnnotationColor = com.nexus.core.theme.NexusTheme.colors.warning
+    val initialAnnotationColor = if (isDarkTheme) Color(0xFFF4F4F6) else Color(0xFF141416)
     var selectedAnnotationColor by remember { mutableStateOf(initialAnnotationColor) }
     var selectedStrokeWidth by remember { mutableFloatStateOf(4f) }
     var selectedEraserFilter by remember { mutableStateOf(com.nexus.feature.reader.pdf.components.EraserTargetFilter.All) }
@@ -230,7 +258,7 @@ fun PdfReaderScreen(
 
     var mainModifier = modifier
         .fillMaxSize()
-        .background(NexusTheme.colors.background)
+        .background(PdfViewerTheme.canvasColor(isDarkTheme))
 
     Box(
         modifier = mainModifier
@@ -267,16 +295,10 @@ fun PdfReaderScreen(
                     is PdfReaderUiState.Success -> {
                         Box(modifier = Modifier.fillMaxSize().hazeSource(hazeState)) {
                             val bottomInset = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                            val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 16.dp else if (isSearchMode) 160.dp else 90.dp)
-                            val bottomPadding by animateDpAsState(targetValue = if (isImmersiveMode) bottomInset else bottomInset + 80.dp)
+                            val topPadding by animateDpAsState(targetValue = if (isImmersiveMode) 16.dp else if (isSearchMode) 130.dp else 76.dp)
+                            val bottomPadding by animateDpAsState(targetValue = if (isImmersiveMode) bottomInset + 8.dp else bottomInset + 92.dp)
                             
-                            val coroutineScope = rememberCoroutineScope()
-                            var scale by remember { mutableFloatStateOf(1f) }
-                            var settledScale by remember { mutableFloatStateOf(1f) }
-                            var offsetX by remember { mutableFloatStateOf(0f) }
-                            var offsetY by remember { mutableFloatStateOf(0f) }
-                            var snapJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
-                            val maxZoom = 5f
+
                             val screenWidthDp = configuration.screenWidthDp.dp
                             val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
                             val screenWidthPxInt = screenWidthPx
@@ -471,15 +493,17 @@ fun PdfReaderScreen(
                                         val bitmap = renderedPages[pageIndex]
                                         
                                         val pageContainerColor = if (backgroundMode == PdfBackgroundMode.Inverts) 
-                                            NexusTheme.colors.background 
+                                            Color(0xFF1C1C1E) 
                                         else 
-                                            NexusTheme.colors.surface
+                                            Color.White
                                             
                                         NexusSurface(
-                                            shape = androidx.compose.ui.graphics.RectangleShape,
+                                            shape = RoundedCornerShape(6.dp),
                                             elevation = 4.dp,
                                             color = pageContainerColor,
-                                            modifier = Modifier.width(screenWidthDp - 32.dp)
+                                            modifier = Modifier
+                                                .width(screenWidthDp - 20.dp)
+                                                .shadow(elevation = 4.dp, shape = RoundedCornerShape(6.dp), clip = true)
                                         ) {
                                             Box(
                                                 modifier = Modifier.graphicsLayer {
@@ -1049,7 +1073,7 @@ fun PdfReaderScreen(
                                         modifier = Modifier.fillMaxSize(),
                                         userScrollEnabled = !isDrawMode,
                                         contentPadding = PaddingValues(top = topPadding, start = 8.dp, end = 8.dp, bottom = bottomPadding),
-                                        verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
                                         pdfContent()
@@ -1057,22 +1081,7 @@ fun PdfReaderScreen(
                                 }
                             }
                             
-                            val currentPage by remember(listState) {
-                                derivedStateOf {
-                                    val layoutInfo = listState.layoutInfo
-                                    val visibleItemsInfo = layoutInfo.visibleItemsInfo
-                                    if (visibleItemsInfo.isEmpty()) {
-                                        1
-                                    } else {
-                                        val viewportCenter = layoutInfo.viewportEndOffset / 2
-                                        val closestItem = visibleItemsInfo.minByOrNull { item ->
-                                            val itemCenter = item.offset + item.size / 2
-                                            kotlin.math.abs(itemCenter - viewportCenter)
-                                        }
-                                        (closestItem?.index ?: 0) + 1
-                                    }
-                                }
-                            }
+
                             
                             var isDraggingSlider by remember { mutableStateOf(false) }
                             var sliderValue by remember { mutableFloatStateOf(1f) }
@@ -1127,72 +1136,6 @@ fun PdfReaderScreen(
                              val pageStrokes = drawnStrokes[pageIdx] ?: emptyList()
                              val redoStrokes = redoStrokesMap[pageIdx] ?: emptyList()
 
-                             // Dockable & Modular PDF Annotation Tool Pill
-                             com.nexus.feature.reader.pdf.components.PdfAnnotationPill(
-                                 isVisible = isAnnotationPillVisible && !isImmersiveMode,
-                                 activeTool = activeAnnotationTool,
-                                 onToolSelect = { tool ->
-                                     activeAnnotationTool = tool
-                                 },
-                                 selectedShape = selectedShape,
-                                 onShapeSelect = { shape -> selectedShape = shape },
-                                 selectedColor = selectedAnnotationColor,
-                                 onColorSelect = { color -> selectedAnnotationColor = color },
-                                 strokeWidth = selectedStrokeWidth,
-                                 onStrokeWidthSelect = { width -> selectedStrokeWidth = width },
-                                 selectedEraserFilter = selectedEraserFilter,
-                                 onEraserFilterSelect = { filter -> selectedEraserFilter = filter },
-                                 selectedStamp = selectedStamp,
-                                 onStampSelect = { stamp -> selectedStamp = stamp },
-                                 dockPosition = toolbarDockPosition,
-                                 onDockPositionChange = { toolbarDockPosition = it },
-                                 isCollapsed = isToolbarCollapsed,
-                                 onToggleCollapse = { isToolbarCollapsed = !isToolbarCollapsed },
-                                 canUndo = pageStrokes.isNotEmpty(),
-                                 onUndo = {
-                                     val current = pageStrokes.toMutableList()
-                                     if (current.isNotEmpty()) {
-                                         val removed = current.removeAt(current.size - 1)
-                                         val updatedList = current.toList()
-                                         drawnStrokes[pageIdx] = updatedList
-                                         viewModel.updateDrawnStrokes(pageIdx, updatedList)
-                                         val rList = redoStrokes.toMutableList()
-                                         rList.add(removed)
-                                         redoStrokesMap[pageIdx] = rList.toList()
-                                     }
-                                 },
-                                 canRedo = redoStrokes.isNotEmpty(),
-                                 onRedo = {
-                                     val rList = redoStrokes.toMutableList()
-                                     if (rList.isNotEmpty()) {
-                                         val restored = rList.removeAt(rList.size - 1)
-                                         redoStrokesMap[pageIdx] = rList.toList()
-                                         val current = pageStrokes.toMutableList()
-                                         current.add(restored)
-                                         val updatedList = current.toList()
-                                         drawnStrokes[pageIdx] = updatedList
-                                         viewModel.updateDrawnStrokes(pageIdx, updatedList)
-                                     }
-                                 },
-                                 modifier = Modifier
-                                     .align(
-                                         when (toolbarDockPosition) {
-                                             com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Left -> Alignment.CenterStart
-                                             com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Right -> Alignment.CenterEnd
-                                             com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Top -> Alignment.TopCenter
-                                             com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Bottom -> Alignment.BottomCenter
-                                         }
-                                     )
-                                     .padding(
-                                          when (toolbarDockPosition) {
-                                              com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Left -> PaddingValues(start = 12.dp)
-                                              com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Right -> PaddingValues(end = 12.dp)
-                                              com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Top -> PaddingValues(top = if (isSearchMode) 175.dp else if (configuration.screenWidthDp > configuration.screenHeightDp) 64.dp else 76.dp)
-                                              com.nexus.feature.reader.pdf.components.ToolbarDockPosition.Bottom -> PaddingValues(bottom = if (configuration.screenWidthDp > configuration.screenHeightDp) 90.dp else 155.dp)
-                                          }
-                                      )
-                                 )
-
                                  if (pendingTextPoint != null) {
                                      val textFocusRequester = remember { FocusRequester() }
                                      val isEditing = editingExistingTextItem != null
@@ -1217,7 +1160,7 @@ fun PdfReaderScreen(
                                          },
                                          text = {
                                              Column(
-                                                 verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs),
+                                                 verticalArrangement = Arrangement.spacedBy(10.dp),
                                                  modifier = Modifier
                                                      .fillMaxWidth()
                                                      .widthIn(min = 300.dp, max = 540.dp)
@@ -1301,192 +1244,123 @@ fun PdfReaderScreen(
                                      )
                                  }
 
-                             // Bottom UI Container
+                                                         // Floating Page Number Indicator Pill
+                            PdfModernPagePill(
+                                visible = !isImmersiveMode && !isAnnotationPillVisible,
+                                currentPage = currentPage,
+                                totalPages = state.pageCount,
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = bottomInset + 68.dp)
+                            )
+
+                            // Floating Modern Annotation Bar (when user toggles annotate)
+                            PdfModernAnnotationBar(
+                                visible = isAnnotationPillVisible && !isImmersiveMode,
+                                isHighlighter = activeAnnotationTool == com.nexus.feature.reader.pdf.components.AnnotationTool.Highlighter,
+                                onSelectPen = {
+                                    activeAnnotationTool = com.nexus.feature.reader.pdf.components.AnnotationTool.Pen
+                                    isDrawMode = true
+                                },
+                                onSelectHighlighter = {
+                                    activeAnnotationTool = com.nexus.feature.reader.pdf.components.AnnotationTool.Highlighter
+                                    isDrawMode = true
+                                },
+                                selectedColor = selectedAnnotationColor,
+                                onSelectColor = { color -> selectedAnnotationColor = color },
+                                onUndo = {
+                                    val current = pageStrokes.toMutableList()
+                                    if (current.isNotEmpty()) {
+                                        val removed = current.removeAt(current.size - 1)
+                                        val updatedList = current.toList()
+                                        drawnStrokes[pageIdx] = updatedList
+                                        viewModel.updateDrawnStrokes(pageIdx, updatedList)
+                                        val rList = redoStrokes.toMutableList()
+                                        rList.add(removed)
+                                        redoStrokesMap[pageIdx] = rList.toList()
+                                    }
+                                },
+                                onClear = {
+                                    drawnStrokes[pageIdx] = emptyList()
+                                    viewModel.updateDrawnStrokes(pageIdx, emptyList())
+                                },
+                                onSave = {
+                                    isSavingAnnotations = true
+                                    viewModel.saveAnnotationsToFile(encodedUri, drawnStrokes.toMap()) { success ->
+                                        isSavingAnnotations = false
+                                        isDrawMode = false
+                                        isAnnotationPillVisible = false
+                                        android.widget.Toast.makeText(context, "Annotations saved to file", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                canUndo = pageStrokes.isNotEmpty(),
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = bottomInset + 66.dp),
+                                isDark = isDarkTheme
+                            )
+
+                            // Floating Modern Bottom Dock
                             AnimatedVisibility(
                                 visible = !isImmersiveMode,
-                                modifier = Modifier.align(Alignment.BottomCenter),
-                                enter = viewerBarEnterTransition(fromTop = false),
-                                exit = viewerBarExitTransition(toTop = false)
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = bottomInset + 10.dp),
+                                enter = slideInVertically(animationSpec = tween(220)) { it } + fadeIn(animationSpec = tween(200)),
+                                exit = slideOutVertically(animationSpec = tween(180)) { it } + fadeOut(animationSpec = tween(150))
                             ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.md)
-                                ) {
-                                    // Floating Page Number Viewer Pill
-                                    if (state.pageCount > 1) {
-                                        Box(
-                                            modifier = Modifier
-                                                 .shadow(
-                                                     elevation = 8.dp,
-                                                     shape = NexusTheme.shapes.pill,
-                                                     spotColor = NexusTheme.colors.primary.copy(alpha = 0.16f),
-                                                     ambientColor = Color.Black.copy(alpha = 0.10f)
-                                                 )
-                                                 .hazeGlassBackground(
-                                                     hazeState = hazeState,
-                                                     shape = NexusTheme.shapes.pill
-                                                 )
-                                                 .springBounceClick {
-                                                     goToPageText = currentPage.toString()
-                                                     showGoToPageDialog = true
-                                                 }
-                                                 .padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.xs)
-                                         ) {
-                                             Row(
-                                                 verticalAlignment = Alignment.CenterVertically,
-                                                 horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
-                                             ) {
-                                                 NexusText(
-                                                     text = "Page $currentPage",
-                                                     style = NexusTheme.typography.body.copy(fontWeight = FontWeight.Bold, fontSize = 13.5.sp),
-                                                     color = NexusTheme.colors.primary
-                                                 )
-                                                 NexusText(
-                                                     text = "of ${state.pageCount}",
-                                                     style = NexusTheme.typography.label,
-                                                     color = NexusTheme.colors.textSecondary
-                                                 )
-                                             }
-                                         }
-                                     }
-
-                                     val isDarkTheme = androidx.compose.foundation.isSystemInDarkTheme()
-
-                                     // Floating Dock Toolbar Container
-                                     Box(
-                                         modifier = Modifier
-                                             .fillMaxWidth()
-                                             .wrapContentWidth(Alignment.CenterHorizontally)
-                                             .widthIn(max = 560.dp)
-                                             .navigationBarsPadding()
-                                             .padding(horizontal = NexusTheme.spacing.sm, vertical = NexusTheme.spacing.xs)
-                                             .shadow(
-                                                 elevation = 16.dp,
-                                                 shape = RoundedCornerShape(25.dp),
-                                                 spotColor = NexusTheme.colors.primary.copy(alpha = if (isDarkTheme) 0.28f else 0.10f),
-                                                 ambientColor = Color.Black.copy(alpha = if (isDarkTheme) 0.40f else 0.08f)
-                                             )
-                                             .hazeGlassBackground(
-                                                 hazeState = hazeState,
-                                                 shape = RoundedCornerShape(25.dp),
-                                                 blurRadius = 28.dp,
-                                                 borderWidth = 1.dp,
-                                                 borderColor = if (isDarkTheme) Color.White.copy(alpha = 0.12f) else Color(0xFFE6E7EF)
-                                             )
-                                             .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xxs)
-                                     ) {
-                                          Row(
-                                              modifier = Modifier.fillMaxWidth(),
-                                              verticalAlignment = Alignment.CenterVertically,
-                                              horizontalArrangement = Arrangement.SpaceEvenly
-                                          ) {
-                                              PdfBottomBarActionItem(
-                                                  modifier = Modifier.weight(1f),
-                                                  iconPainter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_view_list),
-                                                  label = "Outline",
-                                                  contentDescription = "Outline",
-                                                  tint = NexusTheme.colors.textPrimary,
-                                                  enabled = outline.isNotEmpty(),
-                                                  onClick = { if (outline.isNotEmpty()) showOutlineSheet = true }
-                                              )
-
-                                              PdfBottomBarActionItem(
-                                                  modifier = Modifier.weight(1f),
-                                                  iconPainter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_rename),
-                                                  label = "Annotate",
-                                                  contentDescription = "Annotate",
-                                                  tint = NexusTheme.colors.primary,
-                                                  isActive = isAnnotationPillVisible,
-                                                  activeBadgeColor = NexusTheme.colors.primary.copy(alpha = 0.16f),
-                                                  onClick = {
-                                                      isAnnotationPillVisible = !isAnnotationPillVisible
-                                                      isDrawMode = isAnnotationPillVisible
-                                                      if (isAnnotationPillVisible) {
-                                                          if (activeAnnotationTool == null) {
-                                                              activeAnnotationTool = com.nexus.feature.reader.pdf.components.AnnotationTool.Pen
-                                                          }
-                                                      } else {
-                                                          activeAnnotationTool = null
-                                                      }
-                                                  }
-                                              )
-
-                                              PdfBottomBarActionItem(
-                                                  modifier = Modifier.weight(1f),
-                                                  iconPainter = androidx.compose.ui.res.painterResource(
-                                                      id = if (isStarred) com.nexus.core.R.drawable.ic_star_filled else com.nexus.core.R.drawable.ic_star
-                                                  ),
-                                                  label = if (isStarred) "Starred" else "Favorite",
-                                                  contentDescription = "Favorite",
-                                                  tint = NexusTheme.colors.warning,
-                                                  isActive = isStarred,
-                                                  activeBadgeColor = NexusTheme.colors.warning.copy(alpha = 0.16f),
-                                                  onClick = {
-                                                      viewModel.toggleFavorite { nowStarred ->
-                                                          val msg = if (nowStarred) "Added to Favorites" else "Removed from Favorites"
-                                                          android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
-                                                      }
-                                                  }
-                                              )
-
-                                              PdfBottomBarActionItem(
-                                                  modifier = Modifier.weight(1f),
-                                                  iconVector = rememberLayoutDashboardIcon(),
-                                                  label = "View",
-                                                  contentDescription = "View Settings",
-                                                  tint = NexusTheme.colors.textPrimary,
-                                                  onClick = { showViewModal = true }
-                                              )
-
-                                              PdfBottomBarActionItem(
-                                                  modifier = Modifier.weight(1f),
-                                                  iconPainter = androidx.compose.ui.res.painterResource(
-                                                      id = if (backgroundMode == PdfBackgroundMode.Inverts) com.nexus.core.R.drawable.ic_theme_light else com.nexus.core.R.drawable.ic_theme_dark
-                                                  ),
-                                                  label = if (backgroundMode == PdfBackgroundMode.Inverts) "Light" else "Dark",
-                                                  contentDescription = "Toggle Dark Mode",
-                                                  tint = NexusTheme.colors.primary,
-                                                  isActive = backgroundMode == PdfBackgroundMode.Inverts,
-                                                  activeBadgeColor = NexusTheme.colors.primary.copy(alpha = 0.16f),
-                                                  onClick = {
-                                                      backgroundMode = if (backgroundMode == PdfBackgroundMode.Inverts) PdfBackgroundMode.Original else PdfBackgroundMode.Inverts
-                                                  }
-                                              )
-
-                                              PdfBottomBarActionItem(
-                                                  modifier = Modifier.weight(1f),
-                                                  iconPainter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_file_search),
-                                                  label = "Go to",
-                                                  contentDescription = "Go to Page",
-                                                  tint = NexusTheme.colors.textPrimary,
-                                                  onClick = { showGoToPageDialog = true }
-                                              )
-                                          }
-                                     }
-                                    
-                                    AnimatedVisibility(
-                                        visible = isDrawMode && drawnStrokes.values.any { it.isNotEmpty() },
-                                        enter = slideInVertically(animationSpec = tween(220)) { it } + fadeIn(animationSpec = tween(200)),
-                                        exit = slideOutVertically(animationSpec = tween(180)) { it } + fadeOut(animationSpec = tween(150))
-                                    ) {
-                                        NexusButton(
-                                            text = if (isSavingAnnotations) "Saving..." else "Save Annotations",
-                                            leadingIcon = androidx.compose.ui.graphics.vector.ImageVector.vectorResource(id = com.nexus.core.R.drawable.ic_save),
-                                            isLoading = isSavingAnnotations,
-                                            enabled = !isSavingAnnotations,
-                                            onClick = {
-                                                isSavingAnnotations = true
-                                                viewModel.saveAnnotationsToFile(encodedUri, drawnStrokes.toMap()) { success ->
-                                                    isSavingAnnotations = false
-                                                    isDrawMode = false
-                                                    android.widget.Toast.makeText(context, "Annotations saved to file", android.widget.Toast.LENGTH_SHORT).show()
-                                                }
+                                PdfModernBottomDock(
+                                    currentPage = currentPage,
+                                    totalPages = state.pageCount,
+                                    zoomPercent = (scale * 100).roundToInt(),
+                                    isAnnotating = isAnnotationPillVisible,
+                                    onToggleAnnotate = {
+                                        isAnnotationPillVisible = !isAnnotationPillVisible
+                                        isDrawMode = isAnnotationPillVisible
+                                        if (isAnnotationPillVisible && activeAnnotationTool == null) {
+                                            activeAnnotationTool = com.nexus.feature.reader.pdf.components.AnnotationTool.Pen
+                                        }
+                                    },
+                                    onOpenThumbnails = { showThumbnailsSheet = true },
+                                    onPreviousPage = {
+                                        if (currentPage > 1) {
+                                            coroutineScope.launch { listState.animateScrollToItem(currentPage - 2) }
+                                        }
+                                    },
+                                    onNextPage = {
+                                        if (currentPage < state.pageCount) {
+                                            coroutineScope.launch { listState.animateScrollToItem(currentPage) }
+                                        }
+                                    },
+                                    onJumpToPage = {
+                                        goToPageText = currentPage.toString()
+                                        showGoToPageDialog = true
+                                    },
+                                    onZoomIn = {
+                                        val newScale = (scale * 1.25f).coerceAtMost(maxZoom)
+                                        coroutineScope.launch {
+                                            Animatable(scale).animateTo(newScale) { scale = value }
+                                        }
+                                    },
+                                    onZoomOut = {
+                                        val newScale = (scale / 1.25f).coerceAtLeast(1f)
+                                        coroutineScope.launch {
+                                            Animatable(scale).animateTo(newScale) { scale = value }
+                                            if (newScale == 1f) {
+                                                launch { Animatable(offsetX).animateTo(0f) { offsetX = value } }
+                                                launch { Animatable(offsetY).animateTo(0f) { offsetY = value } }
                                             }
-                                        )
-                                    }
-                                    
-
-                                }
+                                        }
+                                    },
+                                    onResetZoom = {
+                                        coroutineScope.launch {
+                                            launch { Animatable(scale).animateTo(1f) { scale = value } }
+                                            launch { Animatable(offsetX).animateTo(0f) { offsetX = value } }
+                                            launch { Animatable(offsetY).animateTo(0f) { offsetY = value } }
+                                        }
+                                    },
+                                    isDark = isDarkTheme
+                                )
                             }
                         }
                     }
@@ -1573,41 +1447,34 @@ fun PdfReaderScreen(
                 }
             }
 
-            Column(
-                modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth()
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
             ) {
                 AnimatedVisibility(
                     visible = !isImmersiveMode,
-                    enter = viewerBarEnterTransition(fromTop = true),
-                    exit = viewerBarExitTransition(toTop = true)
+                    enter = slideInVertically(animationSpec = tween(220)) { -it } + fadeIn(animationSpec = tween(200)),
+                    exit = slideOutVertically(animationSpec = tween(180)) { -it } + fadeOut(animationSpec = tween(150))
                 ) {
-                    NexusViewerTopBar(
+                    PdfModernTopBar(
                         title = displayName,
-                        hazeState = hazeState,
+                        pageCount = (uiState as? PdfReaderUiState.Success)?.pageCount ?: 0,
+                        isSearchActive = isSearchMode,
+                        isDark = isDarkTheme,
                         onBack = onBack,
-                        actions = {
-                            NexusViewerActionButton(
-                                painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_search),
-                                contentDescription = "Search",
-                                isActive = isSearchMode,
-                                onClick = { isSearchMode = !isSearchMode }
-                            )
-                            NexusViewerActionDivider()
-                            NexusViewerActionButton(
-                                painter = androidx.compose.ui.res.painterResource(id = com.nexus.core.R.drawable.ic_more_vert),
-                                contentDescription = "More",
-                                onClick = { showMenu = true }
-                            )
-                        }
+                        onToggleSearch = { isSearchMode = !isSearchMode },
+                        onOpenMore = { showMenu = true }
                     )
                 }
 
-                com.nexus.core.ui.components.ReaderSearchBar(
+                PdfModernSearchBar(
                     visible = isSearchMode && !isImmersiveMode,
                     query = searchQuery,
-                    onQueryChange = { viewModel.setSearchQuery(it) },
                     matchCount = searchResults.size,
                     currentMatchIndex = currentSearchMatchIndex,
+                    isDark = isDarkTheme,
+                    onQueryChange = { viewModel.setSearchQuery(it) },
                     onPreviousMatch = {
                         viewModel.previousSearchMatch()
                         coroutineScope.launch {
@@ -1629,690 +1496,162 @@ fun PdfReaderScreen(
                 )
             }
 
-            if (showRenameDialog) {
-                com.nexus.core.ui.components.NexusDialog(
-                    onDismissRequest = { showRenameDialog = false },
-                    title = { NexusText("Rename File", style = NexusTheme.typography.h2) },
-                    text = {
-                        androidx.compose.foundation.text.BasicTextField(
-                            value = renameText,
-                            onValueChange = { renameText = it },
-                            textStyle = NexusTheme.typography.body.copy(color = NexusTheme.colors.textPrimary),
-                            modifier = Modifier.fillMaxWidth().padding(NexusTheme.spacing.xs).background(NexusTheme.colors.surfaceVariant, NexusTheme.shapes.small).padding(NexusTheme.spacing.md),
-                            singleLine = true
-                        )
-                    },
-                    confirmButton = {
-                        NexusButton(
-                            text = "Rename",
-                            onClick = {
-                                viewModel.renameFile(encodedUri, renameText) { success, msg ->
-                                    showRenameDialog = false
-                                    if (success) {
-                                        android.widget.Toast.makeText(context, "Renamed successfully", android.widget.Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        android.widget.Toast.makeText(context, "Rename failed: $msg", android.widget.Toast.LENGTH_LONG).show()
-                                    }
-                                }
-                            }
-                        )
-                    },
-                    dismissButton = {
-                        NexusButton(text = "Cancel", isOutlined = true, onClick = { showRenameDialog = false })
+            PdfRenameBottomSheet(
+                visible = showRenameDialog,
+                onDismiss = { showRenameDialog = false },
+                currentName = renameText.ifEmpty { displayName.removeSuffix(".pdf") },
+                onConfirmRename = { newName ->
+                    viewModel.renameFile(encodedUri, newName) { success, msg ->
+                        showRenameDialog = false
+                        if (success) {
+                            android.widget.Toast.makeText(context, "Renamed successfully", android.widget.Toast.LENGTH_SHORT).show()
+                        } else {
+                            android.widget.Toast.makeText(context, "Rename failed: $msg", android.widget.Toast.LENGTH_LONG).show()
+                        }
                     }
-                )
-            }
+                },
+                isDark = isDarkTheme
+            )
 
             if (showGoToPageDialog && uiState is PdfReaderUiState.Success) {
                 val successState = uiState as PdfReaderUiState.Success
-                com.nexus.core.ui.components.NexusDialog(
-                    onDismissRequest = { showGoToPageDialog = false },
-                    title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            NexusText("Go to Page", style = NexusTheme.typography.h2)
-                            Box(
-                                modifier = Modifier
-                                    .clip(NexusTheme.shapes.pill)
-                                    .background(NexusTheme.colors.primary.copy(alpha = 0.12f))
-                                    .padding(horizontal = NexusTheme.spacing.xs, vertical = NexusTheme.spacing.xxs)
-                            ) {
-                                NexusText(
-                                    text = "1 - ${successState.pageCount}",
-                                    style = NexusTheme.typography.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
-                                    color = NexusTheme.colors.primary
-                                )
-                            }
+                PdfGoToPageDialog(
+                    currentPage = currentPage,
+                    pageCount = successState.pageCount,
+                    isDark = isDarkTheme,
+                    onDismiss = { showGoToPageDialog = false },
+                    onJumpToPage = { targetPage ->
+                        coroutineScope.launch {
+                            listState.scrollToItem(targetPage - 1)
                         }
-                    },
-                    text = {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(NexusTheme.spacing.md),
-                            modifier = Modifier.fillMaxWidth().padding(top = NexusTheme.spacing.xs)
-                        ) {
-                            // Stepper Row: - button, input, + button
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.sm),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(CircleShape)
-                                        .background(NexusTheme.colors.surfaceVariant)
-                                        .springBounceClick {
-                                            val currentVal = goToPageText.toIntOrNull() ?: 1
-                                            if (currentVal > 1) goToPageText = (currentVal - 1).toString()
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    NexusText("-", style = NexusTheme.typography.h1, color = NexusTheme.colors.textPrimary)
-                                }
-
-                                androidx.compose.foundation.text.BasicTextField(
-                                    value = goToPageText,
-                                    onValueChange = { input ->
-                                        if (input.isEmpty() || input.all { char -> char.isDigit() }) {
-                                            val num = input.toIntOrNull()
-                                            if (num == null || num <= successState.pageCount) {
-                                                goToPageText = input
-                                            }
-                                        }
-                                    },
-                                    textStyle = NexusTheme.typography.title.copy(
-                                        color = NexusTheme.colors.textPrimary,
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                        fontSize = 20.sp,
-                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                                    ),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .background(NexusTheme.colors.surfaceVariant, NexusTheme.shapes.medium)
-                                        .padding(vertical = NexusTheme.spacing.sm, horizontal = NexusTheme.spacing.md),
-                                    singleLine = true,
-                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
-                                    )
-                                )
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(CircleShape)
-                                        .background(NexusTheme.colors.surfaceVariant)
-                                        .springBounceClick {
-                                            val currentVal = goToPageText.toIntOrNull() ?: 1
-                                            if (currentVal < successState.pageCount) goToPageText = (currentVal + 1).toString()
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    NexusText("+", style = NexusTheme.typography.h2, color = NexusTheme.colors.textPrimary)
-                                }
-                            }
-
-                            // Interactive Page Slider
-                            val sliderPos = (goToPageText.toFloatOrNull() ?: 1f).coerceIn(1f, successState.pageCount.toFloat())
-                            androidx.compose.material3.Slider(
-                                value = sliderPos,
-                                onValueChange = { newPos ->
-                                    goToPageText = newPos.roundToInt().toString()
-                                },
-                                valueRange = 1f..successState.pageCount.toFloat(),
-                                colors = androidx.compose.material3.SliderDefaults.colors(
-                                    thumbColor = NexusTheme.colors.primary,
-                                    activeTrackColor = NexusTheme.colors.primary,
-                                    inactiveTrackColor = NexusTheme.colors.surfaceVariant
-                                )
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        NexusButton(
-                            text = "Jump to Page",
-                            onClick = {
-                                val pageNum = goToPageText.toIntOrNull()
-                                if (pageNum != null && pageNum in 1..successState.pageCount) {
-                                    coroutineScope.launch {
-                                        listState.scrollToItem(pageNum - 1)
-                                    }
-                                    showGoToPageDialog = false
-                                    goToPageText = ""
-                                } else {
-                                    android.widget.Toast.makeText(context, "Invalid page number", android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        )
-                    },
-                    dismissButton = {
-                        NexusButton(text = "Cancel", isOutlined = true, onClick = { showGoToPageDialog = false })
                     }
                 )
             }
 
-            if (showInfoDialog && uiState is PdfReaderUiState.Success) {
+            if (uiState is PdfReaderUiState.Success) {
                 val successState = uiState as PdfReaderUiState.Success
-                com.nexus.core.ui.components.NexusFileDetailsSheet(
+                PdfFileInfoBottomSheet(
+                    visible = showInfoDialog,
+                    onDismiss = { showInfoDialog = false },
                     fileName = displayName,
-                    uri = encodedUri,
-                    fileSizeBytes = successState.fileSize,
-                    lastOpenedAt = successState.lastModified,
-                    docType = com.nexus.core.navigation.DocumentType.PDF,
-                    customDetails = listOf(
-                        com.nexus.core.ui.components.FileDetailItem(
-                            iconRes = com.nexus.core.R.drawable.ic_book,
-                            label = "Page count",
-                            value = "${successState.pageCount} pages"
-                        )
-                    ),
-                    onDismissRequest = { showInfoDialog = false }
+                    fileSize = successState.fileSize,
+                    pageCount = successState.pageCount,
+                    lastModified = successState.lastModified,
+                    isDark = isDarkTheme
+                )
+
+                PdfThumbnailsBottomSheet(
+                    visible = showThumbnailsSheet,
+                    onDismiss = { showThumbnailsSheet = false },
+                    pageCount = successState.pageCount,
+                    currentPage = currentPage,
+                    renderedPages = renderedPages,
+                    onRequestPage = { pageIdx ->
+                        coroutineScope.launch {
+                            viewModel.renderPage(pageIdx, 300)
+                        }
+                    },
+                    onSelectPage = { pageIdx ->
+                        coroutineScope.launch {
+                            listState.scrollToItem(pageIdx)
+                        }
+                    },
+                    isDark = isDarkTheme
                 )
             }
-            
+
             if (showOutlineSheet) {
                 androidx.compose.material3.ModalBottomSheet(
                     onDismissRequest = { showOutlineSheet = false },
-                    containerColor = NexusTheme.colors.surface
+                    containerColor = PdfViewerTheme.surfaceSolid(isDarkTheme)
                 ) {
                     if (outline.isEmpty()) {
                         Box(modifier = Modifier.fillMaxWidth().padding(NexusTheme.spacing.xl), contentAlignment = Alignment.Center) {
-                            NexusText("No Outline Available", color = NexusTheme.colors.textSecondary)
+                            NexusText("No Outline Available", color = PdfViewerTheme.mutedColor(isDarkTheme))
                         }
                     } else {
-                        LazyColumn(modifier = Modifier.fillMaxWidth().padding(horizontal = NexusTheme.spacing.md)) {
+                        LazyColumn(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                             items(outline) { item ->
                                 NexusText(
                                     text = item.title,
-                                    modifier = Modifier.fillMaxWidth().springBounceClick {
-                                        showOutlineSheet = false
-                                        coroutineScope.launch { listState.scrollToItem(item.pageIndex.coerceAtLeast(0)) }
-                                    }.padding(vertical = NexusTheme.spacing.sm)
+                                    style = NexusTheme.typography.body.copy(color = PdfViewerTheme.inkColor(isDarkTheme)),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .springBounceClick {
+                                            showOutlineSheet = false
+                                            coroutineScope.launch { listState.scrollToItem(item.pageIndex.coerceAtLeast(0)) }
+                                        }
+                                        .padding(vertical = 12.dp)
                                 )
                             }
                         }
                     }
                 }
             }
-            
-            if (showMenu) {
-                PdfOptionsBottomSheet(
-                    displayName = displayName,
-                    pageCount = (uiState as? PdfReaderUiState.Success)?.pageCount ?: 0,
-                    isStarred = isStarred,
-                    onDismiss = { showMenu = false },
-                    onRename = {
-                        showMenu = false
-                        renameText = displayName
-                        showRenameDialog = true
-                    },
-                    onFavorite = {
-                        showMenu = false
-                        viewModel.toggleFavorite { nowStarred ->
-                            val msg = if (nowStarred) "Added to Favorites" else "Removed from Favorites"
-                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    onPrint = {
-                        showMenu = false
-                        viewModel.printPdf(context, displayName)
-                    },
-                    onShare = {
-                        showMenu = false
-                        viewModel.sharePdf(context, encodedUri)
-                    },
-                    onInfo = {
-                        showMenu = false
-                        showInfoDialog = true
-                    }
-                )
-            }
 
-            if (showViewModal) {
-                ViewSettingsModal(
-                    backgroundMode = backgroundMode,
-                    onBackgroundModeChange = { backgroundMode = it },
-                    isHorizontalLayout = isHorizontalLayout,
-                    onToggleHorizontalLayout = { viewModel.toggleHorizontalLayout() },
-                    onDismiss = { showViewModal = false }
-                )
-            }
+            PdfMoreOptionsBottomSheet(
+                visible = showMenu,
+                onDismiss = { showMenu = false },
+                isStarred = isStarred,
+                onToggleFavorite = {
+                    showMenu = false
+                    viewModel.toggleFavorite { nowStarred ->
+                        val msg = if (nowStarred) "Added to Favorites" else "Removed from Favorites"
+                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onRename = {
+                    showMenu = false
+                    renameText = displayName.removeSuffix(".pdf")
+                    showRenameDialog = true
+                },
+                onFileInfo = {
+                    showMenu = false
+                    showInfoDialog = true
+                },
+                onFitWidth = {
+                    showMenu = false
+                    coroutineScope.launch {
+                        launch { Animatable(scale).animateTo(1f) { scale = value } }
+                        launch { Animatable(offsetX).animateTo(0f) { offsetX = value } }
+                        launch { Animatable(offsetY).animateTo(0f) { offsetY = value } }
+                    }
+                },
+                onFitPage = {
+                    showMenu = false
+                    coroutineScope.launch {
+                        launch { Animatable(scale).animateTo(1f) { scale = value } }
+                        launch { Animatable(offsetX).animateTo(0f) { offsetX = value } }
+                        launch { Animatable(offsetY).animateTo(0f) { offsetY = value } }
+                    }
+                },
+                onRotate90 = {
+                    showMenu = false
+                    pageRotation = (pageRotation + 90) % 360
+                },
+                isNightReading = backgroundMode == PdfBackgroundMode.Inverts,
+                onToggleNightReading = {
+                    backgroundMode = if (backgroundMode == PdfBackgroundMode.Inverts) PdfBackgroundMode.Original else PdfBackgroundMode.Inverts
+                },
+                keepScreenAwake = keepScreenAwake,
+                onToggleKeepAwake = {
+                    viewModel.setKeepScreenAwake(!keepScreenAwake)
+                },
+                onPrint = {
+                    showMenu = false
+                    viewModel.printPdf(context, displayName)
+                },
+                onShare = {
+                    showMenu = false
+                    viewModel.sharePdf(context, encodedUri)
+                },
+                isDark = isDarkTheme
+            )
         }
     }
-
-@Composable
-private fun PdfOptionsBottomSheet(
-    displayName: String,
-    pageCount: Int,
-    isStarred: Boolean,
-    onDismiss: () -> Unit,
-    onRename: () -> Unit,
-    onFavorite: () -> Unit,
-    onPrint: () -> Unit,
-    onShare: () -> Unit,
-    onInfo: () -> Unit
-) {
-    val metaText = if (pageCount > 0) "PDF Document · $pageCount pages" else "PDF Document · PDF"
-
-    val group1 = listOf(
-        com.nexus.core.ui.components.DocumentOptionItem(
-            title = "File info",
-            subtitle = "View document properties",
-            iconRes = com.nexus.core.R.drawable.ic_info,
-            onClick = onInfo
-        ),
-        com.nexus.core.ui.components.DocumentOptionItem(
-            title = "Rename",
-            subtitle = "Rename this file",
-            iconRes = com.nexus.core.R.drawable.ic_rename,
-            onClick = onRename
-        ),
-        com.nexus.core.ui.components.DocumentOptionItem(
-            title = if (isStarred) "Starred" else "Star file",
-            subtitle = "Add or remove bookmark",
-            iconRes = if (isStarred) com.nexus.core.R.drawable.ic_star_filled else com.nexus.core.R.drawable.ic_star,
-            isStarred = isStarred,
-            showChevron = false,
-            onClick = onFavorite
-        )
-    )
-
-    val group2 = listOf(
-        com.nexus.core.ui.components.DocumentOptionItem(
-            title = "Print",
-            subtitle = "Print or save as PDF",
-            iconRes = com.nexus.core.R.drawable.ic_printer,
-            onClick = onPrint
-        ),
-        com.nexus.core.ui.components.DocumentOptionItem(
-            title = "Share",
-            subtitle = "Share this document",
-            iconRes = com.nexus.core.R.drawable.ic_share,
-            onClick = onShare
-        )
-    )
-
-    com.nexus.core.ui.components.DocumentOptionsBottomSheet(
-        sheetTitle = "Document Options",
-        fileName = displayName,
-        fileMeta = metaText,
-        docType = com.nexus.core.navigation.DocumentType.PDF,
-        groups = listOf(group1, group2),
-        onDismiss = onDismiss
-    )
-}
 
 enum class PdfBackgroundMode(val label: String) {
     Original("Original Color"),
     EyeComfort("Eye Comfort (Forest)"),
     Inverts("Inverts")
 }
-
-@Composable
-private fun PdfBottomBarActionItem(
-    label: String,
-    contentDescription: String,
-    tint: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    iconPainter: Painter? = null,
-    iconVector: ImageVector? = null,
-    isActive: Boolean = false,
-    activeBadgeColor: Color = NexusTheme.colors.primary.copy(alpha = 0.14f),
-    enabled: Boolean = true
-) {
-    val haptic = LocalHapticFeedback.current
-    val animatedBadgeColor by animateColorAsState(
-        targetValue = if (isActive) activeBadgeColor else Color.Transparent,
-        animationSpec = tween(200),
-        label = "pdfBadgeColor"
-    )
-    val animatedTint by animateColorAsState(
-        targetValue = if (isActive) tint else if (!enabled) NexusTheme.colors.textSecondary.copy(alpha = 0.35f) else NexusTheme.colors.textPrimary.copy(alpha = 0.85f),
-        animationSpec = tween(200),
-        label = "pdfIconTint"
-    )
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-        modifier = modifier
-            .clip(NexusTheme.shapes.medium)
-            .springBounceClick(enabled = enabled) {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                onClick()
-            }
-            .padding(horizontal = 2.dp, vertical = NexusTheme.spacing.xxs)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(animatedBadgeColor),
-            contentAlignment = Alignment.Center
-        ) {
-            if (iconPainter != null) {
-                Image(
-                    painter = iconPainter,
-                    contentDescription = contentDescription,
-                    colorFilter = ColorFilter.tint(animatedTint),
-                    modifier = Modifier.size(20.dp)
-                )
-            } else if (iconVector != null) {
-                Image(
-                    imageVector = iconVector,
-                    contentDescription = contentDescription,
-                    colorFilter = ColorFilter.tint(animatedTint),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(2.dp))
-        NexusText(
-            text = label,
-            style = NexusTheme.typography.caption.copy(
-                fontSize = 10.5.sp,
-                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Medium,
-                letterSpacing = 0.15.sp
-            ),
-            color = animatedTint,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-fun rememberLayoutDashboardIcon(): ImageVector {
-    return remember {
-        ImageVector.Builder(
-            name = "layout-dashboard",
-            defaultWidth = 24.dp,
-            defaultHeight = 24.dp,
-            viewportWidth = 24f,
-            viewportHeight = 24f
-        ).apply {
-            val strokeColor = SolidColor(Color.Black)
-            addPath(
-                pathData = PathParser().parsePathString("M5 4h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1").toNodes(),
-                stroke = strokeColor,
-                strokeLineWidth = 2f,
-                strokeLineCap = StrokeCap.Round,
-                strokeLineJoin = StrokeJoin.Round
-            )
-            addPath(
-                pathData = PathParser().parsePathString("M5 16h4a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1").toNodes(),
-                stroke = strokeColor,
-                strokeLineWidth = 2f,
-                strokeLineCap = StrokeCap.Round,
-                strokeLineJoin = StrokeJoin.Round
-            )
-            addPath(
-                pathData = PathParser().parsePathString("M15 12h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1").toNodes(),
-                stroke = strokeColor,
-                strokeLineWidth = 2f,
-                strokeLineCap = StrokeCap.Round,
-                strokeLineJoin = StrokeJoin.Round
-            )
-            addPath(
-                pathData = PathParser().parsePathString("M15 4h4a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1").toNodes(),
-                stroke = strokeColor,
-                strokeLineWidth = 2f,
-                strokeLineCap = StrokeCap.Round,
-                strokeLineJoin = StrokeJoin.Round
-            )
-        }.build()
-    }
-}
-
-@Composable
-fun ViewSettingsModal(
-    backgroundMode: PdfBackgroundMode,
-    onBackgroundModeChange: (PdfBackgroundMode) -> Unit,
-    isHorizontalLayout: Boolean,
-    onToggleHorizontalLayout: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable(
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss
-                ),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            com.nexus.core.ui.NexusSurface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(NexusTheme.spacing.md)
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null,
-                        onClick = {} 
-                    ),
-                shape = com.nexus.core.theme.NexusTheme.shapes.large,
-                elevation = 24.dp,
-                color = com.nexus.core.theme.NexusTheme.colors.surface
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(NexusTheme.spacing.md)
-                ) {
-                    NexusText(
-                        text = "Reading Direction",
-                        style = com.nexus.core.theme.NexusTheme.typography.title,
-                        modifier = Modifier.padding(bottom = NexusTheme.spacing.xs)
-                    )
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)) {
-                        com.nexus.core.ui.NexusSurface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(com.nexus.core.theme.NexusTheme.shapes.pill)
-                                .springBounceClick { if (isHorizontalLayout) onToggleHorizontalLayout() },
-                            shape = com.nexus.core.theme.NexusTheme.shapes.pill,
-                            color = if (!isHorizontalLayout) com.nexus.core.theme.NexusTheme.colors.primary else com.nexus.core.theme.NexusTheme.colors.surfaceVariant,
-                            elevation = 0.dp
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.sm),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = rememberArrowsVerticalIcon(),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = if (!isHorizontalLayout) com.nexus.core.theme.NexusTheme.colors.onPrimary else com.nexus.core.theme.NexusTheme.colors.textPrimary
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                NexusText(
-                                    text = "Vertical",
-                                    color = if (!isHorizontalLayout) com.nexus.core.theme.NexusTheme.colors.onPrimary else com.nexus.core.theme.NexusTheme.colors.textPrimary,
-                                    style = com.nexus.core.theme.NexusTheme.typography.label
-                                )
-                            }
-                        }
-                        com.nexus.core.ui.NexusSurface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(com.nexus.core.theme.NexusTheme.shapes.pill)
-                                .springBounceClick { if (!isHorizontalLayout) onToggleHorizontalLayout() },
-                            shape = com.nexus.core.theme.NexusTheme.shapes.pill,
-                            color = if (isHorizontalLayout) com.nexus.core.theme.NexusTheme.colors.primary else com.nexus.core.theme.NexusTheme.colors.surfaceVariant,
-                            elevation = 0.dp
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.sm),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = rememberArrowsHorizontalIcon(),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = if (isHorizontalLayout) com.nexus.core.theme.NexusTheme.colors.onPrimary else com.nexus.core.theme.NexusTheme.colors.textPrimary
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                NexusText(
-                                    text = "Horizontal",
-                                    color = if (isHorizontalLayout) com.nexus.core.theme.NexusTheme.colors.onPrimary else com.nexus.core.theme.NexusTheme.colors.textPrimary,
-                                    style = com.nexus.core.theme.NexusTheme.typography.label
-                                )
-                            }
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(24.dp))
-                    
-                    NexusText(
-                        text = "Background",
-                        style = com.nexus.core.theme.NexusTheme.typography.title,
-                        modifier = Modifier.padding(bottom = NexusTheme.spacing.xs)
-                    )
-                    
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs)
-                    ) {
-                        PdfBackgroundMode.values().forEach { mode ->
-                            com.nexus.core.ui.NexusSurface(
-                                modifier = Modifier
-                                    .clip(com.nexus.core.theme.NexusTheme.shapes.medium)
-                                    .springBounceClick { onBackgroundModeChange(mode) },
-                                shape = com.nexus.core.theme.NexusTheme.shapes.medium,
-                                color = if (backgroundMode == mode) com.nexus.core.theme.NexusTheme.colors.primary.copy(alpha = 0.1f) else com.nexus.core.theme.NexusTheme.colors.surfaceVariant,
-                                elevation = 0.dp
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = NexusTheme.spacing.md, vertical = NexusTheme.spacing.sm),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(16.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                when(mode) {
-                                                    PdfBackgroundMode.Original -> Color.White
-                                                    PdfBackgroundMode.EyeComfort -> com.nexus.core.theme.forestNexusColors.background
-                                                    PdfBackgroundMode.Inverts -> Color.Black
-                                                }
-                                            )
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    NexusText(
-                                        text = mode.label,
-                                        style = com.nexus.core.theme.NexusTheme.typography.body,
-                                        color = if (backgroundMode == mode) com.nexus.core.theme.NexusTheme.colors.primary else com.nexus.core.theme.NexusTheme.colors.textPrimary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun rememberArrowsVerticalIcon(): ImageVector {
-    return remember {
-        ImageVector.Builder(
-            name = "arrows-vertical",
-            defaultWidth = 24.dp, defaultHeight = 24.dp,
-            viewportWidth = 24f, viewportHeight = 24f
-        ).apply {
-            val strokeColor = SolidColor(Color.Black)
-            addPath(
-                pathData = PathParser().parsePathString("M8 7l4 -4l4 4").toNodes(),
-                stroke = strokeColor, strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round
-            )
-            addPath(
-                pathData = PathParser().parsePathString("M8 17l4 4l4 -4").toNodes(),
-                stroke = strokeColor, strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round
-            )
-            addPath(
-                pathData = PathParser().parsePathString("M12 3l0 18").toNodes(),
-                stroke = strokeColor, strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round
-            )
-        }.build()
-    }
-}
-
-@Composable
-fun rememberArrowsHorizontalIcon(): ImageVector {
-    return remember {
-        ImageVector.Builder(
-            name = "arrows-horizontal",
-            defaultWidth = 24.dp, defaultHeight = 24.dp,
-            viewportWidth = 24f, viewportHeight = 24f
-        ).apply {
-            val strokeColor = SolidColor(Color.Black)
-            addPath(
-                pathData = PathParser().parsePathString("M7 8l-4 4l4 4").toNodes(),
-                stroke = strokeColor, strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round
-            )
-            addPath(
-                pathData = PathParser().parsePathString("M17 8l4 4l-4 4").toNodes(),
-                stroke = strokeColor, strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round
-            )
-            addPath(
-                pathData = PathParser().parsePathString("M3 12l18 0").toNodes(),
-                stroke = strokeColor, strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round
-            )
-        }.build()
-    }
-}
-
-@Composable
-fun ConfettiEffect(modifier: Modifier = Modifier) {
-    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition()
-    val progress by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = tween(2000, easing = androidx.compose.animation.core.LinearEasing)
-        )
-    )
-    
-    val particles = remember {
-        List(50) {
-            ConfettiParticle(
-                x = kotlin.random.Random.nextFloat(),
-                y = kotlin.random.Random.nextFloat() * 1.5f - 0.5f,
-                speed = kotlin.random.Random.nextFloat() * 0.5f + 0.5f,
-                color = listOf(Color.Red, Color.Blue, Color.Green, Color.Yellow, Color.Magenta).random(),
-                size = kotlin.random.Random.nextFloat() * 20f + 10f
-            )
-        }
-    }
-    
-    androidx.compose.foundation.Canvas(modifier = modifier) {
-        particles.forEach { p ->
-            val currentY = (p.y + progress * p.speed) % 1.5f
-            if (currentY > -0.2f && currentY < 1.2f) {
-                drawRect(
-                    color = p.color,
-                    topLeft = Offset(p.x * size.width, currentY * size.height),
-                    size = Size(p.size, p.size)
-                )
-            }
-        }
-    }
-}
-
-data class ConfettiParticle(val x: Float, val y: Float, val speed: Float, val color: Color, val size: Float)
