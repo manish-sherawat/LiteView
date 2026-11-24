@@ -710,11 +710,11 @@ fun PdfModernAnnotationBar(
         exit = slideOutVertically(animationSpec = tween(160)) { it } + fadeOut(animationSpec = tween(160)),
         modifier = modifier
     ) {
+        val activeToolBg = if (isDark) Color(0xFFF4F4F6) else Color(0xFF141416)
+        val activeToolInk = if (isDark) Color(0xFF111113) else Color(0xFFFFFFFF)
+
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(bottom = 68.dp)
                 .wrapContentWidth(Alignment.CenterHorizontally)
                 .height(44.dp)
                 .shadow(elevation = 10.dp, shape = CircleShape, ambientColor = Color.Black.copy(alpha = 0.10f), spotColor = Color.Black.copy(alpha = 0.14f))
@@ -734,15 +734,15 @@ fun PdfModernAnnotationBar(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(CircleShape)
-                        .background(if (penActive) PdfViewerTheme.activeSurface(isDark) else Color.Transparent)
+                        .background(if (penActive) activeToolBg else Color.Transparent)
                         .springBounceClick(onClick = onSelectPen),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Edit,
+                        imageVector = rememberPenIcon(isFilled = penActive),
                         contentDescription = "Pen",
                         modifier = Modifier.size(17.dp),
-                        tint = if (penActive) PdfViewerTheme.activeInk(isDark) else ink
+                        tint = if (penActive) activeToolInk else ink
                     )
                 }
 
@@ -751,15 +751,15 @@ fun PdfModernAnnotationBar(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(CircleShape)
-                        .background(if (isHighlighter) PdfViewerTheme.activeSurface(isDark) else Color.Transparent)
+                        .background(if (isHighlighter) activeToolBg else Color.Transparent)
                         .springBounceClick(onClick = onSelectHighlighter),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Highlight,
+                        imageVector = rememberHighlighterIcon(isFilled = isHighlighter),
                         contentDescription = "Highlighter",
                         modifier = Modifier.size(17.dp),
-                        tint = if (isHighlighter) PdfViewerTheme.activeInk(isDark) else ink
+                        tint = if (isHighlighter) activeToolInk else ink
                     )
                 }
 
@@ -1086,7 +1086,7 @@ fun PdfMoreOptionsBottomSheet(
             PdfMenuItemRow(
                 icon = if (isStarred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
                 label = "Favorite",
-                meta = if (isStarred) "Saved" else "Off",
+                meta = if (isStarred) "Saved" else null,
                 ink = ink,
                 muted = muted,
                 onClick = {

@@ -379,7 +379,7 @@ fun PdfReaderScreen(
                                                         val panChange = event.calculatePan()
                                                         
                                                         val newScale = if (isMultiTouch) {
-                                                            (oldScale * zoomChange).coerceIn(1f, maxZoom)
+                                                            (oldScale * zoomChange).coerceIn(0.5f, maxZoom)
                                                         } else {
                                                             oldScale
                                                         }
@@ -441,8 +441,8 @@ fun PdfReaderScreen(
                                     .graphicsLayer {
                                         scaleX = scale
                                         scaleY = scale
-                                        translationX = offsetX
-                                        translationY = offsetY
+                                        translationX = if (scale < 1f) (screenWidthPxInt * (1f - scale)) / 2f else offsetX
+                                        translationY = if (scale < 1f) 0f else offsetY
                                         transformOrigin = TransformOrigin(0f, 0f)
                                     }
                             ) {
@@ -1244,16 +1244,6 @@ fun PdfReaderScreen(
                                      )
                                  }
 
-                                                         // Floating Page Number Indicator Pill
-                            PdfModernPagePill(
-                                visible = !isImmersiveMode && !isAnnotationPillVisible,
-                                currentPage = currentPage,
-                                totalPages = state.pageCount,
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .padding(bottom = bottomInset + 68.dp)
-                            )
-
                             // Floating Modern Annotation Bar (when user toggles annotate)
                             PdfModernAnnotationBar(
                                 visible = isAnnotationPillVisible && !isImmersiveMode,
@@ -1343,10 +1333,10 @@ fun PdfReaderScreen(
                                         }
                                     },
                                     onZoomOut = {
-                                        val newScale = (scale / 1.25f).coerceAtLeast(1f)
+                                        val newScale = (scale / 1.25f).coerceAtLeast(0.5f)
                                         coroutineScope.launch {
                                             Animatable(scale).animateTo(newScale) { scale = value }
-                                            if (newScale == 1f) {
+                                            if (newScale <= 1f) {
                                                 launch { Animatable(offsetX).animateTo(0f) { offsetX = value } }
                                                 launch { Animatable(offsetY).animateTo(0f) { offsetY = value } }
                                             }
@@ -1611,16 +1601,32 @@ fun PdfReaderScreen(
                 },
                 onFitWidth = {
                     showMenu = false
+                    val screenWidthDpVal = configuration.screenWidthDp.toFloat()
+                    val targetScale = (screenWidthDpVal / (screenWidthDpVal - 20f)).coerceIn(1.0f, 1.15f)
                     coroutineScope.launch {
-                        launch { Animatable(scale).animateTo(1f) { scale = value } }
+                        val pageIdx = (currentPage - 1).coerceAtLeast(0)
+                        launch { listState.animateScrollToItem(pageIdx) }
+                        launch { Animatable(scale).animateTo(targetScale) { scale = value } }
                         launch { Animatable(offsetX).animateTo(0f) { offsetX = value } }
                         launch { Animatable(offsetY).animateTo(0f) { offsetY = value } }
                     }
                 },
                 onFitPage = {
                     showMenu = false
+                    val pageIdx = (currentPage - 1).coerceAtLeast(0)
+                    val currentBmp = renderedPages[pageIdx]
+                    val pageRatio = if (currentBmp != null && currentBmp.width > 0) {
+                        currentBmp.height.toFloat() / currentBmp.width.toFloat()
+                    } else {
+                        1.414f
+                    }
+                    val screenWidthDpVal = configuration.screenWidthDp.toFloat()
+                    val pageHeightInViewport = (screenWidthDpVal - 20f) * pageRatio
+                    val availableHeight = configuration.screenHeightDp.toFloat() - 140f
+                    val targetScale = (availableHeight / pageHeightInViewport).coerceIn(0.5f, 0.95f)
                     coroutineScope.launch {
-                        launch { Animatable(scale).animateTo(1f) { scale = value } }
+                        launch { listState.animateScrollToItem(pageIdx) }
+                        launch { Animatable(scale).animateTo(targetScale) { scale = value } }
                         launch { Animatable(offsetX).animateTo(0f) { offsetX = value } }
                         launch { Animatable(offsetY).animateTo(0f) { offsetY = value } }
                     }
