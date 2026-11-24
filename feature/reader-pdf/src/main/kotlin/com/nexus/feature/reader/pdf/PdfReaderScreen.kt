@@ -15,6 +15,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.*
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.lazy.LazyColumn
@@ -303,6 +306,8 @@ fun PdfReaderScreen(
                             val screenWidthDp = configuration.screenWidthDp.dp
                             val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
                             val screenWidthPxInt = screenWidthPx
+                            val availableHeight = (configuration.screenHeightDp.dp - topPadding - bottomPadding - 24.dp).coerceAtLeast(200.dp)
+                            val basePageItemWidth = screenWidthDp - 20.dp
                             
                             // Debounce zoom settling so high-res re-rendering only runs after user finishes pinching/zooming
                             LaunchedEffect(scale) {
@@ -335,7 +340,7 @@ fun PdfReaderScreen(
                                     .pointerInput(Unit) {
                                         detectTapGestures(
                                             onDoubleTap = { tapOffset ->
-                                                val targetScale = if (scale > 1f) 1f else 2.5f
+                                                val targetScale = if (scale > 1.05f) 1f else 2.2f
                                                 snapJob?.cancel()
                                                 snapJob = coroutineScope.launch {
                                                     if (targetScale == 1f) {
@@ -343,21 +348,14 @@ fun PdfReaderScreen(
                                                         launch { Animatable(offsetX).animateTo(0f) { offsetX = value } }
                                                         launch { Animatable(offsetY).animateTo(0f) { offsetY = value } }
                                                     } else {
-                                                        val zoomFactor = targetScale / scale
-                                                        val rawOffsetX = tapOffset.x - (tapOffset.x - offsetX) * zoomFactor
-                                                        val rawOffsetY = tapOffset.y - (tapOffset.y - offsetY) * zoomFactor
-                                                        
-                                                        val maxOffsetX = 0f
-                                                        val minOffsetX = -(screenWidthPxInt.toFloat() * targetScale - screenWidthPxInt.toFloat())
-                                                        val maxOffsetY = 0f
-                                                        val minOffsetY = -(screenHeightPx * targetScale - screenHeightPx)
-                                                        
-                                                        val newOffsetX = rawOffsetX.coerceIn(minOffsetX, maxOffsetX)
-                                                        val newOffsetY = rawOffsetY.coerceIn(minOffsetY, maxOffsetY)
+                                                        val excessWidth = with(density) { (basePageItemWidth * (targetScale - 1f)).toPx() }
+                                                        val maxPanX = (excessWidth / 2f).coerceAtLeast(0f)
+                                                        val screenCenter = screenWidthPx / 2f
+                                                        val panDelta = (screenCenter - tapOffset.x) * (targetScale - 1f)
+                                                        val newOffsetX = panDelta.coerceIn(-maxPanX, maxPanX)
                                                         
                                                         launch { Animatable(scale).animateTo(targetScale) { scale = value } }
                                                         launch { Animatable(offsetX).animateTo(newOffsetX) { offsetX = value } }
-                                                        launch { Animatable(offsetY).animateTo(newOffsetY) { offsetY = value } }
                                                     }
                                                 }
                                             },
@@ -372,81 +370,84 @@ fun PdfReaderScreen(
                                                 val event = awaitPointerEvent()
                                                 val isMultiTouch = event.changes.size > 1
                                                 
-                                                if ((scale > 1f && !isDrawMode) || isMultiTouch) {
-                                                    val centroid = event.calculateCentroid()
-                                                    if (centroid != Offset.Unspecified) {
-                                                        val oldScale = scale
-                                                        val zoomChange = if (isMultiTouch) event.calculateZoom() else 1f
-                                                        val panChange = event.calculatePan()
-                                                        
-                                                        val newScale = if (isMultiTouch) {
-                                                            (oldScale * zoomChange).coerceIn(1f, maxZoom)
-                                                        } else {
-                                                            oldScale
+                                                if (isMultiTouch && !isDrawMode) {
+                                                    val zoomChange = event.calculateZoom()
+                                                    val panChange = event.calculatePan()
+                                                    
+                                                    val newScale = (scale * zoomChange).coerceIn(1f, maxZoom)
+                                                    scale = newScale
+                                                    
+                                                    if (isHorizontalLayout) {
+                                                        val excessHeight = with(density) { (availableHeight * (newScale - 1f)).toPx() }
+                                                        val maxPanY = (excessHeight / 2f).coerceAtLeast(0f)
+                                                        offsetY = (offsetY + panChange.y).coerceIn(-maxPanY, maxPanY)
+                                                        if (kotlin.math.abs(panChange.x) > 0.5f) {
+                                                            coroutineScope.launch { listState.scrollBy(-panChange.x) }
                                                         }
-                                                        val actualZoom = newScale / oldScale
-                                                        scale = newScale
-                                                        
-                                                        val rawOffsetX = centroid.x - (centroid.x - offsetX) * actualZoom + panChange.x
-                                                        val rawOffsetY = centroid.y - (centroid.y - offsetY) * actualZoom + panChange.y
-                                                        
-                                                        val maxOffsetX = 0f
-                                                        val minOffsetX = -(screenWidthPxInt.toFloat() * scale - screenWidthPxInt.toFloat())
-                                                        val maxOffsetY = 0f
-                                                        val minOffsetY = -(screenHeightPx * scale - screenHeightPx)
-                                                        
-                                                        offsetX = if (rawOffsetX > maxOffsetX) {
-                                                            maxOffsetX + (rawOffsetX - maxOffsetX) * 0.25f
-                                                        } else if (rawOffsetX < minOffsetX) {
-                                                            minOffsetX + (rawOffsetX - minOffsetX) * 0.25f
-                                                        } else {
-                                                            rawOffsetX
+                                                    } else {
+                                                        val excessWidth = with(density) { (basePageItemWidth * (newScale - 1f)).toPx() }
+                                                        val maxPanX = (excessWidth / 2f).coerceAtLeast(0f)
+                                                        offsetX = (offsetX + panChange.x).coerceIn(-maxPanX, maxPanX)
+                                                        if (kotlin.math.abs(panChange.y) > 0.5f) {
+                                                            coroutineScope.launch { listState.scrollBy(-panChange.y) }
                                                         }
-                                                        
-                                                        offsetY = if (rawOffsetY > maxOffsetY) {
-                                                            maxOffsetY + (rawOffsetY - maxOffsetY) * 0.25f
-                                                        } else if (rawOffsetY < minOffsetY) {
-                                                            minOffsetY + (rawOffsetY - minOffsetY) * 0.25f
-                                                        } else {
-                                                            rawOffsetY
-                                                        }
-                                                        
-                                                        event.changes.forEach { it.consume() }
                                                     }
+                                                    
+                                                    event.changes.forEach { it.consume() }
                                                 }
                                             } while (event.changes.any { it.pressed })
                                             
-                                            if (scale <= 1.02f) {
+                                            if (scale <= 1.05f) {
                                                 snapJob = coroutineScope.launch {
                                                     launch { Animatable(scale).animateTo(1f) { scale = value } }
                                                     launch { Animatable(offsetX).animateTo(0f) { offsetX = value } }
                                                     launch { Animatable(offsetY).animateTo(0f) { offsetY = value } }
                                                 }
                                             } else {
-                                                val maxOffsetX = 0f
-                                                val minOffsetX = -(screenWidthPxInt * scale - screenWidthPxInt)
-                                                val clampedOffsetX = offsetX.coerceIn(minOffsetX, maxOffsetX)
-                                                
-                                                val maxOffsetY = 0f
-                                                val minOffsetY = -(screenHeightPx * scale - screenHeightPx)
-                                                val clampedOffsetY = offsetY.coerceIn(minOffsetY, maxOffsetY)
-                                                
-                                                if (offsetX != clampedOffsetX || offsetY != clampedOffsetY) {
-                                                    snapJob = coroutineScope.launch {
-                                                        if (offsetX != clampedOffsetX) launch { Animatable(offsetX).animateTo(clampedOffsetX, animationSpec = tween(200)) { offsetX = value } }
-                                                        if (offsetY != clampedOffsetY) launch { Animatable(offsetY).animateTo(clampedOffsetY, animationSpec = tween(200)) { offsetY = value } }
+                                                if (isHorizontalLayout) {
+                                                    val excessHeight = with(density) { (availableHeight * (scale - 1f)).toPx() }
+                                                    val maxPanY = (excessHeight / 2f).coerceAtLeast(0f)
+                                                    val clampedY = offsetY.coerceIn(-maxPanY, maxPanY)
+                                                    if (offsetY != clampedY) {
+                                                        snapJob = coroutineScope.launch {
+                                                            Animatable(offsetY).animateTo(clampedY, animationSpec = tween(180)) { offsetY = value }
+                                                        }
+                                                    }
+                                                } else {
+                                                    val excessWidth = with(density) { (basePageItemWidth * (scale - 1f)).toPx() }
+                                                    val maxPanX = (excessWidth / 2f).coerceAtLeast(0f)
+                                                    val clampedX = offsetX.coerceIn(-maxPanX, maxPanX)
+                                                    if (offsetX != clampedX) {
+                                                        snapJob = coroutineScope.launch {
+                                                            Animatable(offsetX).animateTo(clampedX, animationSpec = tween(180)) { offsetX = value }
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
                                     }
-                                    .graphicsLayer {
-                                        scaleX = scale
-                                        scaleY = scale
-                                        translationX = offsetX
-                                        translationY = offsetY
-                                        transformOrigin = TransformOrigin(0f, 0f)
-                                    }
+                                    .draggable(
+                                        state = rememberDraggableState { delta ->
+                                            if (!isHorizontalLayout && scale > 1.02f) {
+                                                val excessWidth = with(density) { (basePageItemWidth * (scale - 1f)).toPx() }
+                                                val maxPanX = (excessWidth / 2f).coerceAtLeast(0f)
+                                                offsetX = (offsetX + delta).coerceIn(-maxPanX, maxPanX)
+                                            }
+                                        },
+                                        orientation = Orientation.Horizontal,
+                                        enabled = !isHorizontalLayout && scale > 1.02f && !isDrawMode
+                                    )
+                                    .draggable(
+                                        state = rememberDraggableState { delta ->
+                                            if (isHorizontalLayout && scale > 1.02f) {
+                                                val excessHeight = with(density) { (availableHeight * (scale - 1f)).toPx() }
+                                                val maxPanY = (excessHeight / 2f).coerceAtLeast(0f)
+                                                offsetY = (offsetY + delta).coerceIn(-maxPanY, maxPanY)
+                                            }
+                                        },
+                                        orientation = Orientation.Vertical,
+                                        enabled = isHorizontalLayout && scale > 1.02f && !isDrawMode
+                                    )
                             ) {
                                 val colorFilter = remember(backgroundMode) {
                                     when (backgroundMode) {
@@ -506,9 +507,9 @@ fun PdfReaderScreen(
                                         } else {
                                             1.414f
                                         }
-                                        val availableHeight = (configuration.screenHeightDp.dp - topPadding - bottomPadding - 24.dp).coerceAtLeast(200.dp)
                                         val fitPageWidth = (availableHeight / pageRatio).coerceIn(180.dp, screenWidthDp - 20.dp)
-                                        val pageItemWidth = if (isFitPage) fitPageWidth else (screenWidthDp - 20.dp)
+                                        val baseWidth = if (isFitPage) fitPageWidth else (screenWidthDp - 20.dp)
+                                        val pageItemWidth = if (isHorizontalLayout) (availableHeight * scale / pageRatio) else (baseWidth * scale)
 
                                         NexusSurface(
                                             shape = RoundedCornerShape(6.dp),
@@ -562,7 +563,7 @@ fun PdfReaderScreen(
                                                             }
                                                     )
                                                 } else {
-                                                    val placeholderHeight = (screenWidthDp - 32.dp) * 1.414f
+                                                    val placeholderHeight = pageItemWidth * 1.414f
                                                     Box(
                                                         modifier = Modifier
                                                             .fillMaxWidth()
@@ -1072,8 +1073,12 @@ fun PdfReaderScreen(
                                 if (isHorizontalLayout) {
                                     LazyRow(
                                         state = listState,
-                                        modifier = Modifier.fillMaxSize(),
-                                        userScrollEnabled = !isDrawMode && scale <= 1.02f,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .graphicsLayer {
+                                                translationY = offsetY
+                                            },
+                                        userScrollEnabled = !isDrawMode,
                                         contentPadding = PaddingValues(top = topPadding, start = 8.dp, end = 8.dp, bottom = bottomPadding),
                                         horizontalArrangement = Arrangement.spacedBy(NexusTheme.spacing.xs),
                                         verticalAlignment = Alignment.CenterVertically
@@ -1083,8 +1088,12 @@ fun PdfReaderScreen(
                                 } else {
                                     LazyColumn(
                                         state = listState,
-                                        modifier = Modifier.fillMaxSize(),
-                                        userScrollEnabled = !isDrawMode && scale <= 1.02f,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .graphicsLayer {
+                                                translationX = offsetX
+                                            },
+                                        userScrollEnabled = !isDrawMode,
                                         contentPadding = PaddingValues(top = topPadding, start = 8.dp, end = 8.dp, bottom = bottomPadding),
                                         verticalArrangement = Arrangement.spacedBy(10.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally
